@@ -60,7 +60,7 @@ export default {
       const systemInstruction = "Je bent de 'OpenQuatt Huisarts'. Analyseer de log en geef een beknopte diagnose in het Nederlands.";
       const userMessage = `Systeem: ${userProfile.woning_type}, Ketel: ${userProfile.cv_ketel}. Data: ${JSON.stringify(logData)}`;
 
-      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${env.GEMINI_API_KEY}`;
+      const geminiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${env.GEMINI_API_KEY}`;
       
       const geminiResponse = await fetch(geminiUrl, {
         method: "POST",
