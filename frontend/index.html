@@ -13,7 +13,7 @@
         <!-- Header -->
         <header class="border-b border-gray-800 bg-gray-950 p-4 shadow-md">
             <div class="max-w-6xl mx-auto flex justify-between items-center">
-                <h1 class="text-xl font-bold text-orange-500 tracking-wide">OpenHeatPumps <span class="text-xs text-gray-400 font-normal">AI Analytics</span></h1>
+                <h1 class="text-xl font-bold text-orange-500 tracking-wide">OpenHeatPumps <span class="text-xs text-gray-400 font-normal">AI Analytics MVP</span></h1>
                 <span class="bg-orange-950 text-orange-400 border border-orange-800 text-xs px-2 py-1 rounded">OpenQuatt Setup v0.50</span>
             </div>
         </header>
@@ -100,19 +100,18 @@
         <div class="max-w-6xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-4">
             <div>&copy; 2026 OpenHeatPumps. Alle analyses worden lokaal verwerkt.</div>
             <div class="flex flex-wrap justify-center gap-6">
-                <a href="https://github.com/GtHbbrr/openheatpumps-logs-analyzer" target="_blank" class="hover:text-orange-400 transition flex items-center gap-1">
+                <a href="https://github.com" target="_blank" class="hover:text-orange-400 transition flex items-center gap-1">
                     💻 GitHub Repository
                 </a>
-                <a href="https://openquatt.github.io/OpenQuatt/" target="_blank" class="hover:text-orange-400 transition flex items-center gap-1">
+                <a href="https://github.io" target="_blank" class="hover:text-orange-400 transition flex items-center gap-1">
                     📖 OpenQuatt Documentatie
                 </a>
-                <a href="https://gathering.tweakers.net/forum/list_messages/2325776" target="_blank" class="hover:text-orange-400 transition flex items-center gap-1">
+                <a href="https://tweakers.net" target="_blank" class="hover:text-orange-400 transition flex items-center gap-1">
                     💬 Tweakers Topic
                 </a>
             </div>
         </div>
     </footer>
-
     <script>
         const WORKER_URL = "https://openheatpumps-backend.g358xh.workers.dev";
         let activeLogData = null, chatHistory = [];
@@ -133,7 +132,7 @@
         });
 
         el('drop-zone').addEventListener('dragover', e => e.preventDefault());
-        el('drop-zone').addEventListener('drop', e => { e.preventDefault(); if(e.dataTransfer.files.length) laadBestand(e.dataTransfer.files); });
+        el('drop-zone').addEventListener('drop', e => { e.preventDefault(); if(e.dataTransfer.files.length) laadBestand(e.dataTransfer.files[0]); });
 
         async function laadBestand(file) {
             el('file-name').textContent = file.name;
@@ -149,8 +148,50 @@
             el('output-box').textContent = "Systeemanalyse wordt gegenereerd...";
             chatHistory = [];
 
-            const profile = { woning_type: el('woning_type').value, afgiftesysteem: el('afgiftesysteem').value, cv_ketel: el('cv_ketel').value, thermostaat: el('thermostaat').value };
+            const profile = { 
+                woning_type: el('woning_type').value, 
+                afgiftesysteem: el('afgiftesysteem').value, 
+                cv_ketel: el('cv_ketel').value, 
+                thermostaat: el('thermostaat').value 
+            };
 
             try {
-                const r = await fetch(WORKER_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userProfile: profile, logData: activeLogData, messages: null }) });
+                const r = await fetch(WORKER_URL, { 
+                    method: 'POST', 
+                    headers: { 'Content-Type': 'application/json' }, 
+                    body: JSON.stringify({ userProfile: profile, logData: activeLogData, messages: null }) 
+                });
                 const d = await r.json();
+                el('output-box').innerHTML = `<strong>Analyse Resultaat:</strong>\n\n${d.diagnose}`;
+                chatHistory.push({ role: "user", parts: [{ text: "Analyseer dit bestand." }] }, { role: "model", parts: [{ text: d.diagnose }] });
+                el('chat-container').classList.remove('hidden');
+            } catch (err) { el('output-box').textContent = "Fout: " + err.message; }
+            el('loader').classList.add('hidden');
+        });
+
+        async function verstuurVraag() {
+            const v = el('chat-input').value.trim(); if (!v) return;
+            el('chat-input').value = "";
+            el('output-box').innerHTML += `\n\n<span class="text-orange-400"><strong>Jij:</strong> ${v}</span>`;
+            el('loader').classList.remove('hidden');
+            chatHistory.push({ role: "user", parts: [{ text: v }] });
+
+            try {
+                const r = await fetch(WORKER_URL, { 
+                    method: 'POST', 
+                    headers: { 'Content-Type': 'application/json' }, 
+                    body: JSON.stringify({ messages: chatHistory, logData: null, userProfile: {} }) 
+                });
+                const d = await r.json();
+                el('output-box').innerHTML += `\n\n<strong>AI Assistent:</strong>\n${d.diagnose}`;
+                chatHistory.push({ role: "model", parts: [{ text: d.diagnose }] });
+                el('output-box').scrollTop = el('output-box').scrollHeight;
+            } catch (err) { el('output-box').innerHTML += `\n\n<span class="text-red-500"><strong>Fout.</strong></span>`; }
+            el('loader').classList.add('hidden');
+        }
+
+        el('btn-send').addEventListener('click', verstuurVraag);
+        el('chat-input').addEventListener('keypress', e => { if (e.key === 'Enter') verstuurVraag(); });
+    </script>
+</body>
+</html>
