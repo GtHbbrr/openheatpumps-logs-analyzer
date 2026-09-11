@@ -1,7 +1,7 @@
 export default {
   async fetch(request, env) {
     const corsHeaders = {
-      "Access-Control-Allow-Origin": "*", // Pas dit in productie aan naar je eigen domein
+      "Access-Control-Allow-Origin": "*", // Pas dit in productie aan naar je eigen domein OpenHeatpumps.nl
       "Access-Control-Allow-Methods": "POST, OPTIONS",
       "Access-Control-Allow-Headers": "Content-Type",
     };
