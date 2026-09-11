@@ -18,18 +18,17 @@ export default {
       const body = await request.json();
       const { userProfile, logData, saveToDb } = body;
 
-      // Veilige extractie zonder dubbele vraagtekens
       let firmwareVersion = "v0.49.1";
       let hardwareProfile = "Q-edition";
       
-      if (logData && logData.initial) {
-        const fwRow = logData.initial.find(i => i && i[0] === 5);
-        if (fwRow) firmwareVersion = fwRow[1];
-        const hwRow = logData.initial.find(i => i && i[0] === 8);
-        if (hwRow) hardwareProfile = hwRow[1];
+      if (logData && Array.isArray(logData.initial)) {
+        const fwRow = logData.initial.find(i => i && i.name === "projectVersionText");
+        if (fwRow && fwRow.value) firmwareVersion = fwRow.value;
+        
+        const hwRow = logData.initial.find(i => i && i.name === "hardwareProfileText");
+        if (hwRow && hwRow.value) hardwareProfile = hwRow.value;
       }
 
-      // Sla op in D1 als de vink aan staat
       if (saveToDb) {
         const uuid = crypto.randomUUID();
         await env.D1_DB.prepare(`
@@ -47,7 +46,6 @@ export default {
         ).run();
       }
 
-      // De instructie voor Gemini
       const systemInstruction = "Je bent de 'OpenQuatt Huisarts'. Je analyseert een .oqdebug JSON logbestand van een open-source warmtepomp-controller. Kijk specifiek naar 'controlModeLabel' (status), 'requestReason' (foutmeldingen), 'hp1Flow' (waterdoorstroming) en 'boilerActive' (cv-ketel status). Geef een heldere diagnose in begrijpelijk Nederlands. Begin DIRECT met de hoofdconclusie. Geef maximaal 3 concrete actiepunten op basis van de opgegeven hardware.";
 
       const userMessage = `
@@ -61,7 +59,6 @@ export default {
         ${JSON.stringify(logData)}
       `;
 
-      // Aanroep naar Gemini 1.5 Flash via de stabiele endpoint structuur
       const geminiUrl = `https://googleapis.com{env.GEMINI_API_KEY}`;
       
       const geminiResponse = await fetch(geminiUrl, {
@@ -77,14 +74,19 @@ export default {
 
       const geminiJson = await geminiResponse.json();
       
-      // Vang eventuele API-fouten van Google op
       if (geminiJson.error) {
-        return new Response(JSON.stringify({ diagnose: `Google AI Fout: ${geminiJson.error.message}` }), {
+        return new Response(JSON.stringify({ diagnose: `Google AI Studio Fout: ${geminiJson.error.message}` }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
-      const aiText = geminiJson.candidates?.[0]?.content?.parts?.[0]?.text || "Gemini gaf geen resultaat terug. Controleer je API-key.";
+      // Volledig veilige check op de JSON-structuur van Google Gemini zonder dubbele vraagtekens
+      let aiText = "Gemini gaf geen resultaat terug. Controleer of de API-key klopt.";
+      if (geminiJson && geminiJson.candidates && geminiJson.candidates[0] && geminiJson.candidates[0].content && geminiJson.candidates[0].content.parts && geminiJson.candidates[0].content.parts[0]) {
+        aiText = geminiJson.candidates[0].content.parts[0].text;
+      } else {
+        aiText = `Foutieve response-structuur ontvangen. Ruwe data van Google: ${JSON.stringify(geminiJson)}`;
+      }
 
       return new Response(JSON.stringify({ diagnose: aiText }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
