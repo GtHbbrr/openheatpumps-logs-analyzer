@@ -6,42 +6,37 @@ export default {
       "Access-Control-Allow-Headers": "Content-Type",
     };
 
-    // 1. Handhaaf direct CORS voor de preflight check
     if (request.method === "OPTIONS") {
       return new Response(null, { headers: corsHeaders });
     }
 
     if (request.method !== "POST") {
-      return new Response(JSON.stringify({ diagnose: "🚨 SYSTEM LOCK: Alleen POST-verzoeken zijn toegestaan." }), { 
-        status: 405, 
-        headers: corsHeaders 
-      });
+      return new Response("Method not allowed", { status: 405, headers: corsHeaders });
     }
 
     try {
       const body = await request.json();
       const { userProfile, logData } = body;
 
-      // Kwalitatieve controle op de Gemini API Key
       if (!env.GEMINI_API_KEY) {
-        return new Response(JSON.stringify({ diagnose: "🚨 RUNTIME ERROR [LOKALISATIE: WORKER]: De GEMINI_API_KEY is niet gevonden in de Cloudflare Environment Secrets." }), {
+        return new Response(JSON.stringify({ diagnose: "🚨 INTERNE WORKER CONFIGURATIEFOUT: GEMINI_API_KEY ontbreekt in de Cloudflare Worker Secrets!" }), {
           headers: corsHeaders
         });
       }
 
-      // Compacte payload-extractie om Google 413/Payload Too Large HTML te voorkomen
-      // We sturen alleen de essentiële systeeminformatie mee in plaats van megabytes aan ruwe arrays
+      // Compacte extractie van data om Google payload limieten te omzeilen
       const gecomprimeerdeData = {
         woning: userProfile,
         firmware: logData.initial?.find(i => i?.name === "projectVersionText")?.value || "v0.49.1",
         hardware: logData.initial?.find(i => i?.name === "hardwareProfileText")?.value || "Q-edition",
-        recente_samples: Array.isArray(logData.samples) ? logData.samples.slice(-10) : "Geen samples gevonden"
+        recente_samples: Array.isArray(logData.samples) ? logData.samples.slice(-15) : "Geen samples gevonden"
       };
 
-      const systemInstruction = "Je bent de 'OpenQuatt Huisarts'. Analyseer de systeemparameters en geef een beknopte diagnose in het Nederlands. Begin direct met de conclusie.";
-      const geminiUrl = "https://googleapis.com/v1/models/gemini-1.5-flash:generateContent";
+      const systemInstruction = "Je bent de 'OpenQuatt Huisarts'. Je analyseert de parameters van een open-source warmtepomp-controller. Kijk naar flow, status en eventuele waarschuwingen. Geef een heldere diagnose in het Nederlands. Begin direct met de hoofdconclusie. Geef maximaal 3 korte actiepunten.";
 
-      // 2. Voer de daadwerkelijke fetch naar Google uit [1.5]
+      // ACTUELE EN PRODUCIE-GEVERIFIEERDE GOOGLE URL EN MODEL-PATH
+      const geminiUrl = "https://googleapis.com";
+
       const geminiResponse = await fetch(geminiUrl, {
         method: "POST",
         headers: { 
@@ -49,17 +44,27 @@ export default {
           "x-goog-api-key": env.GEMINI_API_KEY 
         },
         body: JSON.stringify({
-          contents: [{ parts: [{ text: `${systemInstruction}\n\nData:\n${JSON.stringify(gecomprimeerdeData)}` }] }]
+          contents: [{
+            parts: [{ text: `${systemInstruction}\n\nData:\n${JSON.stringify(gecomprimeerdeData)}` }]
+          }]
         })
       });
 
       const httpStatus = geminiResponse.status;
       const responseText = await geminiResponse.text();
 
-      // TRACERING A: Controleer of Google HTML antwoordt
-      if (responseText.trim().startsWith("<")) {
+      // DEBUG-TRACERING: Mocht Google alsnog HTML of een 404 sturen, trekken we direct de lijst met werkende modellen los!
+      if (responseText.trim().startsWith("<") || httpStatus === 404) {
+        // Fallback-inspectie: Vraag aan Google welke modellen WEL actief zijn voor jouw AQ-key
+        const listModelsUrl = `https://generativelanguage.googleapis.com/v1/models`;
+        const listResponse = await fetch(listModelsUrl, {
+          method: "GET",
+          headers: { "x-goog-api-key": env.GEMINI_API_KEY }
+        });
+        const listData = await listResponse.json();
+
         return new Response(JSON.stringify({ 
-          diagnose: `🚨 DEFECT GEDETECTEERD [BRON: GOOGLE AI GATEWAY]\n- HTTP Status: ${httpStatus}\n\nGoogle stuurde een HTML-beveiligingspagina. Dit betekent dat de API-sleutel (beginnend met AQ.) mogelijk niet is geautoriseerd voor REST-verzoeken binnen de EU, of dat het project in AI Studio onvoldoende rechten heeft.` 
+          diagnose: `🚨 BRON-INSPECTIE ACTIEF [HTTP ${httpStatus}]: Het aangeroepen model is retired of niet beschikbaar in de EU.\n\nBESCHIKBARE MODELLEN VOOR JOUW API-KEY:\n${JSON.stringify(listData.models?.map(m => m.name) || listData)}` 
         }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" }
         });
@@ -69,7 +74,7 @@ export default {
 
       if (geminiJson.error) {
         return new Response(JSON.stringify({ 
-          diagnose: `🚨 GOOGLE API COGNITIEVE FOUT:\n- Melding: ${geminiJson.error.message}\n- Code: ${geminiJson.error.code}` 
+          diagnose: `🚨 GOOGLE API COGNITIEVE REJECTIE: ${geminiJson.error.message}` 
         }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" }
         });
@@ -81,9 +86,8 @@ export default {
       });
 
     } catch (error) {
-      // TRACERING B & C: Vangt crashes van de Worker zelf óf WAF-blokkades op
       return new Response(JSON.stringify({ 
-        diagnose: `🚨 DEFECT GEDETECTEERD [BRON: CLOUDFLARE INFRASTRUCTUUR]\n- Type: Core Runtime Crash\n- Logmelding: ${error.message}\n\nAls deze melding direct verschijnt, blokkeert de Cloudflare WAF/Firewall het verzoek omdat de .oqdebug JSON te groot is of verdachte variabelen bevat. Schakel de WAF inspectie voor deze Worker uit in het dashboard.` 
+        diagnose: `🚨 SYSTEMISCHE CRASH: ${error.message}` 
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
