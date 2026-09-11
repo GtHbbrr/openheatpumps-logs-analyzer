@@ -18,9 +18,8 @@ export default {
       const body = await request.json();
       const { userProfile, logData, saveToDb } = body;
 
-      // 1. Controleer of de API Key aanwezig is
       if (!env.GEMINI_API_KEY) {
-        return new Response(JSON.stringify({ diagnose: "🚨 CONFIGURATIEFOUT: GEMINI_API_KEY ontbreekt in Worker Secrets!" }), {
+        return new Response(JSON.stringify({ diagnose: "🚨 INTERNE WORKER CONFIGURATIEFOUT: GEMINI_API_KEY is niet gevuld in de Worker Secrets van het Cloudflare Dashboard." }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
@@ -35,7 +34,6 @@ export default {
         if (hwRow && hwRow.value) hardwareProfile = hwRow.value;
       }
 
-      // 2. D1 Database Opslag
       if (saveToDb && env.D1_DB) {
         try {
           const uuid = crypto.randomUUID();
@@ -57,8 +55,7 @@ export default {
         }
       }
 
-      // 3. Systeemprompt en Gebruikersdata samenvoegen
-      const systemInstruction = "Je bent de 'OpenQuatt Huisarts'. Je analyseert een .oqdebug JSON logbestand van een open-source warmtepomp-controller. Kijk specifiek naar 'controlModeLabel' (status), 'requestReason' (foutmeldingen), 'hp1Flow' (waterdoorstroming) en 'boilerActive' (cv-ketel status). Geef een heldere diagnose in begrijpelijk Nederlands. Begin DIRECT met de hoofdconclusie. Geef maximaal 3 concrete actiepunten op basis van de opgegeven hardware.";
+      const systemInstruction = "Je bent de 'OpenQuatt Huisarts'. Je analyseert een .oqdebug JSON logbestand van een open-source warmtepomp-controller. Kijk specifiek naar 'controlModeLabel' (status), 'requestReason' (foutmeldingen), 'hp1Flow' (waterdoorstroming) en 'boilerActive' (cv-ketel status). Geef een heldere diagnose in begrijpelijk Nederlands. Begin DIRECT met de hoofdconclusie. Geef maximaal 3 concrete actiepunten.";
 
       const userMessage = `
         PROFIEL VAN DE GEBRUIKER:
@@ -71,10 +68,9 @@ export default {
         ${JSON.stringify(logData)}
       `;
 
-      // 4. De Officiële Google AI Studio v1 REST-endpoint [1.5]
+      // GEBRUIK HET NIEUWE GEMINI-2.5-FLASH MODEL VOOR REST API'S
       const geminiUrl = `https://googleapis.com{env.GEMINI_API_KEY}`;
       
-      // DE CORRECTE JSON STRUCTUUR CONFORM GOOGLE RELEASES [1.5]
       const payload = {
         contents: [
           {
@@ -91,21 +87,33 @@ export default {
         body: JSON.stringify(payload)
       });
 
+      // DIEPE DEBUGGER: Vang de ruwe HTTP-status direct op
+      const httpStatus = geminiResponse.status;
       const geminiJson = await geminiResponse.json();
       
-      // Vang API-storingen van Google direct op
-      if (geminiJson.error) {
-        return new Response(JSON.stringify({ diagnose: `🚨 GOOGLE AI STUDIO ERROR: ${geminiJson.error.message} (Code: ${geminiJson.error.code})` }), {
+      // Als Google een error-object teruggeeft, dumpen we ALLES live naar de UI
+      if (geminiJson.error || httpStatus !== 200) {
+        const gedetailleerdeFout = `
+          🚨 DIEPE GOOGLE API FOUT DETECTIE:
+          - HTTP Status van Google: ${httpStatus}
+          - Foutmelding: ${geminiJson.error?.message || "Geen specifieke melding"}
+          - Status: ${geminiJson.error?.status || "UNKNOWN"}
+          - Code: ${geminiJson.error?.code || httpStatus}
+          
+          RUWE GOOGLE DEBUGBOX:
+          ${JSON.stringify(geminiJson)}
+        `;
+        return new Response(JSON.stringify({ diagnose: gedetailleerdeFout }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
-      // Veilige extractie van de tekst via de officiële object-tree [1.5]
+      // Veilige extractie van de tekst
       let aiText = "";
       if (geminiJson && geminiJson.candidates && geminiJson.candidates[0] && geminiJson.candidates[0].content && geminiJson.candidates[0].content.parts && geminiJson.candidates[0].content.parts[0]) {
         aiText = geminiJson.candidates[0].content.parts[0].text;
       } else {
-        aiText = `🚨 PARSEFOUT: Onverwachte response-structuur. Ruwe JSON: ${JSON.stringify(geminiJson)}`;
+        aiText = `🚨 PARSEFOUT IN WORKER: Google stuurde een onbekende JSON-boom terug. Ruwe data: ${JSON.stringify(geminiJson)}`;
       }
 
       return new Response(JSON.stringify({ diagnose: aiText }), {
@@ -113,7 +121,7 @@ export default {
       });
 
     } catch (error) {
-      return new Response(JSON.stringify({ diagnose: `🚨 CRITICAL CORE ERROR: ${error.message}` }), {
+      return new Response(JSON.stringify({ diagnose: `🚨 CRITIEKE WORKER KERNFOUT: ${error.message}` }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
