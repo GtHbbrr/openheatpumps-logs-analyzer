@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenHeatPumps Support MVP</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-900 text-gray-100 min-h-screen font-sans">
+
+    <div class="max-w-4xl mx-auto px-4 py-8">
+        <!-- Header -->
+        <header class="mb-8 border-b border-gray-800 pb-4">
+            <h1 class="text-3xl font-bold text-orange-500">🤖 openheatpumps.nl</h1>
+            <p class="text-gray-400 mt-1">De Agile 'Huisarts' voor OpenQuatt debug-logs.</p>
+        </header>
+
+        <!-- Stap 1: Koppel Downloads map -->
+        <div class="bg-gray-800 rounded-xl p-6 mb-6 shadow-lg border border-gray-700">
+            <h2 class="text-xl font-semibold mb-4 text-orange-400">1. Koppel je OpenQuatt downloadmap</h2>
+            <p class="text-sm text-gray-400 mb-4">
+                Klik op de knop hieronder en selecteer je <strong>Downloads</strong>-map. De webapp zoekt volledig lokaal en beveiligd (alleen-lezen) naar je meest recente <code>.oqdebug.json</code> bestand.
+            </p>
+            <div class="flex flex-wrap gap-4 items-center">
+                <button id="btnKoppel" class="bg-orange-600 hover:bg-orange-500 text-white font-bold py-3 px-6 rounded-lg transition">
+                    📂 Koppel Downloads map
+                </button>
+                <div id="dragZone" class="border-2 border-dashed border-gray-600 rounded-lg p-3 text-sm text-gray-400 flex-1 text-center bg-gray-850">
+                    Of sleep je <code>.oqdebug.json</code> hiernaartoe
+                </div>
+            </div>
+            <div id="fileStatus" class="mt-4 text-sm text-gray-300 hidden bg-gray-850 p-3 rounded border border-gray-700"></div>
+        </div>
+
+        <!-- Stap 2: Eenvoudige Knoppen (Verrijken van Profiel) -->
+        <div id="profileZone" class="bg-gray-800 rounded-xl p-6 mb-6 shadow-lg border border-gray-700 hidden">
+            <h2 class="text-xl font-semibold mb-2 text-orange-400">2. Systeem & Woningkenmerken aanvullen</h2>
+            <p class="text-xs text-gray-400 mb-4">Vul je opstelling aan met een paar eenvoudige knoppen om je diagnose te optimaliseren.</p>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-1">Afgiftesysteem</label>
+                    <select id="selectAfgifte" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-white">
+                        <option value="vloerverwarming">Vloerverwarming</option>
+                        <option value="radiatoren">Radiatoren</option>
+                        <option value="fancoils">Fancoils (bijv. Jaga)</option>
+                        <option value="combi">Combinatie / Hybride afgifte</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-1">CV-Ketel Merk</label>
+                    <select id="selectKetel" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-white">
+                        <option value="Intergas">Intergas</option>
+                        <option value="Remeha">Remeha</option>
+                        <option value="Vaillant">Vaillant</option>
+                        <option value="Nefit">Nefit</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-1">Thermostaat</label>
+                    <select id="selectThermostaat" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-white">
+                        <option value="Nest">Google Nest</option>
+                        <option value="Tado">Tado</option>
+                        <option value="Honeywell">Honeywell / Lyric</option>
+                        <option value="Toon">Toon / Overig</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-1">Woningtype</label>
+                    <select id="selectWoning" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-white">
+                        <option value="tussenwoning">Tussenwoning</option>
+                        <option value="hoekwoning">Hoekwoning</option>
+                        <option value="twee-onder-een-kap">2-onder-1-kap</option>
+                        <option value="vrijstaand">Vrijstaande woning</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="mt-4 flex items-center">
+                <input type="checkbox" id="checkSave" class="rounded bg-gray-700 border-gray-600 text-orange-500 focus:ring-orange-500 h-4 w-4" checked>
+                <label for="checkSave" class="ml-2 text-sm text-gray-300">Deel deze metrics anoniem voor de community database-analyses.</label>
+            </div>
+
+            <button id="btnDiagnose" class="mt-6 w-full bg-green-600 hover:bg-green-500 text-white font-bold py-3 px-4 rounded-lg transition shadow-md">
+                🩺 Start Google AI Huisarts Diagnose
+            </button>
+        </div>
+
+        <!-- Stap 3: Het Consult / AI Diagnose Output -->
+        <div id="diagnoseZone" class="bg-gray-800 rounded-xl p-6 shadow-lg border border-gray-700 hidden">
+            <h2 class="text-xl font-semibold mb-4 text-orange-400">3. Het Consult & Behandelplan</h2>
+            <div id="aiOutput" class="prose prose-invert max-w-none text-gray-300 leading-relaxed bg-gray-850 p-4 rounded border border-gray-700 whitespace-pre-line">
+                Analyse wordt uitgevoerd, een moment geduld...
+            </div>
+            <div class="mt-4 pt-4 border-t border-gray-700 text-center text-xs text-gray-500">
+                AI kan fouten maken. Controleer altijd de fysieke Quatt CODEX of raadpleeg het Tweakers forum.
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let geladenLogData = null;
+        const openquattRegex = /^openquatt-debug-recording-\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}-000Z\.oqdebug\.json$/;
+        // Vervang dit met je live Cloudflare Worker URL na deployment!
+        const WORKER_URL = "https://jouw-worker-naam.workers.dev";
+
+        // File System Access API koppeling
+        document.getElementById('btnKoppel').addEventListener('click', async () => {
+            try {
+                const dirHandle = await window.showDirectoryPicker({
+                    id: 'openquatt-downloads',
+                    startIn: 'downloads',
+                    mode: 'read'
+                });
+
+                let oqFiles = [];
+                for await (const entry of dirHandle.values()) {
+                    if (entry.kind === 'file' && openquattRegex.test(entry.name)) {
+                        const file = await entry.getFile();
+                        oqFiles.push({ name: entry.name, fileObject: file });
+                    }
+                }
+
+                if (oqFiles.length > 0) {
+                    oqFiles.sort((a, b) => b.name.localeCompare(a.name));
+                    leesBestandIn(oqFiles[0].fileObject);
+                } else {
+                    alert("Geen geldig OpenQuatt debugbestand gevonden in deze map.");
+                }
+            } catch (err) {
+                console.error("Toegang geweigerd of geannuleerd.", err);
+            }
+        });
+
+        // Drag and drop functionaliteit
+        const dragZone = document.getElementById('dragZone');
+        dragZone.addEventListener('dragover', (e) => e.preventDefault());
+        dragZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            const file = e.dataTransfer.files[0];
+            if (file && openquattRegex.test(file.name)) {
+                leesBestandIn(file);
+            } else {
+                alert("Dit is geen geldig OpenQuatt debugbestand.");
+            }
+        });
+
+        function leesBestandIn(file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    geladenLogData = JSON.parse(e.target.result);
+                    const statusDiv = document.getElementById('fileStatus');
+                    statusDiv.innerHTML = `🟢 <strong>Gevonden log:</strong> ${file.name}<br><span class='text-xs text-gray-400'>Geladen om ${new Date().toLocaleTimeString()}</span>`;
+                    statusDiv.classList.remove('hidden');
+                    document.getElementById('profileZone').classList.remove('hidden');
+                } catch(err) {
+                    alert("Fout bij het parsen van het logbestand.");
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        // Versturen naar Cloudflare Worker + Gemini API
+        document.getElementById('btnDiagnose').addEventListener('click', async () => {
+            if (!geladenLogData) return;
+
+            const diagnoseZone = document.getElementById('diagnoseZone');
+            const aiOutput = document.getElementById('aiOutput');
+            
+            diagnoseZone.classList.remove('hidden');
+            aiOutput.innerHTML = "⏳ De Google AI Huisarts bestudeert je logbestanden en stelt een behandelplan op...";
+
+            const payload = {
+                userProfile: {
+                    woning_type: document.getElementById('selectWoning').value,
+                    afgiftesysteem: document.getElementById('selectAfgifte').value,
+                    cv_ketel: document.getElementById('selectKetel').value,
+                    thermostaat: document.getElementById('selectThermostaat').value
+                },
+                logData: geladenLogData,
+                saveToDb: document.getElementById('checkSave').checked
+            };
+
+            try {
+                const response = await fetch(WORKER_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                const resData = await response.json();
+                aiOutput.innerHTML = resData.diagnose || "Er ging iets mis bij het genereren van het consult.";
+            } catch (err) {
+                aiOutput.innerHTML = "❌ Kon geen verbinding maken met de Cloudflare Worker backend. Controleer of je WORKER_URL juist is ingesteld.";
+                console.error(err);
+            }
+        });
+    </script>
+</body>
+</html>
