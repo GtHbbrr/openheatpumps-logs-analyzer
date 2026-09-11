@@ -19,7 +19,7 @@ export default {
       const { userProfile, logData, saveToDb } = body;
 
       if (!env.GEMINI_API_KEY) {
-        return new Response(JSON.stringify({ diagnose: "🚨 INTERNE WORKER CONFIGURATIEFOUT: GEMINI_API_KEY is niet gevuld in de Worker Secrets van het Cloudflare Dashboard." }), {
+        return new Response(JSON.stringify({ diagnose: "🚨 CONFIGURATIEFOUT: GEMINI_API_KEY ontbreekt in Worker Secrets!" }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
@@ -68,8 +68,8 @@ export default {
         ${JSON.stringify(logData)}
       `;
 
-      // GEBRUIK HET NIEUWE GEMINI-2.5-FLASH MODEL VOOR REST API'S
-      const geminiUrl = `https://googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${env.GEMINI_API_KEY}`;
+      // DE SCHONE GOOGLE URL (ZONDER ?key= ACHTERAAN)
+      const geminiUrl = "https://googleapis.com/v1/models/gemini-1.5-flash:generateContent";
       
       const payload = {
         contents: [
@@ -81,17 +81,19 @@ export default {
         ]
       };
 
+      // FETCH MET DE GEOPTIMALISEERDE 'x-goog-api-key' HEADER VOOR HET NIEUWE AQ AUTHTOKEN FORMAT
       const geminiResponse = await fetch(geminiUrl, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "x-goog-api-key": env.GEMINI_API_KEY  // <--- Hier vangen we je AQ sleutel correct op!
+        },
         body: JSON.stringify(payload)
       });
 
-      // DIEPE DEBUGGER: Vang de ruwe HTTP-status direct op
       const httpStatus = geminiResponse.status;
       const geminiJson = await geminiResponse.json();
       
-      // Als Google een error-object teruggeeft, dumpen we ALLES live naar de UI
       if (geminiJson.error || httpStatus !== 200) {
         const gedetailleerdeFout = `
           🚨 DIEPE GOOGLE API FOUT DETECTIE:
@@ -99,16 +101,12 @@ export default {
           - Foutmelding: ${geminiJson.error?.message || "Geen specifieke melding"}
           - Status: ${geminiJson.error?.status || "UNKNOWN"}
           - Code: ${geminiJson.error?.code || httpStatus}
-          
-          RUWE GOOGLE DEBUGBOX:
-          ${JSON.stringify(geminiJson)}
         `;
         return new Response(JSON.stringify({ diagnose: gedetailleerdeFout }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
-      // Veilige extractie van de tekst
       let aiText = "";
       if (geminiJson && geminiJson.candidates && geminiJson.candidates[0] && geminiJson.candidates[0].content && geminiJson.candidates[0].content.parts && geminiJson.candidates[0].content.parts[0]) {
         aiText = geminiJson.candidates[0].content.parts[0].text;
