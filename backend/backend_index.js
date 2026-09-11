@@ -69,7 +69,7 @@ export default {
       `;
 
       // GEBRUIK HET NIEUWE GEMINI-2.5-FLASH MODEL VOOR REST API'S
-      const geminiUrl = `https://googleapis.com{env.GEMINI_API_KEY}`;
+      const geminiUrl = `https://googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${env.GEMINI_API_KEY}`;
       
       const payload = {
         contents: [
