@@ -34,7 +34,6 @@ export default {
 
       const systemInstruction = "Je bent de 'OpenQuatt Huisarts'. Je analyseert de parameters van een open-source warmtepomp-controller. Kijk naar flow, status en eventuele waarschuwingen. Geef een heldere diagnose in het Nederlands. Begin direct met de hoofdconclusie. Geef maximaal 3 korte actiepunten.";
 
-      // ACTUELE EN PRODUCIE-GEVERIFIEERDE GOOGLE URL EN MODEL-PATH
       const geminiUrl = "https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent";
 
       const geminiResponse = await fetch(geminiUrl, {
@@ -55,9 +54,7 @@ export default {
 
       // DEBUG-TRACERING: Mocht Google alsnog HTML of een 404 sturen, trekken we direct de lijst met werkende modellen los!
       if (responseText.trim().startsWith("<") || httpStatus === 404) {
-        // Fallback-inspectie: Vraag aan Google welke modellen WEL actief zijn voor jouw AQ-key
-        const listModelsUrl = `https://generativelanguage.googleapis.com/v1/models`;
-        const listResponse = await fetch(listModelsUrl, {
+        const listResponse = await fetch("https://generativelanguage.googleapis.com/v1/models", {
           method: "GET",
           headers: { "x-goog-api-key": env.GEMINI_API_KEY }
         });
@@ -74,13 +71,20 @@ export default {
 
       if (geminiJson.error) {
         return new Response(JSON.stringify({ 
-          diagnose: `🚨 GOOGLE API COGNITIEVE REJECTIE: ${geminiJson.error.message}` 
+          diagnose: `🚨 GOOGLE API FOUT: ${geminiJson.error.message}` 
         }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" }
         });
       }
 
-      const aiText = geminiJson.candidates?.[0]?.content?.parts?.[0]?.text || "Geen diagnose gegenereerd.";
+      // VEILIGE TEXT EXTRACTIE ZONDER SYNTAX CRASHES [1.5]
+      let aiText = "";
+      if (geminiJson && geminiJson.candidates && geminiJson.candidates[0] && geminiJson.candidates[0].content && geminiJson.candidates[0].content.parts && geminiJson.candidates[0].content.parts[0]) {
+        aiText = geminiJson.candidates[0].content.parts[0].text;
+      } else {
+        aiText = `🚨 PARSEFOUT IN WORKER: Google stuurde een onbekende JSON-boom terug. Ruwe data: ${responseText}`;
+      }
+
       return new Response(JSON.stringify({ diagnose: aiText }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
