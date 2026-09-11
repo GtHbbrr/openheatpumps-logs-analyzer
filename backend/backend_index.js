@@ -56,7 +56,7 @@ export default {
       // DEBUG-TRACERING: Mocht Google alsnog HTML of een 404 sturen, trekken we direct de lijst met werkende modellen los!
       if (responseText.trim().startsWith("<") || httpStatus === 404) {
         // Fallback-inspectie: Vraag aan Google welke modellen WEL actief zijn voor jouw AQ-key
-        const listModelsUrl = `https://generativelanguage.googleapis.com/v1/models`;
+        const geminiUrl = "https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent";
         const listResponse = await fetch(listModelsUrl, {
           method: "GET",
           headers: { "x-goog-api-key": env.GEMINI_API_KEY }
