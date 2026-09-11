@@ -18,48 +18,49 @@ export default {
       const body = await request.json();
       const { userProfile, logData, saveToDb } = body;
 
-      let firmwareVersion = "v0.49.1";
-      let hardwareProfile = "Q-edition";
-      
-      if (logData && Array.isArray(logData.initial)) {
-        const fwRow = logData.initial.find(i => i && i.name === "projectVersionText");
-        if (fwRow && fwRow.value) firmwareVersion = fwRow.value;
-        
-        const hwRow = logData.initial.find(i => i && i.name === "hardwareProfileText");
-        if (hwRow && hwRow.value) hardwareProfile = hwRow.value;
+      // STAP 1: KRACHTIGE TEST OP GOOGLE API KEY
+      if (!env.GEMINI_API_KEY || env.GEMINI_API_KEY === "") {
+        return new Response(JSON.stringify({ diagnose: "🚨 CONFIGURATIEFOUT: De GEMINI_API_KEY ontbreekt of is niet goed opgeslagen in de Cloudflare Worker Settings Secrets!" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
 
+      // STAP 2: KRACHTIGE TEST OP D1 DATABASE BINDING
+      if (saveToDb && !env.D1_DB) {
+        return new Response(JSON.stringify({ diagnose: "🚨 DATABASEFOUT: De database binding 'D1_DB' ontbreekt in de Cloudflare Worker instellingen, of de tabelnaam matcht niet!" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Sla anoniem op indien aangevinkt
       if (saveToDb) {
-        const uuid = crypto.randomUUID();
-        await env.D1_DB.prepare(`
-          INSERT INTO openquatt_mvp_profiles (id, woning_type, afgiftesysteem, cv_ketel, thermostaat, firmware_version, hardware_profile, raw_log_json)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        `).bind(
-          uuid,
-          userProfile.woning_type || "onbekend",
-          userProfile.afgiftesysteem || "onbekend",
-          userProfile.cv_ketel || "onbekend",
-          userProfile.thermostaat || "onbekend",
-          firmwareVersion,
-          hardwareProfile,
-          JSON.stringify(logData)
-        ).run();
+        try {
+          const uuid = crypto.randomUUID();
+          await env.D1_DB.prepare(`
+            INSERT INTO openquatt_mvp_profiles (id, woning_type, afgiftesysteem, cv_ketel, thermostaat, firmware_version, hardware_profile, raw_log_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          `).bind(
+            uuid,
+            userProfile.woning_type || "onbekend",
+            userProfile.afgiftesysteem || "onbekend",
+            userProfile.cv_ketel || "onbekend",
+            userProfile.thermostaat || "onbekend",
+            "v0.49.1",
+            "Q-edition",
+            JSON.stringify(logData)
+          ).run();
+        } catch (dbErr) {
+          // Als de database faalt, breken we niet af, maar melden we het direct in het AI vlak
+          return new Response(JSON.stringify({ diagnose: `🚨 D1 DATABASE SCHRIJFFOUT: ${dbErr.message}. Controleer of de tabel openquatt_mvp_profiles bestaat.` }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
       }
 
-      const systemInstruction = "Je bent de 'OpenQuatt Huisarts'. Je analyseert een .oqdebug JSON logbestand van een open-source warmtepomp-controller. Kijk specifiek naar 'controlModeLabel' (status), 'requestReason' (foutmeldingen), 'hp1Flow' (waterdoorstroming) en 'boilerActive' (cv-ketel status). Geef een heldere diagnose in begrijpelijk Nederlands. Begin DIRECT met de hoofdconclusie. Geef maximaal 3 concrete actiepunten op basis van de opgegeven hardware.";
+      const systemInstruction = "Je bent de 'OpenQuatt Huisarts'. Analyseer de log en geef een beknopte diagnose in het Nederlands.";
+      const userMessage = `Systeem: ${userProfile.woning_type}, Ketel: ${userProfile.cv_ketel}. Data: ${JSON.stringify(logData)}`;
 
-      const userMessage = `
-        PROFIEL VAN DE GEBRUIKER:
-        - Woningtype: ${userProfile.woning_type}
-        - Afgiftesysteem: ${userProfile.afgiftesysteem}
-        - CV-Ketel: ${userProfile.cv_ketel}
-        - Thermostaat: ${userProfile.thermostaat}
-
-        RUWE LOGDATA:
-        ${JSON.stringify(logData)}
-      `;
-
-      const geminiUrl = `https://googleapis.com{env.GEMINI_API_KEY}`;
+      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${env.GEMINI_API_KEY}`;
       
       const geminiResponse = await fetch(geminiUrl, {
         method: "POST",
@@ -75,17 +76,17 @@ export default {
       const geminiJson = await geminiResponse.json();
       
       if (geminiJson.error) {
-        return new Response(JSON.stringify({ diagnose: `Google AI Studio Fout: ${geminiJson.error.message}` }), {
+        return new Response(JSON.stringify({ diagnose: `🚨 GOOGLE AI STUDIO ERROR: ${geminiJson.error.message} (Code: ${geminiJson.error.code})` }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
-      // Volledig veilige check op de JSON-structuur van Google Gemini zonder dubbele vraagtekens
-      let aiText = "Gemini gaf geen resultaat terug. Controleer of de API-key klopt.";
-      if (geminiJson && geminiJson.candidates && geminiJson.candidates[0] && geminiJson.candidates[0].content && geminiJson.candidates[0].content.parts && geminiJson.candidates[0].content.parts[0]) {
+      // Haal de tekst veilig op uit de Google response structuur
+      let aiText = "";
+      try {
         aiText = geminiJson.candidates[0].content.parts[0].text;
-      } else {
-        aiText = `Foutieve response-structuur ontvangen. Ruwe data van Google: ${JSON.stringify(geminiJson)}`;
+      } catch (e) {
+        aiText = `🚨 PARSEFOUT: Google stuurde een onverwachte structuur terug. Ruwe JSON: ${JSON.stringify(geminiJson)}`;
       }
 
       return new Response(JSON.stringify({ diagnose: aiText }), {
@@ -93,8 +94,8 @@ export default {
       });
 
     } catch (error) {
-      return new Response(JSON.stringify({ error: error.message }), {
-        status: 500,
+      // Dit zorgt ervoor dat ELKE onverwachte crash direct als tekst op je website verschijnt!
+      return new Response(JSON.stringify({ diagnose: `🚨 CRITICAL CORE ERROR: ${error.message}` }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
