@@ -54,7 +54,7 @@ export default {
 
       // DEBUG-TRACERING: Mocht Google alsnog HTML of een 404 sturen, trekken we direct de lijst met werkende modellen los!
       if (responseText.trim().startsWith("<") || httpStatus === 404) {
-        const listResponse = await fetch("https://generativelanguage.googleapis.com/v1beta/models", {
+        const listResponse = await fetch("https://generativelanguage.googleapis.com/v1/models", {
           method: "GET",
           headers: { "x-goog-api-key": env.GEMINI_API_KEY }
         });
