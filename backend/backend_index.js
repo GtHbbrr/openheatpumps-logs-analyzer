@@ -35,7 +35,7 @@ export default {
       const systemInstruction = "Je bent de 'OpenQuatt Huisarts'. Je analyseert de parameters van een open-source warmtepomp-controller. Kijk naar flow, status en eventuele waarschuwingen. Geef een heldere diagnose in het Nederlands. Begin direct met de hoofdconclusie. Geef maximaal 3 korte actiepunten.";
 
       // ACTUELE EN PRODUCIE-GEVERIFIEERDE GOOGLE URL EN MODEL-PATH
-      const geminiUrl = "https://googleapis.com";
+      const geminiUrl = "https://googleapis.com/v1/models/gemini-1.5-flash:generateContent";
 
       const geminiResponse = await fetch(geminiUrl, {
         method: "POST",
