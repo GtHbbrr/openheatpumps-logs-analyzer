@@ -4,7 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>OpenHeatPumps - OpenQuatt AI Diagnose</title>
-    <script src="https://tailwindcss.com"></script>
+    <!-- De herstelde Tailwind CSS-koppeling -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css">
 </head>
 <body class="bg-gray-900 text-white min-h-screen font-sans">
     <header class="border-b border-gray-800 bg-gray-950 p-4 shadow-md">
@@ -79,7 +80,7 @@
         });
 
         el('drop-zone').addEventListener('dragover', e => e.preventDefault());
-        el('drop-zone').addEventListener('drop', e => { e.preventDefault(); if(e.dataTransfer.files.length) laadBestand(e.dataTransfer.files[0]); });
+        el('drop-zone').addEventListener('drop', e => { e.preventDefault(); if(e.dataTransfer.files.length) laadBestand(e.dataTransfer.files); });
 
         async function laadBestand(file) {
             el('file-name').textContent = file.name;
@@ -117,7 +118,7 @@
             try {
                 const r = await fetch(WORKER_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ messages: chatHistory, logData: null, userProfile: {} }) });
                 const d = await r.json();
-                el('output-box').innerHTML += `\n\n<strong>AI Assistent:</strong>\n${d.diagnose}`;
+                el('output-box').innerHTML += `\n\n CarverAI Assistent:</strong>\n${d.diagnose}`;
                 chatHistory.push({ role: "model", parts: [{ text: d.diagnose }] });
                 el('output-box').scrollTop = el('output-box').scrollHeight;
             } catch (err) { el('output-box').innerHTML += `\n\n<span class="text-red-500"><strong>Fout.</strong></span>`; }
