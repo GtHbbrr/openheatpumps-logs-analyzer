@@ -10,3 +10,17 @@ compatibility_date = "2024-03-01"
 binding = "D1_DB"
 database_name = "openquatt-db"
 database_id = "676f322e-af02-4f92-9fcb-7f1949f23281"
+
+[env.preview]
+name = "openheatpumps-backend-preview"
+main = "backend/backend_index.js"
+compatibility_date = "2024-03-01"
+
+# Hier koppelen we een EVENTUELE aparte test-database, 
+# of we hergebruiken tijdelijk de D1_DB binding voor de testfase
+[[env.preview.d1_databases]]
+binding = "D1_DB"
+database_name = "openquatt-db"
+database_id = "676f322e-af02-4f92-9fcb-7f1949f23281"
+
+# Let op: de VECTOR_INDEX voor RAG definiëren we hier straks specifiek voor de preview!
