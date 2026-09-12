@@ -33,30 +33,44 @@ const documentatieBlokken = [
 async function genereerEmbedding(tekst, apiKey) {
   // De schone URL zonder ?key= parameter achteraan [1.5]
   const url = "https://generativelanguage.googleapis.com/v1/models/models/gemini-embedding-2:embedContent";
-  
+
   const response = await fetch(url, {
     method: "POST",
     headers: { 
       "Content-Type": "application/json",
-      "x-goog-api-key": apiKey  // <--- Hier vangen we je AQ sleutel correct op!
+      "x-goog-api-key": apiKey
     },
+    // DE VOLLEDIG GECORRIGEERDE EN VERPLICHTE PAYLOAD-STRUCTUUR VOOR GEMINI-EMBEDDING-2 [1.5]
     body: JSON.stringify({
-      model: "models/models/gemini-embedding-2",
-      content: { parts: [{ text: tekst }] }
+      model: "models/gemini-embedding-2",
+      content: {
+        parts: [
+          { text: tekst }
+        ]
+      }
     })
   });
   
   const responseText = await response.text();
   
-  // Vang eventuele HTML-foutpagina's op voor betere debugging
+  if (!responseText || responseText.trim() === "") {
+    throw new Error("Google stuurde een volledig lege response terug.");
+  }
+  
   if (responseText.trim().startsWith("<")) {
-    throw new Error(`Google weigert de verbinding en stuurde HTML terug. Status: ${response.status}`);
+    throw new Error(`Google stuurde een HTML-beveiligingspagina terug. Status: ${response.status}`);
   }
   
   const data = JSON.parse(responseText);
   if (data.error) throw new Error(data.error.message);
-  return data.embedding.values;
-}
+  
+  // Controleer of de wiskundige waarden aanwezig zijn
+  if (data.embedding && data.embedding.values) {
+    return data.embedding.values;
+  } else {
+    throw new Error(`Onverwachte JSON-structuur ontvangen van Google: ${responseText}`);
+  }
+}  
 
 async function main() {
   // Haal de API-sleutel op uit de wrangler.toml of voer hem hier tijdelijk in
