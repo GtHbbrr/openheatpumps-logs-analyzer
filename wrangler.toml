@@ -24,3 +24,6 @@ database_name = "openquatt-db"
 database_id = "676f322e-af02-4f92-9fcb-7f1949f23281"
 
 # Let op: de VECTOR_INDEX voor RAG definiëren we hier straks specifiek voor de preview!
+[[env.preview.vectorize]]
+binding = "VECTOR_INDEX"
+index_name = "openquatt-docs-preview"
