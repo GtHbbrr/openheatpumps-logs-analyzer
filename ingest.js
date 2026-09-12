@@ -32,7 +32,7 @@ const documentatieBlokken = [
 // FUNCTIE OM DE TEKST OM TE ZETTEN IN EEN WISKUNDIGE VECTOR VIA GOOGLE GEMINI API
 async function genereerEmbedding(tekst, apiKey) {
   // De schone URL zonder ?key= parameter achteraan [1.5]
-  const url = "https://googleapis.com";
+  const url = "https://googleapis.com/v1beta//models/text-embedding-004:embedContent";
   
   const response = await fetch(url, {
     method: "POST",
