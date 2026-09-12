@@ -39,3 +39,31 @@ Volg deze stappen om de MVP lokaal of in je eigen Cloudflare-omgeving te draaien
 2. Stel de **Root Directory** in op `frontend`.
 3. Zorg dat het *Build command* volledig leeg is en de *Build output directory* op `/` staat.
 4. Kopieer de live URL van je Worker en plak deze onderaan in `index.html` bij de variabele `WORKER_URL`. Push de wijziging via GitHub Desktop.
+
+## 🗺️ Community RAG-AI & Historie Roadmap
+
+Om van deze MVP een intelligent community-platform te maken, transformeren we de architectuur naar een geavanceerd Retrieval-Augmented Generation (RAG) systeem dat zowel externe community-kennis als interne historische trends combineert.
+
+### 📍 Fase 1: Slimme Ingestie & Profilering (Huidige Sprint)
+*   **Doel:** Gebruikers koppelen hun lokale log-map. De frontend scant bliksemsnel de map en selecteert via de `lastModified`-tijdstempel automatisch het *meest recente* logbestand voor de directe status-quo diagnose.
+*   **Database:** De gecomprimeerde parameters worden anoniem opgeslagen in Cloudflare D1 om een profielmatrix op te bouwen.
+
+### 📍 Fase 2: Lokale Log-Historie & Trend-Analyse (Jouw Inzicht)
+*   **Doel:** De AI in staat stellen om vragen over gedragsveranderingen door de tijd heen te beantwoorden (*"Waarom pendelt mijn pomp nu meer dan vorige week?"*).
+*   **Uitvoering:** De frontend leest bij het koppelen van de map niet alleen het nieuwste bestand, maar scant ook de *oudere logbestanden* in de map. 
+*   **Techniek:** De frontend extraheert per historisch logbestand een compacte 'vitals-samenvatting' (zoals gemiddelde flow, aantal start/stops per dag, en CV-ketel activiteit). Deze historische tijdlijn wordt als contextuele trenddata meegegeven aan de Gemini-prompt, waardoor de AI diepgaande vergelijkingen kan trekken tussen het verleden en het heden.
+
+### 📍 Fase 3: De Tweakers & Documentatie Vector-Store (RAG Core)
+*   **Doel:** De AI toegang geven tot bestaande community-kennis van experts.
+*   **Uitvoering:** We scrapen het OpenQuatt Tweakers-topic en de open-source documentatie. Deze data zetten we via Cloudflare Vectorize om in numerieke 'embeddings'.
+*   **Werking:** Als je log een afwijking vertoont, zoekt de Worker direct in de vector-database naar matching Tweakers-oplossingen (bijv. het optimaal inregelen van een AVDO-bypass i.c.m. jouw type CV-ketel).
+
+### 📍 Fase 4: Peer-to-Peer Log Vergelijking (De Ultimate Community Matrix)
+*   **Doel:** Logs cross-referencen tussen verschillende installaties.
+*   **Uitvoering:** De AI zoekt in D1 naar 'peers' met exact dezelfde configuratie (bijv. Intergas + Nest + Radiatoren) om te vergelijken: *"Jouw historische flow is stabieler dan die van gebruiker Y, maar je ketel springt 20% vaker bij. Dit komt door instelling Z."*
+
+---
+
+## 💻 Bijdragen & Community
+
+Dit project is 100% open-source en gebouwd voor en door warmtepomp-tweakers. Heb je ideeën over het slimmer parsen van de `.oqdebug.json` arrays of wil je meehelpen aan de Cloudflare Vectorize koppeling? Open een Issue of Pull Request!
