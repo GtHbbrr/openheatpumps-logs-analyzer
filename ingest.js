@@ -29,18 +29,31 @@ const documentatieBlokken = [
   }
 ];
 
-// FUNCTIE OM DE TEKST OM TE ZETTEN IN EEN VISKUNDIGE VECTOR VIA GOOGLE GEMINI API
+// FUNCTIE OM DE TEKST OM TE ZETTEN IN EEN WISKUNDIGE VECTOR VIA GOOGLE GEMINI API
 async function genereerEmbedding(tekst, apiKey) {
-  const url = `https://googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${apiKey}`;
+  // De schone URL zonder ?key= parameter achteraan [1.5]
+  const url = "https://googleapis.com/v1beta/";
+  
   const response = await fetch(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { 
+      "Content-Type": "application/json",
+      "x-goog-api-key": apiKey  // <--- Hier vangen we je AQ sleutel correct op!
+    },
     body: JSON.stringify({
       model: "models/text-embedding-004",
       content: { parts: [{ text: tekst }] }
     })
   });
-  const data = await response.json();
+  
+  const responseText = await response.text();
+  
+  // Vang eventuele HTML-foutpagina's op voor betere debugging
+  if (responseText.trim().startsWith("<")) {
+    throw new Error(`Google weigert de verbinding en stuurde HTML terug. Status: ${response.status}`);
+  }
+  
+  const data = JSON.parse(responseText);
   if (data.error) throw new Error(data.error.message);
   return data.embedding.values;
 }
