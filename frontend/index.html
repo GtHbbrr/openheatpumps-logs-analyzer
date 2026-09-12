@@ -117,18 +117,39 @@
         let activeLogData = null, chatHistory = [];
 
         const el = id => document.getElementById(id);
-        
+
+        // File System Access Map Koppeling - Scant en pakt het allernieuwste logbestand
         el('btn-map').addEventListener('click', async () => {
             try {
                 const dir = await window.showDirectoryPicker();
                 el('map-status').textContent = "Verbonden: " + dir.name;
+                
+                let meestRecenteBestand = null;
+                let hoogsteTijdstempel = 0;
+
+                // Loop door ALLE bestanden in de gekoppelde map heen
                 for await (const entry of dir.values()) {
                     if (entry.kind === 'file' && entry.name.endsWith('.json')) {
-                        laadBestand(await entry.getFile());
-                        return;
+                        const file = await entry.getFile();
+                        
+                        // Vergelijk de wijzigingsdatum van het bestand
+                        if (file.lastModified > hoogsteTijdstempel) {
+                            hoogsteTijdstempel = file.lastModified;
+                            meestRecenteBestand = file;
+                        }
                     }
                 }
-            } catch (err) { alert("Gebruik Drag & Drop."); }
+
+                // Laad pas het bestand in als de hele map is gescand
+                if (meestRecenteBestand) {
+                    laadBestand(meestRecenteBestand);
+                } else {
+                    alert("Geen .json logbestanden gevonden in deze map.");
+                }
+            } catch (err) { 
+                console.error(err);
+                alert("Map-koppeling geweigerd of niet ondersteund. Gebruik Drag & Drop."); 
+            }
         });
 
         el('drop-zone').addEventListener('dragover', e => e.preventDefault());
