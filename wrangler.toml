@@ -27,3 +27,10 @@ database_id = "676f322e-af02-4f92-9fcb-7f1949f23281"
 [[env.preview.vectorize]]
 binding = "VECTOR_INDEX"
 index_name = "openquatt-docs-preview"
+
+# HIER KOPPELEN WE DE CRON TRIGGER TAANK (Elke nacht om 03:00 uur UTC)
+[env.preview.triggers]
+crons = ["0 3 * * *"]
+
+[[env.preview.ai]]
+binding = "AI"
