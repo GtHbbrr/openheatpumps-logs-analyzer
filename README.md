@@ -37,6 +37,17 @@ Om de AI-assistent nog slimmer en betrouwbaarder te maken, breiden we de achterk
 
 ---
 
+## 🔒 Privacy & Veiligheid (Hoe we met je data omgaan)
+
+Bij OpenHeatPumps.nl houden we van transparantie. Dit is hoe we nu met je gegevens omgaan:
+
+*   **Het logbestand gaat naar de AI:** Om een goede en volledige diagnose te kunnen stellen, wordt de inhoud van jouw `.oqdebug.json` bestand op dit moment **integraal (helemaal) meegestuurd** naar de AI-assistent. De AI heeft al deze cijfers en metingen simpelweg nodig om te kunnen ontdekken waarom je warmtepomp vreemd gedrag vertoont.
+*   **Geen accounts of permanente opslag:** We bewaren je bestanden **niet** in een database op internet. Er zijn geen gebruikersaccounts en we bouwen geen stiekem archief op met logs van de community.
+*   **Direct weer weg:** Alles draait in het tijdelijke geheugen van de internetbrowser en de tijdelijke cloud-aanroep. Zodra je het tabblad sluit of de website ververst, zijn alle gegevens direct volledig verdwenen.
+
+---
+
+
 ## 💻 Meehelpen?
 
 Dit project is gemaakt voor en door warmtepomp-bezitters die van duidelijke taal houden. Heb je ideeën om de website nog simpeler te maken of wil je meebouwen aan de cloud-motor? Open dan een Issue of Pull Request op GitHub!
