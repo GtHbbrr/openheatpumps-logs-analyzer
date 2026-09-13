@@ -92,8 +92,21 @@ export default {
         contents[contents.length - 1].parts[0].text = systemInstruction + "\n\n" + pureVraag;
       }
 
-      // UPGRADE: We stappen direct over naar het gloednieuwe gemini-3.7-flash model uit jouw dashboard!
-      let geminiUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.7-flash:generateContent";
+      // 1. DEFINIEER DE 4 BESCHIKBARE MODELLEN VANUIT JE DASHBOARD
+      const beschikbareModellen = [
+        "gemini-3.5-flash",
+        "gemini-3.6-flash",
+        "gemini-3.7-flash",
+        "gemini-3.8-flash"
+      ];
+
+      // 2. KIES WILLEKEURIG EEN MODEL OM DE DRUK PERFECT TE VERDELEN (LOAD BALANCING)
+      let gekozenIndex = Math.floor(Math.random() * beschikbareModellen.length);
+      let primairModel = beschikbareModellen[gekozenIndex];
+      
+      console.log(`🎲 Model-Rotatie activeert: ${primairModel} voor deze scan.`);
+
+      let geminiUrl = `https://googleapis.com{primairModel}:generateContent`;
       let geminiResponse = await fetch(geminiUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
@@ -103,10 +116,16 @@ export default {
       let responseText = await geminiResponse.text();
       let geminiJson = JSON.parse(responseText);
 
-      // AUTOMATISCHE FAILOVER: Als 3.7-flash vol zit of de quota is bereikt, schakelen we direct door naar 3.6-flash
+      // 3. SLIMME AUTOMATISCHE RETRY: Mocht het gekozen model een quota- of druktefout geven?
       if (geminiJson && (geminiJson.error?.code === 503 || geminiJson.error?.code === 429 || geminiJson.error?.message?.includes("quota") || geminiJson.error?.message?.includes("high demand"))) {
-        console.warn("⚠️ Quota of drukte bereikt op Gemini 3.5. Schakelt nu direct over naar Gemini 3.6-flash...");      
-        geminiUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent";
+        
+        // Filter het gecrashte model eruit en kies direct een van de andere 3 overgebleven modellen!
+        const reserveModellen = beschikbareModellen.filter(m => m !== primairModel);
+        let reserveModel = reserveModellen[Math.floor(Math.random() * reserveModellen.length)];
+        
+        console.warn(`⚠️ ${primairModel} raakte een limiet. Schakelt direct over naar reserve-model: ${reserveModel}`);
+        
+        geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/{reserveModel}:generateContent`;
         geminiResponse = await fetch(geminiUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
@@ -116,9 +135,9 @@ export default {
         geminiJson = JSON.parse(responseText);
       }
 
-      // GECORRIGEERD: Veilige JSON-uitlezing van de AI-tekst zonder syntax-fouten
+      // 4. VERWERK HET ANTWOORD OP DE VEILIGE MANIER
       let aiText = "Geen resultaat gegenereerd.";
-      if (geminiJson && geminiJson.candidates && geminiJson.candidates[0] && geminiJson.candidates[0].content && geminiJson.candidates[0].content.parts && geminiJson.candidates[0].content.parts[0]) {
+      if (geminiJson && geminiJson.candidates && geminiJson.candidates[0]?.content?.parts && geminiJson.candidates[0].content.parts[0]?.text) {
         aiText = geminiJson.candidates[0].content.parts[0].text;
       } else if (geminiJson && geminiJson.error) {
         aiText = `🚨 GOOGLE API FOUT: ${geminiJson.error.message}`;
