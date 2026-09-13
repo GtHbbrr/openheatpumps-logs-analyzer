@@ -1,8 +1,14 @@
 export default {
+  // 1. HANDEL AUTOMATISCHE CRON-TRIGGERS AF (Elke nacht om 03:00 uur)
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(this.voerIngestieUit(env));
+  },
+
+  // 2. HANDEL HTTP-VERKEER AF
   async fetch(request, env) {
     const corsHeaders = {
       "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "POST, OPTIONS",
+      "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
       "Access-Control-Allow-Headers": "Content-Type",
     };
 
@@ -10,81 +16,166 @@ export default {
       return new Response(null, { headers: corsHeaders });
     }
 
+    // CHECK OF HET EEN "GET" VERZOEK IS (VOORKOM JSON PARSE CRASHES BIJ CURL)
+    if (request.method === "GET") {
+      try {
+        const resultaatTxt = await this.voerIngestieUit(env);
+        return new Response(JSON.stringify({ status: "success", melding: resultaatTxt }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
+      } catch (err) {
+        return new Response(JSON.stringify({ status: "error", fout: err.message }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
+      }
+    }
+
+    // HANDEL "POST" VERZOEKEN AF VOOR DE DIAGNOSE EN CHAT
     try {
       const body = await request.json();
-      // We accepteren nu 'messages' voor de doorlopende chat-historie
       const { userProfile, logData, messages } = body;
 
       if (!env.GEMINI_API_KEY) {
-        return new Response(JSON.stringify({ diagnose: "🚨 CONFIGURATIEFOUT: GEMINI_API_KEY ontbreekt." }), {
-          headers: corsHeaders
-        });
+        return new Response(JSON.stringify({ diagnose: "🚨 CONFIGURATIEFOUT: GEMINI_API_KEY ontbreekt." }), { headers: corsHeaders });
+      }
+
+      let dynamischeKennisContext = "";
+
+      // GECORRIGEERD: Veilige array-uitlezing voor de gebruikersvraag om de text-crash te voorkomen
+      if (messages && messages.length > 0 && env.VECTOR_INDEX && env.AI) {
+        const laatsteBericht = messages[messages.length - 1];
+        if (laatsteBericht && laatsteBericht.parts && laatsteBericht.parts.length > 0) {
+          const gebruikersVraag = laatsteBericht.parts[0].text;
+
+          try {
+            // Bereken de vector lokaal binnen Cloudflare AI (768 dimensies)
+            const embeddingResponse = await env.AI.run("@cf/baai/bge-base-en-v1.5", {
+              text: [gebruikersVraag]
+            });
+            const queryVector = embeddingResponse.data;
+
+            // Doorzoek de Cloudflare Vectorize-index
+            const vectorMatches = await env.VECTOR_INDEX.query(queryVector, { topK: 2, returnMetadata: true });
+            
+            dynamischeKennisContext = vectorMatches.matches
+              .map(match => `[Bron: OpenQuatt Richtlijn]: ${match.metadata.text}`)
+              .join("\n");
+          } catch (ragErr) {
+            console.error("Vectorize Query Error:", ragErr.message);
+          }
+        }
       }
 
       const systemInstruction = `
-        Je bent de 'OpenHeatPumps AI Assistent'. Je analyseert een volledig .oqdebug JSON logbestand van een warmtepomp-controller en beantwoordt vragen van de gebruiker hierover.
+        Je bent de 'OpenHeatPumps AI Assistent'. Je analyseert een volledig .oqdebug JSON logbestand van een warmtepomp-controller en beantwoordt vragen.
         
+        STRIKTE RAG INSTRUCTIE:
+        Hieronder wordt dynamisch opgehaalde kennis uit de handleidingen meegegeven. Je MOET dit als absolute waarheid beschouwen.
+        Als de bron stelt dat iets NIET kan (zoals handmatige pompregeling), blijf dan strikt feitelijk en verzin geen Home Assistant knoppen.
+
+        DYNAMISCH OPGEHAALDE OPENQUATT KENNIS (RAG):
+        ${dynamischeKennisContext || "Geen specifieke documentatie-matches gevonden voor deze vraag."}
+
         ANALYSEVOLGORDE:
-        1. WARMTEVRAAG CONTROLEREN: Kijk naar 'roomTemperature' (binnentemperatuur) en 'roomTemperatureSetpoint' (gevraagde temperatuur). Is het setpoint LAGER dan of gelijk aan de kamertemperatuur? Dan is er GEEN warmtevraag.
-        2. STATUS CONTROLEREN: Kijk naar 'controlModeLabel' of 'strategyActiveCode'. Als het systeem in 'Standby' of 'Idle' staat omdat er geen warmtevraag is, dan is een lage of nul-waterdoorstroming (hp1Flow) VOLKOMEN NORMAAL. Concludeer dat het systeem naar behoren stand-by staat.
-        3. PAS BIJ ACTIEF BEDRIJF analyseer je de 'hp1Flow', 'boilerActive' (cv-ketel interactie) en 'requestReason'.
-        
-        Geef beknopte, technisch accurate antwoorden in het Nederlands. Begin de allereerste reactie DIRECT met de hoofdconclusie en maximaal 3 korte actiepunten. Blijf in de vervolggesprekken behulpzaam en reageer specifiek op de vragen van de gebruiker.
+        1. WARMTEVRAAG CONTROLEREN: Binnentemperatuur vs setpoint.
+        2. STATUS CONTROLEREN: In 'Standby' is een nul-flow normaal.
       `;
 
-      // Bouw de contents-array op voor het Gemini chat-format [1.5]
       let contents = [];
-      
-      // Voeg de initiële log-context en de eerste prompt toe als het gesprek net start
       if (!messages || messages.length === 0) {
-        const initieelBericht = `
-          PROFIEL:
-          - Woningtype: ${userProfile.woning_type || "onbekend"}
-          - Afgiftesysteem: ${userProfile.afgiftesysteem || "onbekend"}
-          - CV-Ketel: ${userProfile.cv_ketel || "onbekend"}
-          - Thermostaat: ${userProfile.thermostaat || "onbekend"}
-
-          VOLLEDIGE LOGDATA:
-          ${JSON.stringify(logData)}
-        `;
-        contents.push({
-          role: "user",
-          parts: [{ text: systemInstruction + "\n\n" + initieelBericht }]
-        });
+        const initieelBericht = `PROFIEL: ${JSON.stringify(userProfile)}\n\nLOGDATA:\n${JSON.stringify(logData)}`;
+        contents.push({ role: "user", parts: [{ text: systemInstruction + "\n\n" + initieelBericht }] });
       } else {
-        // Als er al een chat-historie is, sturen we de eerdere berichten netjes mee [1.5]
         contents = messages;
+        const pureVraag = contents[contents.length - 1].parts[0].text;
+        contents[contents.length - 1].parts[0].text = systemInstruction + "\n\n" + pureVraag;
       }
 
-      const geminiUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent";
-
-      const geminiResponse = await fetch(geminiUrl, {
+      // UPGRADE: We stappen direct over naar het gloednieuwe gemini-3.5-flash model uit jouw dashboard!
+      let geminiUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent";
+      let geminiResponse = await fetch(geminiUrl, {
         method: "POST",
-        headers: { 
-          "Content-Type": "application/json",
-          "x-goog-api-key": env.GEMINI_API_KEY 
-        },
+        headers: { "Content-Type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
         body: JSON.stringify({ contents: contents })
       });
 
-      const responseText = await geminiResponse.text();
-      const geminiJson = JSON.parse(responseText);
+      let responseText = await geminiResponse.text();
+      let geminiJson = JSON.parse(responseText);
 
-      let aiText = "";
-      if (geminiJson && geminiJson.candidates && geminiJson.candidates[0].content && geminiJson.candidates[0].content.parts) {
-        aiText = geminiJson.candidates[0].content.parts[0].text;
-      } else {
-        aiText = `🚨 FOUTMELDING: ${JSON.stringify(geminiJson)}`;
+      // AUTOMATISCHE FAILOVER: Als 3.5-flash alsnog een drukte-piek raakt, schakelen we direct door naar 3.8-flash
+      if (geminiJson && (geminiJson.error?.code === 503 || geminiJson.error?.message?.includes("high demand"))) {
+        geminiUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent";
+        geminiResponse = await fetch(geminiUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
+          body: JSON.stringify({ contents: contents })
+        });
+        responseText = await geminiResponse.text();
+        geminiJson = JSON.parse(responseText);
       }
 
-      return new Response(JSON.stringify({ diagnose: aiText }), {
-        headers: corsHeaders
-      });
+      // GECORRIGEERD: Veilige JSON-uitlezing van de AI-tekst zonder syntax-fouten
+      let aiText = "Geen resultaat gegenereerd.";
+      if (geminiJson && geminiJson.candidates && geminiJson.candidates[0] && geminiJson.candidates[0].content && geminiJson.candidates[0].content.parts && geminiJson.candidates[0].content.parts[0]) {
+        aiText = geminiJson.candidates[0].content.parts[0].text;
+      } else if (geminiJson && geminiJson.error) {
+        aiText = `🚨 GOOGLE API FOUT: ${geminiJson.error.message}`;
+      }
+
+      return new Response(JSON.stringify({ diagnose: aiText }), { headers: corsHeaders });
 
     } catch (error) {
-      return new Response(JSON.stringify({ diagnose: `🚨 SYSTEMISCHE CRASH: ${error.message}` }), {
-        headers: corsHeaders
-      });
+      return new Response(JSON.stringify({ diagnose: `🚨 SYSTEMISCHE CRASH: ${error.message}` }), { headers: corsHeaders });
     }
+  },
+
+  // 3. DE GEAUTOMATISEERDE RECHTTREEKSE INGESTIE-MOTOR (GEERD OP LOKALE EMBEDDINGS)
+  async voerIngestieUit(env) {
+    if (!env.VECTOR_INDEX || !env.AI) {
+      throw new Error("Cloudflare AI of Vectorize binding ontbreekt in deze omgeving.");
+    }
+
+    const url = "https://openquatt.github.io/OpenQuatt/problemen-oplossen.html";
+    const response = await fetch(url);
+    const html = await response.text();
+
+    const alineas = html
+      .split("<p>")
+      .map(p => p.split("</p>")[0].replace(/<[^>]*>/g, '').trim())
+      .filter(text => text.length > 50 && !text.includes("javascript") && !text.includes("css"));
+
+    const cloudflarePayload = [];
+
+    for (let i = 0; i < alineas.length; i++) {
+      const tekstSectie = alineas[i];
+
+      try {
+        const embeddingResponse = await env.AI.run("@cf/baai/bge-base-en-v1.5", {
+          text: [tekstSectie]
+        });
+        const vectorValues = embeddingResponse.data;
+
+        if (vectorValues && vectorValues.length === 768) {
+          cloudflarePayload.push({
+            id: `live_doc_${i}`,
+            values: vectorValues,
+            metadata: {
+              source: "OpenQuatt Live Documentatie",
+              text: tekstSectie
+            }
+          });
+        }
+      } catch (e) {
+        console.error(`Sectie ${i} kon niet worden omgezet: ${e.message}`);
+      }
+    }
+
+    if (cloudflarePayload.length > 0) {
+      await env.VECTOR_INDEX.insert(cloudflarePayload);
+      return `Succesvol ${cloudflarePayload.length} documentatie-secties gevectoriseerd en opgeslagen!`;
+    }
+
+    return "Geen geschikte alineas gevonden om te importeren.";
   }
 };
