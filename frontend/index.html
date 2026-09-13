@@ -44,11 +44,15 @@
                             </select>
                         </div>
                         <div>
-                            <label class="block text-xs text-gray-400 font-medium mb-1">CV-Ketel Merk</label>
+                            <label class="block text-xs text-gray-400 font-medium mb-1">CV-Ketel</label>
                             <select id="cv_ketel" class="w-full bg-gray-900 border border-gray-700 rounded p-2 text-sm text-gray-300 focus:outline-none focus:border-orange-500">
                                 <option value="Intergas">Intergas</option>
                                 <option value="Remeha">Remeha</option>
                                 <option value="Vaillant">Vaillant</option>
+                                <option value="Vaillant">Andere gas-ketel</option>
+                                <option value="Vaillant">E-ketel</option>
+                                <option value="Vaillant">Doorstroomverwarmer</option>
+                                <option value="Vaillant">Geen</option>
                             </select>
                         </div>
                         <div>
@@ -57,6 +61,7 @@
                                 <option value="Tado">Tado</option>
                                 <option value="Honeywell">Honeywell</option>
                                 <option value="Nest">Google Nest</option>
+                                <option value="Nest">Anders</option>
                             </select>
                         </div>
                     </div>
@@ -64,12 +69,25 @@
 
                 <div class="border-t border-gray-800 pt-6">
                     <h2 class="text-lg font-semibold mb-3 text-gray-200">2. Logboek Koppelen</h2>
-                    <button id="btn-map" class="w-full bg-orange-600 hover:bg-orange-700 text-white font-medium p-3 rounded transition shadow-lg text-sm">📂 Koppel Log-map</button>
-                    <input type="file" id="mobile-file-input" accept=".json" class="hidden">
-                    <p id="map-status" class="text-xs text-gray-500 mt-2 text-center">Nog geen map gekoppeld</p>
+                    
+                    <!-- GECORRIGEERD: Knoppen staan nu op desktop netjes naast elkaar via grid -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <!-- Knop 1: Voor de hele map (Alleen zichtbaar op PC/Mac) -->
+                        <button id="btn-map" class="w-full bg-orange-600 hover:bg-orange-700 text-white font-medium p-3 rounded transition shadow-lg text-sm hidden md:block">
+                            📂 Koppel hele Log-map
+                        </button>
+                        
+                        <!-- Knop 2: De losse bestandskiezer (Altijd zichtbaar, overal bruikbaar) -->
+                        <label for="mobile-file-input" class="w-full bg-gray-800 hover:bg-gray-700 text-gray-200 font-medium p-3 rounded transition shadow-lg text-sm text-center cursor-pointer border border-gray-700 block">
+                            📄 Kies los .json bestand
+                        </label>
+                        <input type="file" id="mobile-file-input" accept=".json" class="hidden">
+                    </div>
+                    
+                    <p id="map-status" class="text-xs text-gray-500 mt-2 text-center">Nog geen map of bestand gekoppeld</p>
                 </div>
             </div>
-
+            
             <!-- Right: AI Console & Chat -->
             <div class="md:col-span-2 flex flex-col space-y-6">
                 
@@ -146,43 +164,50 @@
 
         const el = id => document.getElementById(id);
 
-        // File System Access Map Koppeling - Scant en pakt het allernieuwste logbestand
+        // Universele Bestands- en Mapkoppeling
         el('btn-map').addEventListener('click', async () => {
-            // MOBIELE SCHAKELAAR: Als de telefoon geen map-scanning ondersteunt, open direct de mobiele kiezer!
+        // DESKTOP & MOBIEL CHECK: Als de browser showDirectoryPicker NIET ondersteunt (zoals op mobiel of oudere browsers)
             if (!window.showDirectoryPicker) {
                 el('mobile-file-input').click();
                 return;
             }
 
-            try {
-                const dir = await window.showDirectoryPicker();
-                el('map-status').textContent = "Verbonden: " + dir.name;
-                
-                let meestRecenteBestand = null;
-                let hoogsteTijdstempel = 0;
+            // DESKTOP MET CHOICE: Als de browser het wél ondersteunt, geven we de desktop-gebruiker de keuze!
+            if (confirm("Wil je een héle map koppelen zodat we automatisch het nieuwste logboek zoeken?\n\n(Klik op 'Annuleren' om handmatig één specifiek los .json bestand te kiezen)")) {
+                try {
+                    const dir = await window.showDirectoryPicker();
+                    el('map-status').textContent = "Verbonden map: " + dir.name;
+                    
+                    let meestRecenteBestand = null;
+                    let hoogsteTijdstempel = 0;
 
-                // Loop door ALLE bestanden in de gekoppelde map heen
-                for await (const entry of dir.values()) {
-                    if (entry.kind === 'file' && entry.name.endsWith('.json')) {
-                        const file = await entry.getFile();
-                        
-                        // Vergelijk de wijzigingsdatum van het bestand
-                        if (file.lastModified > hoogsteTijdstempel) {
-                            hoogsteTijdstempel = file.lastModified;
-                            meestRecenteBestand = file;
+                    // Loop door ALLE bestanden in de gekoppelde map heen
+                    for await (const entry of dir.values()) {
+                        if (entry.kind === 'file' && entry.name.endsWith('.json')) {
+                            const file = await entry.getFile();
+                            
+                            // Vergelijk de wijzigingsdatum van het bestand
+                            if (file.lastModified > hoogsteTijdstempel) {
+                                hoogsteTijdstempel = file.lastModified;
+                                meestRecenteBestand = file;
+                            }
                         }
                     }
-                }
 
-                // Laad pas het bestand in als de hele map is gescand
-                if (meestRecenteBestand) {
-                    laadBestand(meestRecenteBestand);
-                } else {
-                    alert("Geen .json logbestanden gevonden in deze map.");
+                    // Laad pas het bestand in als de hele map is gescand
+                    if (meestRecenteBestand) {
+                        laadBestand(meestRecenteBestand);
+                    } else {
+                        alert("Geen .json logbestanden gevonden in deze map.");
+                    }
+                } catch (err) { 
+                    console.error(err);
+                    // Als de gebruiker de mappen-toegang halverwege weigert, crasht de boel niet maar openen we de bestandskiezer
+                    el('mobile-file-input').click();
                 }
-            } catch (err) { 
-                console.error(err);
-                alert("Map-koppeling geweigerd of afgebroken."); 
+            } else {
+                // Als de desktop-gebruiker op 'Annuleren' klikt, openen we direct de Finder/Verkenner voor één los bestand!
+                el('mobile-file-input').click();
             }
         });
 
