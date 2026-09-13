@@ -1,5 +1,5 @@
 export default {
-  // Dit blok wordt automatisch getriggerd door de Cloudflare Cron (of via een test-URL)
+  // Dit blok wordt automatisch getriggerd door de Cloudflare Cron (of via een test-URL )
   async scheduled(event, env, ctx) {
     ctx.waitUntil(this.ingestOpenQuattDocs(env));
   },
