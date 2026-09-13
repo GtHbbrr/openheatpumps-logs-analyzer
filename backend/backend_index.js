@@ -42,26 +42,28 @@ export default {
 
       let dynamischeKennisContext = "";
 
+      // GECORRIGEERD: Veilige array-uitlezing voor de gebruikersvraag om de text-crash te voorkomen
       if (messages && messages.length > 0 && env.VECTOR_INDEX && env.AI) {
-        const gebruikersVraag = messages[messages.length - 1].parts[0].text;
+        const laatsteBericht = messages[messages.length - 1];
+        if (laatsteBericht && laatsteBericht.parts && laatsteBericht.parts.length > 0) {
+          const gebruikersVraag = laatsteBericht.parts[0].text;
 
-        try {
-          // Bereken de vector lokaal binnen Cloudflare AI (768 dimensies)
-          const embeddingResponse = await env.AI.run("@cf/baai/bge-base-en-v1.5", {
-            text: [gebruikersVraag]
-          });
-          
-          // GECORRIGEERD: Cloudflare AI geeft de resultaten terug in data[0]
-          const queryVector = embeddingResponse.data[0];
+          try {
+            // Bereken de vector lokaal binnen Cloudflare AI (768 dimensies)
+            const embeddingResponse = await env.AI.run("@cf/baai/bge-base-en-v1.5", {
+              text: [gebruikersVraag]
+            });
+            const queryVector = embeddingResponse.data;
 
-          // Doorzoek de Cloudflare Vectorize-index
-          const vectorMatches = await env.VECTOR_INDEX.query(queryVector, { topK: 2, returnMetadata: true });
-          
-          dynamischeKennisContext = vectorMatches.matches
-            .map(match => `[Bron: OpenQuatt Richtlijn]: ${match.metadata.text}`)
-            .join("\n");
-        } catch (ragErr) {
-          console.error("Vectorize Query Error:", ragErr.message);
+            // Doorzoek de Cloudflare Vectorize-index
+            const vectorMatches = await env.VECTOR_INDEX.query(queryVector, { topK: 2, returnMetadata: true });
+            
+            dynamischeKennisContext = vectorMatches.matches
+              .map(match => `[Bron: OpenQuatt Richtlijn]: ${match.metadata.text}`)
+              .join("\n");
+          } catch (ragErr) {
+            console.error("Vectorize Query Error:", ragErr.message);
+          }
         }
       }
 
@@ -69,15 +71,15 @@ export default {
         Je bent de 'OpenHeatPumps AI Assistent'. Je analyseert een volledig .oqdebug JSON logbestand van een warmtepomp-controller en beantwoordt vragen.
         
         STRIKTE RAG INSTRUCTIE:
-        Hieronder wordt dynamisch opgehaalde kennis uit de officiële OpenQuatt-handleiningen meegegeven. 
-        Je MOET deze informatie als absolute, leidende waarheid beschouwen. Als de bron stelt dat iets NIET kan (zoals handmatige pompregeling), blijf dan strikt feitelijk en verzin geen Home Assistant knoppen of poorten.
+        Hieronder wordt dynamisch opgehaalde kennis uit de handleidingen meegegeven. Je MOET dit als absolute waarheid beschouwen.
+        Als de bron stelt dat iets NIET kan (zoals handmatige pompregeling), blijf dan strikt feitelijk en verzin geen Home Assistant knoppen.
 
         DYNAMISCH OPGEHAALDE OPENQUATT KENNIS (RAG):
-        ${dynamischeKennisContext || "Geen specifieke documentatie-matches gevonden voor deze vraag. Baseer je antwoord strikt op de logdata."}
+        ${dynamischeKennisContext || "Geen specifieke documentatie-matches gevonden voor deze vraag."}
 
-        ANALYSEVOLGORDE VOOR DE EERSTE RUN:
-        1. WARMTEVRAAG CONTROLEREN: Binnentemperatuur vs setpoint. Setpoint lager? Dan is rust (Stand-by) normaal.
-        2. STATUS CONTROLEREN: In 'Standby' is een nul-flow of lage waterdoorstroming (hp1Flow) het normale, gewenste gedrag.
+        ANALYSEVOLGORDE:
+        1. WARMTEVRAAG CONTROLEREN: Binnentemperatuur vs setpoint.
+        2. STATUS CONTROLEREN: In 'Standby' is een nul-flow normaal.
       `;
 
       let contents = [];
@@ -86,19 +88,34 @@ export default {
         contents.push({ role: "user", parts: [{ text: systemInstruction + "\n\n" + initieelBericht }] });
       } else {
         contents = messages;
-        contents.parts.text = systemInstruction + "\n\n" + (contents.parts.text.split("\n\n").slice(1).join("\n\n") || "");
+        const pureVraag = contents[contents.length - 1].parts[0].text;
+        contents[contents.length - 1].parts[0].text = systemInstruction + "\n\n" + pureVraag;
       }
 
-      const geminiUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent";;
-      const geminiResponse = await fetch(geminiUrl, {
+      // UPGRADE: We stappen direct over naar het gloednieuwe gemini-3.5-flash model uit jouw dashboard!
+      let geminiUrl = "const geminiUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent";";
+      let geminiResponse = await fetch(geminiUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
         body: JSON.stringify({ contents: contents })
       });
 
-      const responseText = await geminiResponse.text();
-      const geminiJson = JSON.parse(responseText);
+      let responseText = await geminiResponse.text();
+      let geminiJson = JSON.parse(responseText);
 
+      // AUTOMATISCHE FAILOVER: Als 3.5-flash alsnog een drukte-piek raakt, schakelen we direct door naar 3.8-flash
+      if (geminiJson && (geminiJson.error?.code === 503 || geminiJson.error?.message?.includes("high demand"))) {
+        geminiUrl = "const geminiUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent";";
+        geminiResponse = await fetch(geminiUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
+          body: JSON.stringify({ contents: contents })
+        });
+        responseText = await geminiResponse.text();
+        geminiJson = JSON.parse(responseText);
+      }
+
+      // GECORRIGEERD: Veilige JSON-uitlezing van de AI-tekst zonder syntax-fouten
       let aiText = "Geen resultaat gegenereerd.";
       if (geminiJson && geminiJson.candidates && geminiJson.candidates[0] && geminiJson.candidates[0].content && geminiJson.candidates[0].content.parts && geminiJson.candidates[0].content.parts[0]) {
         aiText = geminiJson.candidates[0].content.parts[0].text;
@@ -123,7 +140,6 @@ export default {
     const response = await fetch(url);
     const html = await response.text();
 
-    // Splits op paragrafen en strip de HTML-tags er netjes van af
     const alineas = html
       .split("<p>")
       .map(p => p.split("</p>")[0].replace(/<[^>]*>/g, '').trim())
@@ -135,13 +151,10 @@ export default {
       const tekstSectie = alineas[i];
 
       try {
-        // Genereer de wiskundige embedding lokaal via Cloudflare Workers AI
         const embeddingResponse = await env.AI.run("@cf/baai/bge-base-en-v1.5", {
           text: [tekstSectie]
         });
-        
-        // GECORRIGEERD: Cloudflare Workers AI geeft embeddings terug in de data[0] array matrix
-        const vectorValues = embeddingResponse.data[0];
+        const vectorValues = embeddingResponse.data;
 
         if (vectorValues && vectorValues.length === 768) {
           cloudflarePayload.push({
@@ -159,7 +172,6 @@ export default {
     }
 
     if (cloudflarePayload.length > 0) {
-      // Sla de geschoonde vectoren direct op in de Cloudflare Vectorize Index
       await env.VECTOR_INDEX.insert(cloudflarePayload);
       return `Succesvol ${cloudflarePayload.length} documentatie-secties gevectoriseerd en opgeslagen!`;
     }
