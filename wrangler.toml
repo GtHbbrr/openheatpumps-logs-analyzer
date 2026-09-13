@@ -2,22 +2,15 @@ name = "openheatpumps-backend-dev"
 main = "backend/backend_index.js"
 compatibility_date = "2024-03-01"
 
-[vars]
-# Let op: De GEMINI_API_KEY configureren we als Secret in het dashboard, die zetten we hier niet in tekst neer .
-
 [[d1_databases]]
 binding = "D1_DB"
 database_name = "openquatt-db"
 database_id = "676f322e-af02-4f92-9fcb-7f1949f23281"
 
-# Let op: de VECTOR_INDEX voor RAG definiëren we hier straks specifiek voor de preview!
 [[vectorize]]
 binding = "VECTOR_INDEX"
 index_name = "openquatt-docs-preview"
 
-# HIER KOPPELEN WE DE CRON TRIGGER TAANK (Elke nacht om 03:00 uur UTC)
-[triggers]
-crons = ["0 3 * * *"]
-
-[[ai]]
+# GECORRIGEERD: Enkele haken in plaats van dubbele haken voor de AI-configuratie [1.5]
+[ai]
 binding = "AI"
