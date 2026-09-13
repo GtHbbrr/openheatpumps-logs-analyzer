@@ -1,5 +1,5 @@
 export default {
-  // 1. HANDEL AUTOMATISCHE CRON-TRIGGERS AF (Elke nacht om 03:00 uur)
+  // 1. HANDEL AUTOMATISCHE CRON-TRIGGERS AF (Elke nacht om 03:00 uur )
   async scheduled(event, env, ctx) {
     ctx.waitUntil(this.voerIngestieUit(env));
   },
