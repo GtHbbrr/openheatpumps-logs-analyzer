@@ -106,7 +106,7 @@ export default {
       
       console.log(`🎲 Model-Rotatie activeert: ${primairModel} voor deze scan.`);
 
-      let geminiUrl = "https://generativelanguage.googleapis.com/v1beta/models/{primairModel}:generateContent";
+      let geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/{primairModel}:generateContent`;
       let geminiResponse = await fetch(geminiUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
@@ -125,7 +125,7 @@ export default {
         
         console.warn(`⚠️ ${primairModel} raakte een limiet. Schakelt direct over naar reserve-model: ${reserveModel}`);
         
-        geminiUrl = "https://generativelanguage.googleapis.com/v1beta/models/{reserveModel}:generateContent";
+        geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/{reserveModel}:generateContent`;
         geminiResponse = await fetch(geminiUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
@@ -140,7 +140,7 @@ export default {
       if (geminiJson && geminiJson.candidates && geminiJson.candidates[0]?.content?.parts && geminiJson.candidates[0].content.parts[0]?.text) {
         aiText = geminiJson.candidates[0].content.parts[0].text;
       } else if (geminiJson && geminiJson.error) {
-        aiText = `🚨 GOOGLE API FOUT: ${geminiJson.error.message}`;
+        aiText = `🚨 GOOGLE API FOUT: ${geminiJson.error.message} met model-url: ${geminiUrl}`;
       }
 
       return new Response(JSON.stringify({ diagnose: aiText }), { headers: corsHeaders });
