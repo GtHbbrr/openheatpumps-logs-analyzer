@@ -1,5 +1,5 @@
 export default {
-  // 1. HANDEL AUTOMATISCHE CRON-TRIGGERS AF (Elke nacht om 03:00 uur )
+  // 1. HANDEL AUTOMATISCHE CRON-TRIGGERS AF (Elke nacht om 03:00 uur)
   async scheduled(event, env, ctx) {
     ctx.waitUntil(this.voerIngestieUit(env));
   },
@@ -16,7 +16,7 @@ export default {
       return new Response(null, { headers: corsHeaders });
     }
 
-    // INTERNE TRIGGER: Als je met een GET-verzoek naar de API surft, start de RAG-ingestie!
+    // CHECK OF HET EEN "GET" VERZOEK IS (VOORKOM JSON PARSE CRASHES BIJ CURL)
     if (request.method === "GET") {
       try {
         const resultaatTxt = await this.voerIngestieUit(env);
@@ -31,7 +31,7 @@ export default {
       }
     }
 
-    // GEWONE DIAGNOSE EN CHAT (POST-VERZOEK)
+    // HANDEL "POST" VERZOEKEN AF VOOR DE DIAGNOSE EN CHAT
     try {
       const body = await request.json();
       const { userProfile, logData, messages } = body;
@@ -42,7 +42,6 @@ export default {
 
       let dynamischeKennisContext = "";
 
-      // Voer alleen een vector-zoekopdracht uit als er een chatbericht is én Vectorize/AI gekoppeld zijn
       if (messages && messages.length > 0 && env.VECTOR_INDEX && env.AI) {
         const gebruikersVraag = messages[messages.length - 1].parts.text;
 
@@ -51,7 +50,9 @@ export default {
           const embeddingResponse = await env.AI.run("@cf/baai/bge-base-en-v1.5", {
             text: [gebruikersVraag]
           });
-          const queryVector = embeddingResponse.data[0]; // Pak de eerste array-output
+          
+          // GECORRIGEERD: Cloudflare AI geeft de resultaten terug in data[0]
+          const queryVector = embeddingResponse.data[0];
 
           // Doorzoek de Cloudflare Vectorize-index
           const vectorMatches = await env.VECTOR_INDEX.query(queryVector, { topK: 2, returnMetadata: true });
@@ -68,7 +69,7 @@ export default {
         Je bent de 'OpenHeatPumps AI Assistent'. Je analyseert een volledig .oqdebug JSON logbestand van een warmtepomp-controller en beantwoordt vragen.
         
         STRIKTE RAG INSTRUCTIE:
-        Hieronder wordt dynamisch opgehaalde kennis uit de officiële OpenQuatt-handleidingen meegegeven. 
+        Hieronder wordt dynamisch opgehaalde kennis uit de officiële OpenQuatt-handleiningen meegegeven. 
         Je MOET deze informatie als absolute, leidende waarheid beschouwen. Als de bron stelt dat iets NIET kan (zoals handmatige pompregeling), blijf dan strikt feitelijk en verzin geen Home Assistant knoppen of poorten.
 
         DYNAMISCH OPGEHAALDE OPENQUATT KENNIS (RAG):
@@ -85,10 +86,10 @@ export default {
         contents.push({ role: "user", parts: [{ text: systemInstruction + "\n\n" + initieelBericht }] });
       } else {
         contents = messages;
-        contents[0].parts[0].text = systemInstruction + "\n\n" + (contents[0].parts[0].text.split("\n\n").slice(1).join("\n\n") || "");
+        contents.parts.text = systemInstruction + "\n\n" + (contents.parts.text.split("\n\n").slice(1).join("\n\n") || "");
       }
 
-      const geminiUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent";
+      const geminiUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent";;
       const geminiResponse = await fetch(geminiUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
@@ -116,7 +117,7 @@ export default {
     const response = await fetch(url);
     const html = await response.text();
 
-    // Pluk de paragrafen kaal van HTML-tags
+    // Splits op paragrafen en strip de HTML-tags er netjes van af
     const alineas = html
       .split("<p>")
       .map(p => p.split("</p>")[0].replace(/<[^>]*>/g, '').trim())
@@ -127,24 +128,32 @@ export default {
     for (let i = 0; i < alineas.length; i++) {
       const tekstSectie = alineas[i];
 
-      // Genereer de wiskundige embedding lokaal via Cloudflare Workers AI
-      const embeddingResponse = await env.AI.run("@cf/baai/bge-base-en-v1.5", {
-        text: [tekstSectie]
-      });
-      const vectorValues = embeddingResponse.data[0];
+      try {
+        // Genereer de wiskundige embedding lokaal via Cloudflare Workers AI
+        const embeddingResponse = await env.AI.run("@cf/baai/bge-base-en-v1.5", {
+          text: [tekstSectie]
+        });
+        
+        // GECORRIGEERD: Cloudflare Workers AI geeft embeddings terug in de data[0] array matrix
+        const vectorValues = embeddingResponse.data[0];
 
-      cloudflarePayload.push({
-        id: `live_doc_${i}`,
-        values: vectorValues,
-        metadata: {
-          source: "OpenQuatt Live Documentatie",
-          text: tekstSectie
+        if (vectorValues && vectorValues.length === 768) {
+          cloudflarePayload.push({
+            id: `live_doc_${i}`,
+            values: vectorValues,
+            metadata: {
+              source: "OpenQuatt Live Documentatie",
+              text: tekstSectie
+            }
+          });
         }
-      });
+      } catch (e) {
+        console.error(`Sectie ${i} kon niet worden omgezet: ${e.message}`);
+      }
     }
 
     if (cloudflarePayload.length > 0) {
-      // GECORRIGEERD: We gebruiken de officiële .insert() methode van Cloudflare Vectorize
+      // Sla de geschoonde vectoren direct op in de Cloudflare Vectorize Index
       await env.VECTOR_INDEX.insert(cloudflarePayload);
       return `Succesvol ${cloudflarePayload.length} documentatie-secties gevectoriseerd en opgeslagen!`;
     }
