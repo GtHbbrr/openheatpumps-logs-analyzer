@@ -11,6 +11,6 @@ database_id = "676f322e-af02-4f92-9fcb-7f1949f23281"
 binding = "VECTOR_INDEX"
 index_name = "openquatt-docs-preview"
 
-# GECORRIGEERD: Enkele haken in plaats van dubbele haken voor de AI-configuratie [1.5]
+# GECORRIGEERD: Enkele haken in plaats van dubbele haken voor de AI-configuratie[1.5]
 [ai]
 binding = "AI"
