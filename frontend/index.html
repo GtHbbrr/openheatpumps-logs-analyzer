@@ -146,43 +146,50 @@
 
         const el = id => document.getElementById(id);
 
-        // File System Access Map Koppeling - Scant en pakt het allernieuwste logbestand
+        // Universele Bestands- en Mapkoppeling
         el('btn-map').addEventListener('click', async () => {
-            // MOBIELE SCHAKELAAR: Als de telefoon geen map-scanning ondersteunt, open direct de mobiele kiezer!
+        // DESKTOP & MOBIEL CHECK: Als de browser showDirectoryPicker NIET ondersteunt (zoals op mobiel of oudere browsers)
             if (!window.showDirectoryPicker) {
                 el('mobile-file-input').click();
                 return;
             }
 
-            try {
-                const dir = await window.showDirectoryPicker();
-                el('map-status').textContent = "Verbonden: " + dir.name;
-                
-                let meestRecenteBestand = null;
-                let hoogsteTijdstempel = 0;
+            // DESKTOP MET CHOICE: Als de browser het wél ondersteunt, geven we de desktop-gebruiker de keuze!
+            if (confirm("Wil je een héle map koppelen zodat we automatisch het nieuwste logboek zoeken?\n\n(Klik op 'Annuleren' om handmatig één specifiek los .json bestand te kiezen)")) {
+                try {
+                    const dir = await window.showDirectoryPicker();
+                    el('map-status').textContent = "Verbonden map: " + dir.name;
+                    
+                    let meestRecenteBestand = null;
+                    let hoogsteTijdstempel = 0;
 
-                // Loop door ALLE bestanden in de gekoppelde map heen
-                for await (const entry of dir.values()) {
-                    if (entry.kind === 'file' && entry.name.endsWith('.json')) {
-                        const file = await entry.getFile();
-                        
-                        // Vergelijk de wijzigingsdatum van het bestand
-                        if (file.lastModified > hoogsteTijdstempel) {
-                            hoogsteTijdstempel = file.lastModified;
-                            meestRecenteBestand = file;
+                    // Loop door ALLE bestanden in de gekoppelde map heen
+                    for await (const entry of dir.values()) {
+                        if (entry.kind === 'file' && entry.name.endsWith('.json')) {
+                            const file = await entry.getFile();
+                            
+                            // Vergelijk de wijzigingsdatum van het bestand
+                            if (file.lastModified > hoogsteTijdstempel) {
+                                hoogsteTijdstempel = file.lastModified;
+                                meestRecenteBestand = file;
+                            }
                         }
                     }
-                }
 
-                // Laad pas het bestand in als de hele map is gescand
-                if (meestRecenteBestand) {
-                    laadBestand(meestRecenteBestand);
-                } else {
-                    alert("Geen .json logbestanden gevonden in deze map.");
+                    // Laad pas het bestand in als de hele map is gescand
+                    if (meestRecenteBestand) {
+                        laadBestand(meestRecenteBestand);
+                    } else {
+                        alert("Geen .json logbestanden gevonden in deze map.");
+                    }
+                } catch (err) { 
+                    console.error(err);
+                    // Als de gebruiker de mappen-toegang halverwege weigert, crasht de boel niet maar openen we de bestandskiezer
+                    el('mobile-file-input').click();
                 }
-            } catch (err) { 
-                console.error(err);
-                alert("Map-koppeling geweigerd of afgebroken."); 
+            } else {
+                // Als de desktop-gebruiker op 'Annuleren' klikt, openen we direct de Finder/Verkenner voor één los bestand!
+                el('mobile-file-input').click();
             }
         });
 
