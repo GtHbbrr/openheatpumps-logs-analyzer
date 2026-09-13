@@ -106,7 +106,7 @@ export default {
       
       console.log(`🎲 Model-Rotatie activeert: ${primairModel} voor deze scan.`);
 
-      let geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/{reserveModel}:generateContent`;
+      let geminiUrl = "https://generativelanguage.googleapis.com/v1beta/models/{primairModel}:generateContent";
       let geminiResponse = await fetch(geminiUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
@@ -125,7 +125,7 @@ export default {
         
         console.warn(`⚠️ ${primairModel} raakte een limiet. Schakelt direct over naar reserve-model: ${reserveModel}`);
         
-        geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/{reserveModel}:generateContent`;
+        geminiUrl = "https://generativelanguage.googleapis.com/v1beta/models/{reserveModel}:generateContent";
         geminiResponse = await fetch(geminiUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
