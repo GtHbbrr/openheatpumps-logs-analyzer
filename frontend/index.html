@@ -28,8 +28,7 @@
                     <div class="space-y-4">
                         <div>
                             <label class="block text-xs text-gray-400 font-medium mb-1">Woningtype</label>
-                            <select id="woning_type" class="w-full bg-gray-900 border border-gray-700 rounded p-2 text-sm text-gray-300 focus:outline-none focus:border-orange-500">
-                                <option value="vloerverwarming">Vloerverwarming & radiatoren</option>                                
+                            <select id="woning_type" class="w-full bg-gray-900 border border-gray-700 rounded p-2 text-sm text-gray-300 focus:outline-none focus:border-orange-500">                        
                                 <option value="tussenwoning">Tussenwoning</option>
                                 <option value="vrijstaand">Vrijstaand</option>
                                 <option value="hoekwoning">Hoekwoning</option>
@@ -38,6 +37,7 @@
                         <div>
                             <label class="block text-xs text-gray-400 font-medium mb-1">Afgiftesysteem</label>
                             <select id="afgiftesysteem" class="w-full bg-gray-900 border border-gray-700 rounded p-2 text-sm text-gray-300 focus:outline-none focus:border-orange-500">
+                                <option value="vloerverwarming">Vloerverwarming & radiatoren</option>    
                                 <option value="radiatoren">Radiatoren</option>
                                 <option value="vloerverwarming">Vloerverwarming</option>
                                 <option value="fancoils">Fancoils / Jaga</option>
@@ -121,8 +121,26 @@
             </div>
         </div>
     </footer>
+
     <script>
         const WORKER_URL = "https://api-dev.openheatpumps.nl";
+
+        // SLIMME EN LICHTE VERTALER OM MARKDOWN OM TE ZETTEN NAAR TAILWIND HTML [1.1]
+        function parseMarkdown(tekst) {
+            return tekst
+                // Vertaal ### Koppen naar oranje, dikgedrukte titels
+                .replace(/^### (.*$)/gim, '<h3 class="text-base font-bold text-orange-400 mt-6 mb-2 tracking-wide border-b border-gray-800 pb-1">$1</h3>')
+                // Vertaal **dikgedrukte tekst** naar wit en vetgedrukt
+                .replace(/\*\*(.*?)\*\*/g, '<strong class="font-bold text-white">$1</strong>')
+                // Vertaal * cursieve tekst of lijst-sterretjes
+                .replace(/^\*\s(.*$)/gim, '<span class="inline-block text-orange-500 mr-1">•</span> $1')
+                .replace(/\*(.*?)\*/g, '<em class="italic text-gray-300">$1</em>')
+                // Vertaal `code-backticks` naar een strak grijs computer-lettertype
+                .replace(/`(.*?)`/g, '<code class="bg-gray-900 border border-gray-800 text-orange-300 px-1.5 py-0.5 rounded font-mono text-xs">$1</code>')
+                // Zorg dat gewone regeleinden netjes worden afgebroken
+                .replace(/\n/g, '<br>');
+        }
+        
         let activeLogData = null, chatHistory = [];
 
         const el = id => document.getElementById(id);
@@ -192,7 +210,7 @@
                     body: JSON.stringify({ userProfile: profile, logData: activeLogData, messages: null }) 
                 });
                 const d = await r.json();
-                el('output-box').innerHTML = `<strong>Analyse Resultaat:</strong>\n\n${d.diagnose}`;
+                el('output-box').innerHTML = `<strong>Analyse Resultaat:</strong><br><br>${parseMarkdown(d.diagnose)}`;
                 chatHistory.push({ role: "user", parts: [{ text: "Analyseer dit bestand." }] }, { role: "model", parts: [{ text: d.diagnose }] });
                 el('chat-container').classList.remove('hidden');
             } catch (err) { el('output-box').textContent = "Fout: " + err.message; }
