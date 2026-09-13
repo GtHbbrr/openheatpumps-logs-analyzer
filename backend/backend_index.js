@@ -106,7 +106,7 @@ export default {
       
       console.log(`🎲 Model-Rotatie activeert: ${primairModel} voor deze scan.`);
 
-      let geminiUrl = `https://googleapis.com{primairModel}:generateContent`;
+      let geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/{reserveModel}:generateContent`;
       let geminiResponse = await fetch(geminiUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
