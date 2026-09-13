@@ -92,8 +92,21 @@ export default {
         contents[contents.length - 1].parts[0].text = systemInstruction + "\n\n" + pureVraag;
       }
 
-      // UPGRADE: We stappen direct over naar het gloednieuwe gemini-3.5-flash model uit jouw dashboard!
-      let geminiUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent";
+      // 1. DEFINIEER DE 4 BESCHIKBARE MODELLEN VANUIT JE DASHBOARD
+      const beschikbareModellen = [
+        "gemini-3.5-flash",
+        "gemini-3.6-flash",
+        "gemini-3.7-flash",
+        "gemini-3.8-flash"
+      ];
+
+      // 2. KIES WILLEKEURIG EEN MODEL OM DE DRUK PERFECT TE VERDELEN (LOAD BALANCING)
+      let gekozenIndex = Math.floor(Math.random() * beschikbareModellen.length);
+      let primairModel = beschikbareModellen[gekozenIndex];
+      
+      console.log(`🎲 Model-Rotatie activeert: ${primairModel} voor deze scan.`);
+
+      let geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${primairModel}:generateContent`;
       let geminiResponse = await fetch(geminiUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
@@ -103,9 +116,16 @@ export default {
       let responseText = await geminiResponse.text();
       let geminiJson = JSON.parse(responseText);
 
-      // AUTOMATISCHE FAILOVER: Als 3.5-flash alsnog een drukte-piek raakt, schakelen we direct door naar 3.8-flash
-      if (geminiJson && (geminiJson.error?.code === 503 || geminiJson.error?.message?.includes("high demand"))) {
-        geminiUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent";
+      // 3. SLIMME AUTOMATISCHE RETRY: Mocht het gekozen model een quota- of druktefout geven?
+      if (geminiJson && (geminiJson.error?.code === 503 || geminiJson.error?.code === 429 || geminiJson.error?.message?.includes("quota") || geminiJson.error?.message?.includes("high demand"))) {
+        
+        // Filter het gecrashte model eruit en kies direct een van de andere 3 overgebleven modellen!
+        const reserveModellen = beschikbareModellen.filter(m => m !== primairModel);
+        let reserveModel = reserveModellen[Math.floor(Math.random() * reserveModellen.length)];
+        
+        console.warn(`⚠️ ${primairModel} raakte een limiet. Schakelt direct over naar reserve-model: ${reserveModel}`);
+        
+        geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${reserveModel}:generateContent`;
         geminiResponse = await fetch(geminiUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
@@ -115,12 +135,12 @@ export default {
         geminiJson = JSON.parse(responseText);
       }
 
-      // GECORRIGEERD: Veilige JSON-uitlezing van de AI-tekst zonder syntax-fouten
+      // 4. VERWERK HET ANTWOORD OP DE VEILIGE MANIER
       let aiText = "Geen resultaat gegenereerd.";
-      if (geminiJson && geminiJson.candidates && geminiJson.candidates[0] && geminiJson.candidates[0].content && geminiJson.candidates[0].content.parts && geminiJson.candidates[0].content.parts[0]) {
+      if (geminiJson && geminiJson.candidates && geminiJson.candidates[0]?.content?.parts && geminiJson.candidates[0].content.parts[0]?.text) {
         aiText = geminiJson.candidates[0].content.parts[0].text;
       } else if (geminiJson && geminiJson.error) {
-        aiText = `🚨 GOOGLE API FOUT: ${geminiJson.error.message}`;
+        aiText = `🚨 GOOGLE API FOUT: ${geminiJson.error.message} met model-url: ${geminiUrl}`;
       }
 
       return new Response(JSON.stringify({ diagnose: aiText }), { headers: corsHeaders });
@@ -130,12 +150,13 @@ export default {
     }
   },
 
-  // 3. DE GEAUTOMATISEERDE RECHTTREEKSE INGESTIE-MOTOR (GEERD OP LOKALE EMBEDDINGS)
+  // 3. DE GEAUTOMATISEERDE RECHTTREEKSE INGESTIE-MOTOR (NU MET SKILL.MD EXPERT KENNIS)
   async voerIngestieUit(env) {
     if (!env.VECTOR_INDEX || !env.AI) {
       throw new Error("Cloudflare AI of Vectorize binding ontbreekt in deze omgeving.");
     }
 
+    // BRON 1: Haal eerst de gewone problemen-oplossen pagina op van internet
     const url = "https://openquatt.github.io/OpenQuatt/problemen-oplossen.html";
     const response = await fetch(url);
     const html = await response.text();
@@ -144,6 +165,18 @@ export default {
       .split("<p>")
       .map(p => p.split("</p>")[0].replace(/<[^>]*>/g, '').trim())
       .filter(text => text.length > 50 && !text.includes("javascript") && !text.includes("css"));
+
+    // BRON 2: GECORRIGEERD - WE VOEGEN DE HARDEN EXPERT-REGELS UIT SKILL.MD RECHTTREEKS TOE AAN DE PAYLOAD!
+    const expertSecties = [
+      "OpenQuatt logboeken gebruiken een speciale deltamix encoding (device-psram-delta-json-v1). Waarden in de samples zijn geen absolute totalen, maar wijzigingen ten opzichte van de startstatus (t=0). De analyzer moet een lopende status bijhouden per kolom.",
+      "De warmtepomp werkt via de Power House-strategie. Dit is vermogensgestuurd op basis van huisverlies (phouseHouse) en interne vraag (phouseReq). Er is GEEN vaste aanvoertemperatuur (supply target) zoals bij klassieke stooklijnen.",
+      "Als de warmtepomp snel stopt (kort cyclen), vergelijk dan het gevraagde vermogen (strategyRequestedPower) met de laagste fysieke stand van de compressor (pmin in lowLoadDynamicThresholds). Levert de pomp op zijn laagste stand al te veel warmte bij zacht weer? Dan stopt de actuator logischerwijs via de off-drempel.",
+      "De start en herstart van de warmtepomp wordt bepaald door de warmte-intentie (Heat Intent). Zodra de binnentemperatuur zakt onder het setpoint minus de comfort-band (standaard 0,1 graden), schiet de vraag via het fast_floor_w_ mechanisme direct omhoog naar het minimale startvermogen om een gezonde run te starten.",
+      "Het compressor-niveau (hp1Compressor) is de stand die via Modbus-register 1999 naar de buitenunit wordt gestuurd. De gemeten frequentie (hp1Freq) is wat de buitenunit daadwerkelijk doet. Er is geen vaste 48 Hz minimumlimiet in de code; de laagste stand van het modelanker is altijd 20 Hz."
+    ];
+
+    // Voeg de expert-secties samen met de gewone alineas
+    expertSecties.forEach(txt => alineas.push(txt));
 
     const cloudflarePayload = [];
 
@@ -158,10 +191,10 @@ export default {
 
         if (vectorValues && vectorValues.length === 768) {
           cloudflarePayload.push({
-            id: `live_doc_${i}`,
+            id: `expert_doc_${i}`,
             values: vectorValues,
             metadata: {
-              source: "OpenQuatt Live Documentatie",
+              source: i >= alineas.length - expertSecties.length ? "OpenQuatt SKILL Expert-Matrix" : "OpenQuatt Live Documentatie",
               text: tekstSectie
             }
           });
@@ -173,9 +206,10 @@ export default {
 
     if (cloudflarePayload.length > 0) {
       await env.VECTOR_INDEX.insert(cloudflarePayload);
-      return `Succesvol ${cloudflarePayload.length} documentatie-secties gevectoriseerd en opgeslagen!`;
+      return `Succesvol ${cloudflarePayload.length} documentatie- en expert-secties gevectoriseerd en opgeslagen!`;
     }
 
     return "Geen geschikte alineas gevonden om te importeren.";
   }
+  
 };
