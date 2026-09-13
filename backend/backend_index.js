@@ -92,8 +92,8 @@ export default {
         contents[contents.length - 1].parts[0].text = systemInstruction + "\n\n" + pureVraag;
       }
 
-      // UPGRADE: We stappen direct over naar het gloednieuwe gemini-3.5-flash model uit jouw dashboard!
-      let geminiUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent";
+      // UPGRADE: We stappen direct over naar het gloednieuwe gemini-3.7-flash model uit jouw dashboard!
+      let geminiUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.7-flash:generateContent";
       let geminiResponse = await fetch(geminiUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
@@ -103,10 +103,10 @@ export default {
       let responseText = await geminiResponse.text();
       let geminiJson = JSON.parse(responseText);
 
-      // AUTOMATISCHE FAILOVER: Als 3.5-flash vol zit of de quota is bereikt, schakelen we direct door naar 3.8-flash
+      // AUTOMATISCHE FAILOVER: Als 3.7-flash vol zit of de quota is bereikt, schakelen we direct door naar 3.6-flash
       if (geminiJson && (geminiJson.error?.code === 503 || geminiJson.error?.code === 429 || geminiJson.error?.message?.includes("quota") || geminiJson.error?.message?.includes("high demand"))) {
-        console.warn("⚠️ Quota of drukte bereikt op Gemini 3.5. Schakelt nu direct over naar Gemini 3.8-flash...");      
-        geminiUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent";
+        console.warn("⚠️ Quota of drukte bereikt op Gemini 3.5. Schakelt nu direct over naar Gemini 3.6-flash...");      
+        geminiUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent";
         geminiResponse = await fetch(geminiUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
