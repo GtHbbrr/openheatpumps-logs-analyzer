@@ -64,18 +64,21 @@
 
                 <div class="border-t border-gray-800 pt-6">
                     <h2 class="text-lg font-semibold mb-3 text-gray-200">2. Logboek Koppelen</h2>
-                    <div class="flex flex-col gap-2">
-                        <!-- Knop 1: Voor de hele map (werkt op PC/Mac) -->
+                    
+                    <!-- GECORRIGEERD: Knoppen staan nu op desktop netjes naast elkaar via grid -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <!-- Knop 1: Voor de hele map (Alleen zichtbaar op PC/Mac) -->
                         <button id="btn-map" class="w-full bg-orange-600 hover:bg-orange-700 text-white font-medium p-3 rounded transition shadow-lg text-sm hidden md:block">
-                            📂 Koppel hele Log-map (Automatisch nieuwste)
+                            📂 Koppel hele Log-map
                         </button>
                         
-                        <!-- Knop 2: De traditionele bestandskiezer (Zichtbaar op mobiel én desktop!) -->
+                        <!-- Knop 2: De losse bestandskiezer (Altijd zichtbaar, overal bruikbaar) -->
                         <label for="mobile-file-input" class="w-full bg-gray-800 hover:bg-gray-700 text-gray-200 font-medium p-3 rounded transition shadow-lg text-sm text-center cursor-pointer border border-gray-700 block">
-                            📄 Kies één los .json bestand
+                            📄 Kies los .json bestand
                         </label>
                         <input type="file" id="mobile-file-input" accept=".json" class="hidden">
                     </div>
+                    
                     <p id="map-status" class="text-xs text-gray-500 mt-2 text-center">Nog geen map of bestand gekoppeld</p>
                 </div>
 
