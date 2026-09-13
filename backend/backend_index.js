@@ -93,7 +93,7 @@ export default {
       }
 
       // UPGRADE: We stappen direct over naar het gloednieuwe gemini-3.5-flash model uit jouw dashboard!
-      let geminiUrl = "const geminiUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent";";
+      let geminiUrl = "const geminiUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent";
       let geminiResponse = await fetch(geminiUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
@@ -105,7 +105,7 @@ export default {
 
       // AUTOMATISCHE FAILOVER: Als 3.5-flash alsnog een drukte-piek raakt, schakelen we direct door naar 3.8-flash
       if (geminiJson && (geminiJson.error?.code === 503 || geminiJson.error?.message?.includes("high demand"))) {
-        geminiUrl = "const geminiUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent";";
+        geminiUrl = "const geminiUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent";
         geminiResponse = await fetch(geminiUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
