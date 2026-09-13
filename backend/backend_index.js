@@ -43,7 +43,7 @@ export default {
       let dynamischeKennisContext = "";
 
       if (messages && messages.length > 0 && env.VECTOR_INDEX && env.AI) {
-        const gebruikersVraag = messages[messages.length - 1].parts.text;
+        const gebruikersVraag = messages[messages.length - 1].parts[0].text;
 
         try {
           // Bereken de vector lokaal binnen Cloudflare AI (768 dimensies)
