@@ -98,7 +98,13 @@ export default {
 
       const responseText = await geminiResponse.text();
       const geminiJson = JSON.parse(responseText);
-      const aiText = geminiJson.candidates?.[0]?.content?.parts?.[0]?.text || "Geen resultaat gegenereerd.";
+
+      let aiText = "Geen resultaat gegenereerd.";
+      if (geminiJson && geminiJson.candidates && geminiJson.candidates[0] && geminiJson.candidates[0].content && geminiJson.candidates[0].content.parts && geminiJson.candidates[0].content.parts[0]) {
+        aiText = geminiJson.candidates[0].content.parts[0].text;
+      } else if (geminiJson && geminiJson.error) {
+        aiText = `🚨 GOOGLE API FOUT: ${geminiJson.error.message}`;
+      }
 
       return new Response(JSON.stringify({ diagnose: aiText }), { headers: corsHeaders });
 
