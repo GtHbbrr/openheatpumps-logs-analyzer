@@ -152,6 +152,7 @@
             if (!tekst) return "";
             return tekst
                 // Rigoureuze LaTeX en wiskundige codes opschonen naar normale taal
+                .replace(/\\mathbf\s*\{(.*?)\}/g, '<strong>$1</strong>') // GECORRIGEERD: Vertaal \mathbf{...} naar vette HTML-tekst
                 .replace(/\\text\s*\{(.*?)\}/g, '$1')   
                 .replace(/\\approx/g, '±')              
                 .replace(/\\times/g, '×')               
@@ -159,7 +160,7 @@
                 .replace(/\\Delta T/g, 'Delta T')       
                 .replace(/\\circ/g, '°')                
                 
-                // GECORRIGEERD: Eerst Level 4 heading checken, daarna pas Level 3!
+                // Eerst Level 4 heading checken, daarna pas Level 3!
                 .replace(/^#### (.*$)/gim, '<h4 class="text-sm font-bold text-orange-400 mt-4 mb-1 tracking-wide">$1</h4>')
                 .replace(/^### (.*$)/gim, '<h3 class="text-base font-bold text-orange-400 mt-6 mb-2 tracking-wide border-b border-gray-800 pb-1">$1</h3>')
                 
