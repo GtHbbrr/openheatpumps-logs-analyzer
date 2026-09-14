@@ -155,9 +155,17 @@
         // 1. DE SLIMME EN UNIVERSELE MARKDOWN & LATEX PARSER
         function parseMarkdown(tekst) {
             if (!tekst) return "";
-            return tekst
-                // Rigoureuze LaTeX en wiskundige codes opschonen naar normale taal
-                .replace(/\\mathbf\s*\{(.*?)\}/g, '<strong>$1</strong>') // GECORRIGEERD: Vertaal \mathbf{...} naar vette HTML-tekst
+            
+            // ONTSMETTING: Maak de rauwe tekst eerst volledig veilig tegen vreemde HTML-injecties [1.1]
+            let veiligTekst = tekst
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;");
+
+            return veiligTekst
+                // Herstel specifieke LaTeX en wiskundige codes naar normale taal
+                .replace(/\\mathbf\s*\{&lt;strong&gt;(.*?)&lt;\/strong&gt;\}/g, '<strong>$1</strong>')
+                .replace(/\\mathbf\s*\{(.*?)\}/g, '<strong>$1</strong>')
                 .replace(/\\text\s*\{(.*?)\}/g, '$1')   
                 .replace(/\\approx/g, '±')              
                 .replace(/\\times/g, '×')               
@@ -165,11 +173,11 @@
                 .replace(/\\Delta T/g, 'Delta T')       
                 .replace(/\\circ/g, '°')                
                 
-                // Eerst Level 4 heading checken, daarna pas Level 3!
+                // Kopteksten (Eerst Level 4, daarna Level 3)
                 .replace(/^#### (.*$)/gim, '<h4 class="text-sm font-bold text-orange-400 mt-4 mb-1 tracking-wide">$1</h4>')
                 .replace(/^### (.*$)/gim, '<h3 class="text-base font-bold text-orange-400 mt-6 mb-2 tracking-wide border-b border-gray-800 pb-1">$1</h3>')
                 
-                // Standaard Markdown parsing naar Tailwind HTML
+                // Standaard Markdown opmaak naar Tailwind HTML
                 .replace(/\*\*(.*?)\*\*/g, '<strong class="font-bold text-white">$1</strong>')
                 .replace(/^\s*[•*]\s(.*$)/gim, '<span class="inline-block text-orange-500 mr-1">•</span> $1')
                 .replace(/`(.*?)`/g, '<code class="bg-gray-900 border border-gray-800 text-orange-300 px-1.5 py-0.5 rounded font-mono text-xs">$1</code>')
