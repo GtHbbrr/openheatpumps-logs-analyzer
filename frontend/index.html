@@ -152,14 +152,19 @@
             if (!tekst) return "";
             return tekst
                 // Rigoureuze LaTeX en wiskundige codes opschonen naar normale taal
-                .replace(/\\text\s*\{(.*?)\}/g, '$1')   // Verwijdert \text{...} wrappers
-                .replace(/\\approx/g, '±')              // Verandert \approx naar circa teken
-                .replace(/\\times/g, '×')               // Verandert \times naar vermenigvuldigingsteken
-                .replace(/\$(.*?)\$/g, '$1')            // Verwijdert wiskundige dollartekens
-                .replace(/\\Delta T/g, 'Delta T')       // Herstelt Delta T symbool
-                .replace(/\\circ/g, '°')                // Herstelt graden-tekens
-                // Standaard Markdown parsing naar Tailwind HTML
+                .replace(/\\mathbf\s*\{(.*?)\}/g, '<strong>$1</strong>') // GECORRIGEERD: Vertaal \mathbf{...} naar vette HTML-tekst
+                .replace(/\\text\s*\{(.*?)\}/g, '$1')   
+                .replace(/\\approx/g, '±')              
+                .replace(/\\times/g, '×')               
+                .replace(/\$(.*?)\$/g, '$1')            
+                .replace(/\\Delta T/g, 'Delta T')       
+                .replace(/\\circ/g, '°')                
+                
+                // Eerst Level 4 heading checken, daarna pas Level 3!
+                .replace(/^#### (.*$)/gim, '<h4 class="text-sm font-bold text-orange-400 mt-4 mb-1 tracking-wide">$1</h4>')
                 .replace(/^### (.*$)/gim, '<h3 class="text-base font-bold text-orange-400 mt-6 mb-2 tracking-wide border-b border-gray-800 pb-1">$1</h3>')
+                
+                // Standaard Markdown parsing naar Tailwind HTML
                 .replace(/\*\*(.*?)\*\*/g, '<strong class="font-bold text-white">$1</strong>')
                 .replace(/^\s*[•*]\s(.*$)/gim, '<span class="inline-block text-orange-500 mr-1">•</span> $1')
                 .replace(/`(.*?)`/g, '<code class="bg-gray-900 border border-gray-800 text-orange-300 px-1.5 py-0.5 rounded font-mono text-xs">$1</code>')

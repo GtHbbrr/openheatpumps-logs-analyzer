@@ -16,7 +16,6 @@ export default {
       return new Response(null, { headers: corsHeaders });
     }
 
-    // CHECK OF HET EEN "GET" VERZOEK IS (VOORKOM JSON PARSE CRASHES BIJ CURL)
     if (request.method === "GET") {
       try {
         const resultaatTxt = await this.voerIngestieUit(env);
@@ -31,80 +30,83 @@ export default {
       }
     }
 
-    // HANDEL "POST" VERZOEKEN AF VOOR DE DIAGNOSE EN CHAT
+    // HANDEL "POST" VERZOEKEN AF (DIAGNOSE & CHAT)
     try {
       const body = await request.json();
       const { userProfile, logData, messages } = body;
 
       if (!env.GEMINI_API_KEY) {
-        return new Response(JSON.stringify({ diagnose: "🚨 CONFIGURATIEFOUT: GEMINI_API_KEY ontbreekt." }), { headers: corsHeaders });
+        return new Response(JSON.stringify({ status: "error", diagnose: "🚨 CONFIGURATIEFOUT: GEMINI_API_KEY ontbreekt." }), { headers: corsHeaders });
+      }
+
+      // A. BEPAAL DYNAMISCH DE RELEVANTE VRAAG (EERSTE RUN OF VERVOLGVRAAG)
+      let actueleVraag = "Analyseer dit bestand.";
+      if (messages && messages.length > 0) {
+        const laatsteBericht = messages[messages.length - 1];
+        if (laatsteBericht && laatsteBericht.parts && laatsteBericht.parts.text) {
+          actueleVraag = laatsteBericht.parts.text;
+        }
       }
 
       let dynamischeKennisContext = "";
 
-      // GECORRIGEERD: Veilige array-uitlezing voor de gebruikersvraag om de text-crash te voorkomen
-      if (messages && messages.length > 0 && env.VECTOR_INDEX && env.AI) {
-        const laatsteBericht = messages[messages.length - 1];
-        if (laatsteBericht && laatsteBericht.parts && laatsteBericht.parts.length > 0) {
-          const gebruikersVraag = laatsteBericht.parts[0].text;
+      // B. GECORRIGEERD: DOORZOEK DE DATABASE BIJ *ELK* VERZOEK (DUS OOK BIJ CHAT VRAGEN!)
+      if (env.VECTOR_INDEX && env.AI) {
+        try {
+          const embeddingResponse = await env.AI.run("@cf/baai/bge-base-en-v1.5", {
+            text: [actueleVraag]
+          });
+          const queryVector = embeddingResponse.data;
 
-          try {
-            // Bereken de vector lokaal binnen Cloudflare AI (768 dimensies)
-            const embeddingResponse = await env.AI.run("@cf/baai/bge-base-en-v1.5", {
-              text: [gebruikersVraag]
-            });
-            const queryVector = embeddingResponse.data;
-
-            // Doorzoek de Cloudflare Vectorize-index
-            const vectorMatches = await env.VECTOR_INDEX.query(queryVector, { topK: 2, returnMetadata: true });
-            
-            dynamischeKennisContext = vectorMatches.matches
-              .map(match => `[Bron: OpenQuatt Richtlijn]: ${match.metadata.text}`)
-              .join("\n");
-          } catch (ragErr) {
-            console.error("Vectorize Query Error:", ragErr.message);
-          }
+          const vectorMatches = await env.VECTOR_INDEX.query(queryVector, { topK: 3, returnMetadata: true });
+          
+          dynamischeKennisContext = vectorMatches.matches
+            .map(match => `[Geverifieerde Richtlijn]: ${match.metadata.text}`)
+            .join("\n");
+        } catch (ragErr) {
+          console.error("Vectorize Query Error:", ragErr.message);
         }
       }
 
+      // C. GECORRIGEERD: PROFIEL EN INSTRUCTIES WORDEN HIER ENKELDRAADS EN DWINGEND OPGEBOUWD
       const systemInstruction = `
-        Je bent de 'OpenHeatPumps AI Assistent'. Je analyseert een volledig .oqdebug JSON logbestand van een warmtepomp-controller en beantwoordt vragen.
+        Je bent de 'OpenHeatPumps AI Assistent'. Je analyseert .oqdebug JSON logbestanden van OpenQuatt warmtepomp-controllers.
+        
+        STRIKTE GEBRUIKERSCONTEXT (NEGEER DIT NIET!):
+        * Woningtype: ${userProfile?.woning_type || "Onbekend"}
+        * Afgiftesysteem: ${userProfile?.afgiftesysteem || "Onbekend"}
+        * Aanwezige CV-ketel: ${userProfile?.cv_ketel || "GEEN KETEL AANWEZIG"}
+        * Thermostaat: ${userProfile?.thermostaat || "Onbekend"}
         
         STRIKTE RAG INSTRUCTIE:
-        Hieronder wordt dynamisch opgehaalde kennis uit de handleidingen meegegeven. Je MOET dit als absolute waarheid beschouwen.
-        Als de bron stelt dat iets NIET kan (zoals handmatige pompregeling), blijf dan strikt feitelijk en verzin geen Home Assistant knoppen.
+        Hieronder staat live kennis uit de handleidingen en de 'Power House' software-matrix. Dit is de absolute waarheid.
+        OpenQuatt werkt VERMOGENSGESTUURD op basis van huisverlies (phouseHouse) en de actuele vraag (phouseReq). Er is GEEN sprake van een klassieke stooklijn of vast aanvoerdoel (supply target)! Als de pomp bijv. 2,4 kW stookt terwijl de warmtevraag 4 kW is, komt dit omdat het berekende huisverlies (phouseHouse) op dat moment aangeeft dat 2,4 kW voldoende is om de comfort-band te bewaken (Power House comfort-band wetten).
+        
+        DYNAMISCH GEPROMPTE KENNIS UIT DATABASE:
+        ${dynamischeKennisContext || "Geen specifieke documentatie-matches gevonden voor deze vraag. Gebruik de algemene OpenQuatt wetten."}
 
-        DYNAMISCH OPGEHAALDE OPENQUATT KENNIS (RAG):
-        ${dynamischeKennisContext || "Geen specifieke documentatie-matches gevonden voor deze vraag."}
-
-        ANALYSEVOLGORDE:
-        1. WARMTEVRAAG CONTROLEREN: Binnentemperatuur vs setpoint.
-        2. STATUS CONTROLEREN: In 'Standby' is een nul-flow normaal.
+        ANALYSEVOLGORDE VOOR EERSTE RUN:
+        1. WARMTEVRAAG: Binnentemperatuur vs setpoint.
+        2. STATUS: In Standby is 0-flow normaal.
       `;
-
+      // D. BOUW DE CONVERSATIE OP VOOR GOOGLE GEMINI (ZONDER PROFIEL-VERLIES)
       let contents = [];
       if (!messages || messages.length === 0) {
-        const initieelBericht = `PROFIEL: ${JSON.stringify(userProfile)}\n\nLOGDATA:\n${JSON.stringify(logData)}`;
+        // Eerste run: stuur profiel + logboek
+        const initieelBericht = `LOGDATA:\n${JSON.stringify(logData)}`;
         contents.push({ role: "user", parts: [{ text: systemInstruction + "\n\n" + initieelBericht }] });
       } else {
-        contents = messages;
-        const pureVraag = contents[contents.length - 1].parts[0].text;
-        contents[contents.length - 1].parts[0].text = systemInstruction + "\n\n" + pureVraag;
+        // Vervolgrun: we schonken de geschiedenis op en injecteren de verse systemInstruction dwingend in het laatste bericht
+        contents = JSON.parse(JSON.stringify(messages)); // Diepe kopie om front-end niet te breken
+        const oorspronkelijkeTekst = contents[contents.length - 1].parts[0].text;
+        contents[contents.length - 1].parts[0].text = systemInstruction + "\n\nVolgens de chat-geschiedenis loopt het hieronder door. Beantwoord nu de specifieke gebruikersvraag:\n" + oorspronkelijkeTekst;
       }
 
-      // 1. DEFINIEER DE 4 BESCHIKBARE MODELLEN VANUIT JE DASHBOARD
-      const beschikbareModellen = [
-        "gemini-3.5-flash",
-        "gemini-3.6-flash",
-        "gemini-3.7-flash",
-        "gemini-3.8-flash"
-      ];
-
-      // 2. KIES WILLEKEURIG EEN MODEL OM DE DRUK PERFECT TE VERDELEN (LOAD BALANCING)
+      // E. MODEL-ROTATIE EN FAILOVER MOTOR
+      const beschikbareModellen = ["gemini-3.5-flash", "gemini-3.6-flash", "gemini-3.7-flash", "gemini-3.8-flash"];
       let gekozenIndex = Math.floor(Math.random() * beschikbareModellen.length);
       let primairModel = beschikbareModellen[gekozenIndex];
-      
-      console.log(`🎲 Model-Rotatie activeert: ${primairModel} voor deze scan.`);
+      let reserveModel = undefined;
 
       let geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${primairModel}:generateContent`;
       let geminiResponse = await fetch(geminiUrl, {
@@ -116,14 +118,9 @@ export default {
       let responseText = await geminiResponse.text();
       let geminiJson = JSON.parse(responseText);
 
-      // 3. SLIMME AUTOMATISCHE RETRY: Mocht het gekozen model een quota- of druktefout geven?
       if (geminiJson && (geminiJson.error?.code === 503 || geminiJson.error?.code === 429 || geminiJson.error?.message?.includes("quota") || geminiJson.error?.message?.includes("high demand"))) {
-        
-        // Filter het gecrashte model eruit en kies direct een van de andere 3 overgebleven modellen!
         const reserveModellen = beschikbareModellen.filter(m => m !== primairModel);
-        let reserveModel = reserveModellen[Math.floor(Math.random() * reserveModellen.length)];
-        
-        console.warn(`⚠️ ${primairModel} raakte een limiet. Schakelt direct over naar reserve-model: ${reserveModel}`);
+        reserveModel = reserveModellen[Math.floor(Math.random() * reserveModellen.length)];
         
         geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${reserveModel}:generateContent`;
         geminiResponse = await fetch(geminiUrl, {
@@ -135,62 +132,77 @@ export default {
         geminiJson = JSON.parse(responseText);
       }
 
-      // 4. VERWERK HET ANTWOORD EN GEEF HET MODEL APART MEE IN DE JSON
+      // ====================================================================
+      // RESPONSE GATEWAY MET LIVE PROMPT- & TELEMETRIE-INSPECTIE
+      // ====================================================================
       let gebruiktModel = typeof reserveModel !== 'undefined' ? reserveModel : primairModel;
       let statusType = "success";
-      let pureAiText = "Geen resultaat gegenereerd.";
+      let pureAiText = "";
 
-      if (geminiJson && geminiJson.candidates && geminiJson.candidates?.content?.parts && geminiJson.candidates.content.parts?.text) {
-        // CRUCIAL: We houden de tekst hier PURE, zonder de model-badge tekst erin te plakken!
-        pureAiText = geminiJson.candidates.content.parts.text;
+      if (geminiJson && geminiJson.candidates && geminiJson.candidates[0] && geminiJson.candidates[0].content && geminiJson.candidates[0].content.parts && geminiJson.candidates[0].content.parts[0] && geminiJson.candidates[0].content.parts[0].text) {
+        // Het normale succes-pad
+        pureAiText = geminiJson.candidates[0].content.parts[0].text;
       } else if (geminiJson && geminiJson.error) {
+        // Het normale fout-pad
         statusType = "error";
         pureAiText = `🚨 GOOGLE API FOUT: ${geminiJson.error.message}`;
+      } else {
+        // DE TOTALE INSPECTIE-UPGRADE: Toon exact de response én de meegestuurde prompt!
+        statusType = "error";
+        const aanwezigeKeys = Object.keys(geminiJson).join(', ') || "Geen keys gevonden";
+        const ruweInhoud = JSON.stringify(geminiJson).substring(0, 300);
+        
+        // Haal de onbewerkte prompt-tekst op die we naar Google hebben gestuurd
+        const verzondenPrompt = contents && contents[0] && contents[0].parts && contents[0].parts[0] ? contents[0].parts[0].text : "Prompt onleesbaar";
+        const ingekortePrompt = verzondenPrompt.substring(0, 600); // Pak de eerste 600 tekens voor inspectie
+        
+        pureAiText = `🚨 ONVERWACHT ANTWOORD VAN GOOGLE (Geen tekst gegenereerd).\n` +
+                     `• Model gebruikt: ${gebruiktModel}\n` +
+                     `• Beschikbare JSON data-velden: [${aanwezigeKeys}]\n` +
+                     `• Ruwe inspectie-data van Google: ${ruweInhoud}...\n\n` +
+                     `--- LIVE INSPECTIE VERZONDEN PROMPT (EERSTE DEEL) ---\n` +
+                     `${ingekortePrompt}...`;
       }
 
-      // Stuur de data gestructureerd terug. De frontend pakt 'model' en 'diagnose' apart uit!
       return new Response(JSON.stringify({ 
         status: statusType,
         model: gebruiktModel,
         diagnose: pureAiText 
       }), { headers: corsHeaders });
 
+    } catch (error) {
+      return new Response(JSON.stringify({ status: "error", model: "Crash-pijp", diagnose: `🚨 SYSTEMISCHE CRASH: ${error.message}` }), { headers: corsHeaders });
     }
   },
 
-  // 3. DE GEAUTOMATISEERDE RECHTTREEKSE INGESTIE-MOTOR (NU MET SKILL.MD EXPERT KENNIS)
+  // 3. DE GEAUTOMATISEERDE RECHTTREEKSE INGESTIE-MOTOR (GEERD OP LOKALE EMBEDDINGS)
   async voerIngestieUit(env) {
     if (!env.VECTOR_INDEX || !env.AI) {
-      throw new Error("Cloudflare AI of Vectorize binding ontbreekt in deze omgeving.");
+      throw new Error("Cloudflare AI of Vectorize binding ontbreekt.");
     }
 
-    // BRON 1: Haal eerst de gewone problemen-oplossen pagina op van internet
     const url = "https://openquatt.github.io/OpenQuatt/problemen-oplossen.html";
     const response = await fetch(url);
     const html = await response.text();
 
     const alineas = html
       .split("<p>")
-      .map(p => p.split("</p>")[0].replace(/<[^>]*>/g, '').trim())
+      .map(p => p.split("</p>").replace(/<[^>]*>/g, '').trim())
       .filter(text => text.length > 50 && !text.includes("javascript") && !text.includes("css"));
 
-    // BRON 2: GECORRIGEERD - WE VOEGEN DE HARDEN EXPERT-REGELS UIT SKILL.MD RECHTTREEKS TOE AAN DE PAYLOAD!
     const expertSecties = [
       "OpenQuatt logboeken gebruiken een speciale deltamix encoding (device-psram-delta-json-v1). Waarden in de samples zijn geen absolute totalen, maar wijzigingen ten opzichte van de startstatus (t=0). De analyzer moet een lopende status bijhouden per kolom.",
-      "De warmtepomp werkt via de Power House-strategie. Dit is vermogensgestuurd op basis van huisverlies (phouseHouse) en interne vraag (phouseReq). Er is GEEN vaste aanvoertemperatuur (supply target) zoals bij klassieke stooklijnen.",
+      "De warmtepomp werkt via de Power House-strategie. Dit is vermogensgestuurd op basis van huisverlies (phouseHouse) en interne vraag (phouseReq). Er is GEEN vaste aanvoertemperatuur (supply target) zoals bij klassieke stooklijnen. Als de pomp minder kW levert dan de thermostaat vraagt, regelt de Cicero dat autonoom in omdat phouseHouse leidend is.",
       "Als de warmtepomp snel stopt (kort cyclen), vergelijk dan het gevraagde vermogen (strategyRequestedPower) met de laagste fysieke stand van de compressor (pmin in lowLoadDynamicThresholds). Levert de pomp op zijn laagste stand al te veel warmte bij zacht weer? Dan stopt de actuator logischerwijs via de off-drempel.",
       "De start en herstart van de warmtepomp wordt bepaald door de warmte-intentie (Heat Intent). Zodra de binnentemperatuur zakt onder het setpoint minus de comfort-band (standaard 0,1 graden), schiet de vraag via het fast_floor_w_ mechanisme direct omhoog naar het minimale startvermogen om een gezonde run te starten.",
-      "Het compressor-niveau (hp1Compressor) is de stand die via Modbus-register 1999 naar de buitenunit wordt gestuurd. De gemeten frequentie (hp1Freq) is wat de buitenunit daadwerkelijk doet. Er is geen vaste 48 Hz minimumlimiet in de code; de laagste stand van het modelanker is altijd 20 Hz."
+      "Het compressor-niveau (hp1Compressor) is de stand die via Modbus-register 1999 naar de buitenunit wordt gestuurd. De gemeten frequentie (hp1Freq) is what de buitenunit daadwerkelijk doet. Er is geen vaste 48 Hz minimumlimiet in de code; de laagste stand van het modelanker is always 20 Hz."
     ];
 
-    // Voeg de expert-secties samen met de gewone alineas
     expertSecties.forEach(txt => alineas.push(txt));
-
     const cloudflarePayload = [];
 
     for (let i = 0; i < alineas.length; i++) {
       const tekstSectie = alineas[i];
-
       try {
         const embeddingResponse = await env.AI.run("@cf/baai/bge-base-en-v1.5", {
           text: [tekstSectie]
@@ -208,7 +220,7 @@ export default {
           });
         }
       } catch (e) {
-        console.error(`Sectie ${i} kon niet worden omgezet: ${e.message}`);
+        console.error(`Sectie ${i} fout: ${e.message}`);
       }
     }
 
@@ -216,8 +228,6 @@ export default {
       await env.VECTOR_INDEX.insert(cloudflarePayload);
       return `Succesvol ${cloudflarePayload.length} documentatie- en expert-secties gevectoriseerd en opgeslagen!`;
     }
-
-    return "Geen geschikte alineas gevonden om te importeren.";
+    return "Geen geschikte alineas gevonden.";
   }
-  
 };
