@@ -132,15 +132,36 @@ export default {
         geminiJson = JSON.parse(responseText);
       }
 
+      // ====================================================================
+      // RESPONSE GATEWAY MET LIVE PROMPT- & TELEMETRIE-INSPECTIE
+      // ====================================================================
       let gebruiktModel = typeof reserveModel !== 'undefined' ? reserveModel : primairModel;
       let statusType = "success";
-      let pureAiText = "Geen resultaat gegenereerd.";
+      let pureAiText = "";
 
-      if (geminiJson && geminiJson.candidates && geminiJson.candidates[0]?.content?.parts[0] && geminiJson.candidates[0].content.parts[0].text)  
-        pureAiText = geminiJson.candidates.content.parts.text;
+      if (geminiJson && geminiJson.candidates && geminiJson.candidates[0] && geminiJson.candidates[0].content && geminiJson.candidates[0].content.parts && geminiJson.candidates[0].content.parts[0] && geminiJson.candidates[0].content.parts[0].text) {
+        // Het normale succes-pad
+        pureAiText = geminiJson.candidates[0].content.parts[0].text;
       } else if (geminiJson && geminiJson.error) {
+        // Het normale fout-pad
         statusType = "error";
         pureAiText = `🚨 GOOGLE API FOUT: ${geminiJson.error.message}`;
+      } else {
+        // DE TOTALE INSPECTIE-UPGRADE: Toon exact de response én de meegestuurde prompt!
+        statusType = "error";
+        const aanwezigeKeys = Object.keys(geminiJson).join(', ') || "Geen keys gevonden";
+        const ruweInhoud = JSON.stringify(geminiJson).substring(0, 300);
+        
+        // Haal de onbewerkte prompt-tekst op die we naar Google hebben gestuurd
+        const verzondenPrompt = contents && contents[0] && contents[0].parts && contents[0].parts[0] ? contents[0].parts[0].text : "Prompt onleesbaar";
+        const ingekortePrompt = verzondenPrompt.substring(0, 600); // Pak de eerste 600 tekens voor inspectie
+        
+        pureAiText = `🚨 ONVERWACHT ANTWOORD VAN GOOGLE (Geen tekst gegenereerd).\n` +
+                     `• Model gebruikt: ${gebruiktModel}\n` +
+                     `• Beschikbare JSON data-velden: [${aanwezigeKeys}]\n` +
+                     `• Ruwe inspectie-data van Google: ${ruweInhoud}...\n\n` +
+                     `--- LIVE INSPECTIE VERZONDEN PROMPT (EERSTE DEEL) ---\n` +
+                     `${ingekortePrompt}...`;
       }
 
       return new Response(JSON.stringify({ 
