@@ -141,14 +141,14 @@ export default {
       let pureAiText = "Geen resultaat gegenereerd.";
 
       if (geminiJson && geminiJson.candidates && geminiJson.candidates?.content?.parts && geminiJson.candidates.content.parts?.text) {
-        // We houden de tekst hier puur, want de frontend zet het model nu in de statusbalk!
+        // CRUCIAL: We houden de tekst hier PURE, zonder de model-badge tekst erin te plakken!
         pureAiText = geminiJson.candidates.content.parts.text;
       } else if (geminiJson && geminiJson.error) {
         statusType = "error";
         pureAiText = `🚨 GOOGLE API FOUT: ${geminiJson.error.message}`;
       }
 
-      // Stuur de data gestructureerd terug naar de browser
+      // Stuur de data gestructureerd terug. De frontend pakt 'model' en 'diagnose' apart uit!
       return new Response(JSON.stringify({ 
         status: statusType,
         model: gebruiktModel,
