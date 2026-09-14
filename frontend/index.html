@@ -242,12 +242,11 @@
             }
         });
 
-        // 6. EERSTE ANALYSE STARTEN (NU MET LIVE STATUS LOGGING IN DE CONSOLE)
+        // 6. EERSTE ANALYSE STARTEN (NU MET OPTIONELE BEGINVRAAG MEEGEVOERD)
         el('btn-diagnose').addEventListener('click', async () => {
             if (!activeLogData) return;
             el('loader').classList.remove('hidden');
             
-            // Live Statusstappen tonen in de console terwijl de gebruiker wacht
             const outputBox = el('output-box');
             outputBox.innerHTML = `⚙️ <span class="text-gray-400">Verbinding maken met Cloudflare API-gateway...</span><br>` +
                                   `🔍 <span class="text-gray-400">RAG-database raadplegen voor OpenQuatt-richtlijnen...</span><br>` +
@@ -262,8 +261,19 @@
                 thermostaat: el('thermostaat').value 
             };
 
+            // Lees de optionele beginvraag uit
+            const beginVraagTekst = el('begin_vraag').value.trim();
+            
+            // GECORRIGEERD: Als de gebruiker een beginvraag heeft ingevuld, stoppen we die direct in de chatHistory-tijdlijn!
+            if (beginVraagTekst) {
+                chatHistory.push({ role: "user", parts: [{ text: `Specifieke klacht/vraag van de gebruiker: ${beginVraagTekst}` }] });
+                // Toon de eigen beginvraag ook alvast netjes als startblok in de console
+                outputBox.innerHTML += `<br><br><div><span class="text-xs text-gray-500">Omgevings-klacht meegegeven: "${beginVraagTekst}"</span></div>`;
+            }
+
             el('btn-diagnose').disabled = true;
             el('btn-diagnose').textContent = "AI analyseert het logboek...";
+
 
             try {
                 const r = await fetch(WORKER_URL, { 
