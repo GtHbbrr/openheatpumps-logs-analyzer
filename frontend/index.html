@@ -142,98 +142,93 @@
     </footer>
 
     <script>
-        const WORKER_URL = "https://api-dev.openheatpumps.nl";
+        let activeLogData = null, chatHistory = [];
 
-        // SLIMME EN LICHTE VERTALER OM MARKDOWN OM TE ZETTEN NAAR TAILWIND HTML [1.1]
+        const el = id => document.getElementById(id);
 
+        // 1. DE SLIMME EN UNIVERSELE MARKDOWN & LATEX PARSER
         function parseMarkdown(tekst) {
             if (!tekst) return "";
             return tekst
-                // 1. Rigoureuze LaTeX en wiskundige codes opschonen naar normale taal
+                // Rigoureuze LaTeX en wiskundige codes opschonen naar normale taal
                 .replace(/\\text\s*\{(.*?)\}/g, '$1')   // Verwijdert \text{...} wrappers
-                .replace(/\\approx/g, '±')              // Verandert \approx naar het ± of circa teken
-                .replace(/\\times/g, '×')               // Verandert \times naar het × vermenigvuldigingsteken
-                .replace(/\$(.*?)\$/g, '$1')            // Verwijdert alle overgebleven wiskundige dollartekens
-                .replace(/\\Delta T/g, 'Delta T')       // Herstelt het Delta T symbool
+                .replace(/\\approx/g, '±')              // Verandert \approx naar circa teken
+                .replace(/\\times/g, '×')               // Verandert \times naar vermenigvuldigingsteken
+                .replace(/\$(.*?)\$/g, '$1')            // Verwijdert wiskundige dollartekens
+                .replace(/\\Delta T/g, 'Delta T')       // Herstelt Delta T symbool
                 .replace(/\\circ/g, '°')                // Herstelt graden-tekens
-                
-                // 2. Standaard Markdown parsing naar Tailwind HTML
+                // Standaard Markdown parsing naar Tailwind HTML
                 .replace(/^### (.*$)/gim, '<h3 class="text-base font-bold text-orange-400 mt-6 mb-2 tracking-wide border-b border-gray-800 pb-1">$1</h3>')
                 .replace(/\*\*(.*?)\*\*/g, '<strong class="font-bold text-white">$1</strong>')
                 .replace(/^\s*[•*]\s(.*$)/gim, '<span class="inline-block text-orange-500 mr-1">•</span> $1')
                 .replace(/`(.*?)`/g, '<code class="bg-gray-900 border border-gray-800 text-orange-300 px-1.5 py-0.5 rounded font-mono text-xs">$1</code>')
                 .replace(/\n/g, '<br>');
         }
-        let activeLogData = null, chatHistory = [];
 
-        const el = id => document.getElementById(id);
-
-        // Universele Bestands- en Mapkoppeling
-        el('btn-map').addEventListener('click', async () => {
-        // DESKTOP & MOBIEL CHECK: Als de browser showDirectoryPicker NIET ondersteunt (zoals op mobiel of oudere browsers)
-            if (!window.showDirectoryPicker) {
-                el('mobile-file-input').click();
-                return;
-            }
-
-            // DESKTOP MET CHOICE: Als de browser het wél ondersteunt, geven we de desktop-gebruiker de keuze!
-            if (confirm("Wil je een héle map koppelen zodat we automatisch het nieuwste logboek zoeken?\n\n(Klik op 'Annuleren' om handmatig één specifiek los .json bestand te kiezen)")) {
-                try {
-                    const dir = await window.showDirectoryPicker();
-                    el('map-status').textContent = "Verbonden map: " + dir.name;
-                    
-                    let meestRecenteBestand = null;
-                    let hoogsteTijdstempel = 0;
-
-                    // Loop door ALLE bestanden in de gekoppelde map heen
-                    for await (const entry of dir.values()) {
-                        if (entry.kind === 'file' && entry.name.endsWith('.json')) {
-                            const file = await entry.getFile();
-                            
-                            // Vergelijk de wijzigingsdatum van het bestand
-                            if (file.lastModified > hoogsteTijdstempel) {
-                                hoogsteTijdstempel = file.lastModified;
-                                meestRecenteBestand = file;
-                            }
-                        }
-                    }
-
-                    // Laad pas het bestand in als de hele map is gescand
-                    if (meestRecenteBestand) {
-                        laadBestand(meestRecenteBestand);
-                    } else {
-                        alert("Geen .json logbestanden gevonden in deze map.");
-                    }
-                } catch (err) { 
-                    console.error(err);
-                    // Als de gebruiker de mappen-toegang halverwege weigert, crasht de boel niet maar openen we de bestandskiezer
-                    el('mobile-file-input').click();
-                }
-            } else {
-                // Als de desktop-gebruiker op 'Annuleren' klikt, openen we direct de Finder/Verkenner voor één los bestand!
-                el('mobile-file-input').click();
-            }
-        });
-
-        // MOBIELE OPVANGER: Zodra de gebruiker op zijn mobiel een bestand kiest, schieten we hem direct door de lader!
-        el('mobile-file-input').addEventListener('change', (e) => {
-            if (e.target.files && e.target.files.length > 0) {
-                laadBestand(e.target.files[0]);
-                el('map-status').textContent = "Bestand gekoppeld via mobiel";
-            }
-        });
-
-        el('drop-zone').addEventListener('dragover', e => e.preventDefault());
-        el('drop-zone').addEventListener('drop', e => { e.preventDefault(); if(e.dataTransfer.files.length) laadBestand(e.dataTransfer.files[0]); });
-
+        // 2. FUNCTIE: HET BESTAND ECHT INLEZEN EN DE UI ACTIVEREN
         async function laadBestand(file) {
-            el('file-name').textContent = file.name;
-            activeLogData = JSON.parse(await file.text());
-            el('btn-diagnose').disabled = false;
-            el('btn-diagnose').classList.remove('opacity-50', 'cursor-not-allowed');
-            el('btn-diagnose').classList.add('hover:bg-green-600');
+            try {
+                el('file-name').textContent = file.name;
+                activeLogData = JSON.parse(await file.text());
+                
+                // Activeer de grote groene analyse-knop
+                el('btn-diagnose').disabled = false;
+                el('btn-diagnose').classList.remove('opacity-50', 'cursor-not-allowed');
+                el('btn-diagnose').classList.add('hover:bg-green-600', 'bg-green-600');
+                el('btn-diagnose').classList.remove('bg-green-700');
+            } catch (jsonErr) {
+                alert("Fout bij het openen: Het geselecteerde bestand is geen geldig JSON-logbestand.");
+            }
         }
 
+        // 3. KNOP 1: HELE MAP SCANNEN (PC/MAC)
+        el('btn-map').addEventListener('click', async () => {
+            try {
+                const dir = await window.showDirectoryPicker();
+                el('map-status').textContent = "Verbonden map: " + dir.name;
+                
+                let meestRecenteBestand = null;
+                let hoogsteTijdstempel = 0;
+
+                for await (const entry of dir.values()) {
+                    if (entry.kind === 'file' && entry.name.endsWith('.json')) {
+                        const file = await entry.getFile();
+                        if (file.lastModified > hoogsteTijdstempel) {
+                            hoogsteTijdstempel = file.lastModified;
+                            meestRecenteBestand = file;
+                        }
+                    }
+                }
+
+                if (meestRecenteBestand) {
+                    await laadBestand(meestRecenteBestand);
+                } else {
+                    alert("Geen .json logbestanden gevonden in deze map.");
+                }
+            } catch (err) { 
+                console.error(err);
+                alert("Map-koppeling afgebroken of niet ondersteund."); 
+            }
+        });
+
+        // 4. KNOP 2: LOSSE BESTANDSKIEZER (MAC, PC & MOBIEL)
+        el('mobile-file-input').addEventListener('change', async (e) => {
+            if (e.target.files && e.target.files.length > 0) {
+                await laadBestand(e.target.files[0]);
+                el('map-status').textContent = "Bestand handmatig gekoppeld";
+            }
+        });
+
+        // 5. DRAG & DROP LOGICA
+        el('drop-zone').addEventListener('dragover', e => e.preventDefault());
+        el('drop-zone').addEventListener('drop', async (e) => { 
+            e.preventDefault(); 
+            if (e.dataTransfer.files.length) {
+                await laadBestand(e.dataTransfer.files[0]); 
+            }
+        });
+
+        // 6. EERSTE ANALYSE STARTEN (GROENE KNOP)
         el('btn-diagnose').addEventListener('click', async () => {
             if (!activeLogData) return;
             el('loader').classList.remove('hidden');
@@ -253,86 +248,86 @@
                     headers: { 'Content-Type': 'application/json' }, 
                     body: JSON.stringify({ userProfile: profile, logData: activeLogData, messages: null }) 
                 });
-                const d = await r.json();
+                
+                const rauweTekst = await r.text();
+                let d = null;
+                try { d = JSON.parse(rauweTekst); } catch(pErr) { d = { diagnose: `🚨 NETWERKFOUT: Ongeldig antwoord van server.` }; }
+
                 el('output-box').innerHTML = `<strong>Analyse Resultaat:</strong><br><br>${parseMarkdown(d.diagnose)}`;
                 chatHistory.push({ role: "user", parts: [{ text: "Analyseer dit bestand." }] }, { role: "model", parts: [{ text: d.diagnose }] });
                 el('chat-container').classList.remove('hidden');
-            } catch (err) { el('output-box').textContent = "Fout: " + err.message; }
+            } catch (err) { 
+                el('output-box').textContent = "Fout: " + err.message; 
+            }
             el('loader').classList.add('hidden');
         });
 
-        async function verstuurVraag() {
-            const v = el('chat-input').value.trim(); if (!v) return;
-            el('chat-input').value = "";
-            el('output-box').innerHTML += `\n\n<span class="text-orange-400"><strong>Jij:</strong> ${v}</span>`;
+        // 7. VERVOLGVRAGEN VERSTUREN (ORANJE/RODE KNOP)
+        el('btn-send').addEventListener('click', async () => {
+            const inputField = el('chat-input');
+            const outputBox = el('output-box');
+            
+            const isFoutGeweest = outputBox.innerHTML.includes("🚨 GOOGLE API FOUT") || outputBox.innerHTML.includes("🚨 SYSTEMISCHE CRASH") || outputBox.innerHTML.includes("🚨 NETWERKFOUT");
+            let vraagTekst = "";
+            
+            if (isFoutGeweest) {
+                const laatsteUserBericht = chatHistory.filter(m => m.role === "user").pop();
+                vraagTekst = laatsteUserBericht ? laatsteUserBericht.parts.text : inputField.value;
+            } else {
+                vraagTekst = inputField.value.trim();
+                if (!vraagTekst) return;
+                
+                outputBox.innerHTML += `<br><br><div class="text-right"><span class="bg-gray-800 text-gray-200 border border-gray-700 px-3 py-2 rounded-lg inline-block text-sm max-w-[85%] text-left"><strong>Jij:</strong><br>${vraagTekst}</span></div>`;
+                chatHistory.push({ role: "user", parts: [{ text: vraagTekst }] });
+                inputField.value = "";
+            }
+
             el('loader').classList.remove('hidden');
-            chatHistory.push({ role: "user", parts: [{ text: v }] });
+            el('btn-send').disabled = true;
+            el('btn-send').textContent = "Versturen...";
 
             try {
+                const profile = { 
+                    woning_type: el('woning_type').value, 
+                    afgiftesysteem: el('afgiftesysteem').value, 
+                    cv_ketel: el('cv_ketel').value, 
+                    thermostaat: el('thermostaat').value 
+                };
+
                 const r = await fetch(WORKER_URL, { 
                     method: 'POST', 
                     headers: { 'Content-Type': 'application/json' }, 
-                    body: JSON.stringify({ messages: chatHistory, logData: null, userProfile: {} }) 
+                    body: JSON.stringify({ userProfile: profile, logData: activeLogData, messages: chatHistory }) 
                 });
-                const d = await r.json();
-                el('output-box').innerHTML += `\n\n<strong>AI Assistent:</strong><br><br>${parseMarkdown(d.diagnose)}`;
-                chatHistory.push({ role: "model", parts: [{ text: d.diagnose }] });
-                el('output-box').scrollTop = el('output-box').scrollHeight;
-            } catch (err) { el('output-box').innerHTML += `\n\n<span class="text-red-500"><strong>Fout.</strong></span>`; }
-            el('loader').classList.add('hidden');
-        }
-
-        // De Slimme Chat-verstuurder met tijdlijn-behoud en dubbele functie
-        try {
-            const profile = { 
-                woning_type: el('woning_type').value, 
-                afgiftesysteem: el('afgiftesysteem').value, 
-                cv_ketel: el('cv_ketel').value, 
-                thermostaat: el('thermostaat').value 
-            };
-
-            const r = await fetch(WORKER_URL, { 
-                method: 'POST', 
-                headers: { 'Content-Type': 'application/json' }, 
-                body: JSON.stringify({ userProfile: profile, logData: activeLogData, messages: chatHistory }) 
-            });
-            
-            // GECORRIGEERD: Eerst de tekst ophalen om te controleren of het wel geldige JSON is [1.5]
-            const rauweTekst = await r.text();
-            let d = null;
-            
-            try {
-                d = JSON.parse(rauweTekst);
-            } catch(parseErr) {
-                // Als het geen JSON is (zoals een Cloudflare 524 timeout), maken we er zelf een nette melding van [1.5]
-                d = { diagnose: `🚨 CLOUDFLARE NETWERKFOUT: De server reageerde te traag (Timeout). Probeer het nogmaals. (Rauw antwoord: ${rauweTekst.trim()})` };
-            }
-            
-            if (d.diagnose.includes("🚨 GOOGLE API FOUT") || d.diagnose.includes("🚨 SYSTEMISCHE CRASH") || d.diagnose.includes("🚨 CLOUDFLARE NETWERKFOUT")) {
-                outputBox.innerHTML += `<br><br><span class="text-red-400 font-bold">${d.diagnose}</span>`;
+                
+                const rauweTekst = await r.text();
+                let d = null;
+                try { d = JSON.parse(rauweTekst); } catch(pErr) { d = { diagnose: `🚨 NETWERKFOUT: De server reageerde te traag (Timeout). Probeer het nogmaals.` }; }
+                
+                if (d.diagnose.includes("🚨 GOOGLE API FOUT") || d.diagnose.includes("🚨 SYSTEMISCHE CRASH") || d.diagnose.includes("🚨 NETWERKFOUT")) {
+                    outputBox.innerHTML += `<br><br><span class="text-red-400 font-bold">${d.diagnose}</span>`;
+                    el('btn-send').textContent = "🔁 Opnieuw Proberen";
+                    el('btn-send').classList.remove('bg-orange-600', 'hover:bg-orange-700');
+                    el('btn-send').classList.add('bg-red-600', 'hover:bg-red-700');
+                } else {
+                    outputBox.innerHTML += `<br><br><div><span class="inline-block text-sm max-w-[95%]">${parseMarkdown(d.diagnose)}</span></div>`;
+                    chatHistory.push({ role: "model", parts: [{ text: d.diagnose }] });
+                    
+                    el('btn-send').textContent = "Verstuur";
+                    el('btn-send').classList.remove('bg-red-600', 'hover:bg-red-700');
+                    el('btn-send').classList.add('bg-orange-600', 'hover:bg-orange-700');
+                }
+                outputBox.scrollTop = outputBox.scrollHeight;
+            } catch (err) { 
+                outputBox.innerHTML += `<br><br><span class="text-red-400 font-bold">🚨 VERBINDINGSFOUT: ${err.message}</span>`;
                 el('btn-send').textContent = "🔁 Opnieuw Proberen";
                 el('btn-send').classList.remove('bg-orange-600', 'hover:bg-orange-700');
                 el('btn-send').classList.add('bg-red-600', 'hover:bg-red-700');
-            } else {
-                // Succes! Voeg het antwoord toe aan het scherm
-                outputBox.innerHTML += `<br><br><div><span class="inline-block text-sm max-w-[95%]">${parseMarkdown(d.diagnose)}</span></div>`;
-                chatHistory.push({ role: "model", parts: [{ text: d.diagnose }] });
-                
-                el('btn-send').textContent = "Verstuur";
-                el('btn-send').classList.remove('bg-red-600', 'hover:bg-red-700');
-                el('btn-send').classList.add('bg-orange-600', 'hover:bg-orange-700');
             }
-            
-            outputBox.scrollTop = outputBox.scrollHeight;
+            el('loader').classList.add('hidden');
+            el('btn-send').disabled = false;
+        });
 
-        } catch (err) { 
-            outputBox.innerHTML += `<br><br><span class="text-red-400 font-bold">🚨 VERBINDINGSFOUT: ${err.message}</span>`;
-            el('btn-send').textContent = "🔁 Opnieuw Proberen";
-            el('btn-send').classList.remove('bg-orange-600', 'hover:bg-orange-700');
-            el('btn-send').classList.add('bg-red-600', 'hover:bg-red-700');
-        }
-
-        el('chat-input').addEventListener('keypress', e => { if (e.key === 'Enter') verstuurVraag(); });
     </script>
 </body>
 </html>
