@@ -283,77 +283,54 @@
         }
 
         // De Slimme Chat-verstuurder met tijdlijn-behoud en dubbele functie
-        el('btn-send').addEventListener('click', async () => {
-            const inputField = el('chat-input');
-            const outputBox = el('output-box');
-            
-            const isFoutGeweest = outputBox.innerHTML.includes("🚨 GOOGLE API FOUT") || outputBox.innerHTML.includes("🚨 SYSTEMISCHE CRASH");
-            let vraagTekst = "";
-            
-            if (isFoutGeweest) {
-                // RETRY PAD: Pak de laatste user-vraag uit de geschiedenis
-                const laatsteUserBericht = chatHistory.filter(m => m.role === "user").pop();
-                vraagTekst = laatsteUserBericht ? laatsteUserBericht.parts[0].text : inputField.value;
-                console.log("🔄 Fout gedetecteerd. Vraag wordt opnieuw verzonden!");
-            } else {
-                // NORMAAL PAD: Pak de tekst uit het invoerveld
-                vraagTekst = inputField.value.trim();
-                if (!vraagTekst) return;
-                
-                // GECORRIGEERD: Toon jouw eigen vraag NU direct zichtbaar in de chatbox!
-                outputBox.innerHTML += `<br><br><div class="text-right"><span class="bg-gray-800 text-gray-200 border border-gray-700 px-3 py-2 rounded-lg inline-block text-sm max-w-[85%] text-left"><strong>Jij:</strong><br>${vraagTekst}</span></div>`;
-                
-                chatHistory.push({ role: "user", parts: [{ text: vraagTekst }] });
-                inputField.value = ""; // Maak het invoerveld direct leeg
-            }
+        try {
+            const profile = { 
+                woning_type: el('woning_type').value, 
+                afgiftesysteem: el('afgiftesysteem').value, 
+                cv_ketel: el('cv_ketel').value, 
+                thermostaat: el('thermostaat').value 
+            };
 
-            el('loader').classList.remove('hidden');
-            el('btn-send').disabled = true;
-            el('btn-send').textContent = "Versturen...";
-
+            const r = await fetch(WORKER_URL, { 
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/json' }, 
+                body: JSON.stringify({ userProfile: profile, logData: activeLogData, messages: chatHistory }) 
+            });
+            
+            // GECORRIGEERD: Eerst de tekst ophalen om te controleren of het wel geldige JSON is [1.5]
+            const rauweTekst = await r.text();
+            let d = null;
+            
             try {
-                const profile = { 
-                    woning_type: el('woning_type').value, 
-                    afgiftesysteem: el('afgiftesysteem').value, 
-                    cv_ketel: el('cv_ketel').value, 
-                    thermostaat: el('thermostaat').value 
-                };
-
-                const r = await fetch(WORKER_URL, { 
-                    method: 'POST', 
-                    headers: { 'Content-Type': 'application/json' }, 
-                    body: JSON.stringify({ userProfile: profile, logData: activeLogData, messages: chatHistory }) 
-                });
-                
-                const d = await r.json();
-                
-                if (d.diagnose.includes("🚨 GOOGLE API FOUT") || d.diagnose.includes("🚨 SYSTEMISCHE CRASH")) {
-                    outputBox.innerHTML += `<br><br><span class="text-red-400 font-bold">${d.diagnose}</span>`;
-                    el('btn-send').textContent = "🔁 Opnieuw Proberen";
-                    el('btn-send').classList.remove('bg-orange-600', 'hover:bg-orange-700');
-                    el('btn-send').classList.add('bg-red-600', 'hover:bg-red-700');
-                } else {
-                    // VOEG HET ANTWOORD NETJES TOE ONDER DE GESCHIEDENIS (ZONDER OVERSCHRIJVEN)
-                    outputBox.innerHTML += `<br><br><div><span class="inline-block text-sm max-w-[95%]">${parseMarkdown(d.diagnose)}</span></div>`;
-                    chatHistory.push({ role: "model", parts: [{ text: d.diagnose }] });
-                    
-                    el('btn-send').textContent = "Verstuur";
-                    el('btn-send').classList.remove('bg-red-600', 'hover:bg-red-700');
-                    el('btn-send').classList.add('bg-orange-600', 'hover:bg-orange-700');
-                }
-                
-                // Scroll de console automatisch vloeiend mee naar beneden
-                outputBox.scrollTop = outputBox.scrollHeight;
-
-            } catch (err) { 
-                outputBox.innerHTML += `<br><br><span class="text-red-400 font-bold">🚨 SYSTEMISCHE CRASH: ${err.message}</span>`;
-                el('btn-send').textContent = "🔁 Opnieuw Proberen";
+                d = JSON.parse(rauweTekst);
+            } catch(parseErr) {
+                // Als het geen JSON is (zoals een Cloudflare 524 timeout), maken we er zelf een nette melding van [1.5]
+                d = { diagnose: `🚨 CLOUDFLARE NETWERKFOUT: De server reageerde te traag (Timeout). Probeer het nogmaals. (Rauw antwoord: ${rauweTekst.trim()})` };
             }
             
-            el('loader').classList.add('hidden');
-            el('btn-send').disabled = false;
-        });
+            if (d.diagnose.includes("🚨 GOOGLE API FOUT") || d.diagnose.includes("🚨 SYSTEMISCHE CRASH") || d.diagnose.includes("🚨 CLOUDFLARE NETWERKFOUT")) {
+                outputBox.innerHTML += `<br><br><span class="text-red-400 font-bold">${d.diagnose}</span>`;
+                el('btn-send').textContent = "🔁 Opnieuw Proberen";
+                el('btn-send').classList.remove('bg-orange-600', 'hover:bg-orange-700');
+                el('btn-send').classList.add('bg-red-600', 'hover:bg-red-700');
+            } else {
+                // Succes! Voeg het antwoord toe aan het scherm
+                outputBox.innerHTML += `<br><br><div><span class="inline-block text-sm max-w-[95%]">${parseMarkdown(d.diagnose)}</span></div>`;
+                chatHistory.push({ role: "model", parts: [{ text: d.diagnose }] });
+                
+                el('btn-send').textContent = "Verstuur";
+                el('btn-send').classList.remove('bg-red-600', 'hover:bg-red-700');
+                el('btn-send').classList.add('bg-orange-600', 'hover:bg-orange-700');
+            }
+            
+            outputBox.scrollTop = outputBox.scrollHeight;
 
+        } catch (err) { 
+            outputBox.innerHTML += `<br><br><span class="text-red-400 font-bold">🚨 VERBINDINGSFOUT: ${err.message}</span>`;
+            el('btn-send').textContent = "🔁 Opnieuw Proberen";
+            el('btn-send').classList.remove('bg-orange-600', 'hover:bg-orange-700');
+            el('btn-send').classList.add('bg-red-600', 'hover:bg-red-700');
+        }
 
         el('chat-input').addEventListener('keypress', e => { if (e.key === 'Enter') verstuurVraag(); });
     </script>
