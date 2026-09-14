@@ -137,8 +137,10 @@ export default {
 
       // 4. VERWERK HET ANTWOORD OP DE VEILIGE MANIER
       let aiText = "Geen resultaat gegenereerd.";
+      let gebruiktModel = typeof reserveModel !== 'undefined' ? reserveModel : primairModel;
       if (geminiJson && geminiJson.candidates && geminiJson.candidates[0]?.content?.parts && geminiJson.candidates[0].content.parts[0]?.text) {
         aiText = geminiJson.candidates[0].content.parts[0].text;
+        aiText = `🤖 [Model: ${gebruiktModel}]\n\n${geminiJson.candidates[0].content.parts[0].text}`;
       } else if (geminiJson && geminiJson.error) {
         aiText = `🚨 GOOGLE API FOUT: ${geminiJson.error.message} met model-url: ${geminiUrl}`;
       }
