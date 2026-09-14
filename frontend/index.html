@@ -357,13 +357,18 @@
                 if (statusRegel) statusRegel.remove();
 
                 if (isTimeout || d.status === "error" || d.diagnose.includes("🚨 GOOGLE API FOUT") || d.diagnose.includes("🚨 SYSTEMISCHE CRASH")) {
-                    outputBox.innerHTML += `<br><br><span class="text-red-400 font-bold">❌ Fout op model: ${d.model}</span><br><span class="text-red-400 font-bold">${d.diagnose}</span>`;
+                    // GECORRIGEERD: We stoppen de foutmelding nu in een herkenbaar 'error-msg' bakje zodat we het kunnen wissen bij succes
+                    outputBox.innerHTML += `<br><div class="error-msg text-red-400 font-bold"><br>❌ Fout op model: ${d.model}<br>${d.diagnose}</div>`;
                     el('btn-send').textContent = "🔁 Opnieuw Proberen";
                     el('btn-send').classList.remove('bg-orange-600', 'hover:bg-orange-700');
                     el('btn-send').classList.add('bg-red-600', 'hover:bg-red-700');
                 } else {
+                    // GECORRIGEERD: Als er een oude foutmelding in beeld staat, wissen we die nu per direct! [1.13]
+                    const oudeFouten = outputBox.querySelectorAll('.error-msg');
+                    oudeFouten.forEach(fout => fout.remove());
+
                     // VOEG HET ANTWOORD TOE EN TOON DE MODELNAAM IN DE CHAT-TIJDLINJ
-                    outputBox.innerHTML += `<div><span class="inline-block text-sm max-w-[95%]">${parseMarkdown(d.diagnose)}</span></div>`;
+                    outputBox.innerHTML += `<br><br><div class="text-xs text-gray-500 mb-1">🤖 Beantwoord via model: ${d.model}</div><div><span class="inline-block text-sm max-w-[95%]">${parseMarkdown(d.diagnose)}</span></div>`;
                     chatHistory.push({ role: "model", parts: [{ text: d.diagnose }] });
                     
                     el('btn-send').textContent = "Verstuur";
@@ -375,7 +380,8 @@
                 const statusRegel = el('live-chat-status');
                 if (statusRegel) statusRegel.remove();
                 
-                outputBox.innerHTML += `<br><br><span class="text-red-400 font-bold">🚨 VERBINDINGSFOUT: ${err.message}</span>`;
+                // GECORRIGEERD: Ook verbindingsfouten stoppen we in het herkenbare bakje [1.13]
+                outputBox.innerHTML += `<br><div class="error-msg text-red-400 font-bold"><br>🚨 VERBINDINGSFOUT: ${err.message}</div>`;
                 el('btn-send').textContent = "🔁 Opnieuw Proberen";
                 el('btn-send').classList.remove('bg-orange-600', 'hover:bg-orange-700');
                 el('btn-send').classList.add('bg-red-600', 'hover:bg-red-700');
