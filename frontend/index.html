@@ -146,17 +146,21 @@
 
         // SLIMME EN LICHTE VERTALER OM MARKDOWN OM TE ZETTEN NAAR TAILWIND HTML [1.1]
         function parseMarkdown(tekst) {
+            if (!tekst) return "";
             return tekst
-                // Vertaal ### Koppen naar oranje, dikgedrukte titels
+                // Herstel wiskundige LaTeX codes naar normale tekst
+                .replace(/\$(.*?)\^\123(.*)\125\\text\123C\125\$/g, '$1°C') // Herstel graden Celsius matrix
+                .replace(/\$(.*?)\$/g, '$1') // Strip overige wiskundige dollartekens
+                .replace(/\\Delta T/g, 'Delta T') // Herstel delta T symbool
+                .replace(/\\text\123(.*?)\125/g, '$1') // Strip \text{} wrappers
+                .replace(/\\circ/g, '°') // Herstel losse graden tekens
+                // Normale Markdown parsing
                 .replace(/^### (.*$)/gim, '<h3 class="text-base font-bold text-orange-400 mt-6 mb-2 tracking-wide border-b border-gray-800 pb-1">$1</h3>')
-                // Vertaal **dikgedrukte tekst** naar wit en vetgedrukt
                 .replace(/\*\*(.*?)\*\*/g, '<strong class="font-bold text-white">$1</strong>')
-                // Vertaal * cursieve tekst of lijst-sterretjes
-                .replace(/^\*\s(.*$)/gim, '<span class="inline-block text-orange-500 mr-1">•</span> $1')
-                .replace(/\*(.*?)\*/g, '<em class="italic text-gray-300">$1</em>')
-                // Vertaal `code-backticks` naar een strak grijs computer-lettertype
+                .replace(/^\s*•\s(.*$)/gim, '<span class="inline-block text-orange-500 mr-1">•</span> $1')
+                .replace(/^\s*\*\s(.*$)/gim, '<span class="inline-block text-orange-500 mr-1">•</span> $1')
+                .replace(/Opmerking:\*/g, '<strong>Opmerking:</strong>') // Herstel afgebroken sterretjes bij opmerkingen
                 .replace(/`(.*?)`/g, '<code class="bg-gray-900 border border-gray-800 text-orange-300 px-1.5 py-0.5 rounded font-mono text-xs">$1</code>')
-                // Zorg dat gewone regeleinden netjes worden afgebroken
                 .replace(/\n/g, '<br>');
         }
 
@@ -278,7 +282,77 @@
             el('loader').classList.add('hidden');
         }
 
-        el('btn-send').addEventListener('click', verstuurVraag);
+        // De Slimme Chat-verstuurder met dubbele "Opnieuw" functie bij fouten
+        el('btn-send').addEventListener('click', async () => {
+            const inputField = el('chat-input');
+            const outputBox = el('output-box');
+            
+            // CONTROLEER OF ER EEN FOUT IN DE BOX STAAT. ZO JA: DIT IS EEN RETRY!
+            const isFoutGeweest = outputBox.textContent.includes("🚨 GOOGLE API FOUT") || outputBox.textContent.includes("🚨 SYSTEMISCHE CRASH");
+            
+            let vraagTekst = "";
+            
+            if (isFoutGeweest) {
+                // Pak de allerlaatste vraag die we zelf gesteld hadden uit de geschiedenis
+                const laatsteUserBericht = chatHistory.filter(m => m.role === "user").pop();
+                vraagTekst = laatsteUserBericht ? laatsteUserBericht.parts.text : inputField.value;
+                console.log("🔄 Fout gedetecteerd. Dubbele functie geactiveerd: Vraag wordt opnieuw verzonden!");
+            } else {
+                // Normaal pad: pak de tekst uit het invoerveld
+                vraagTekst = inputField.value.trim();
+                if (!vraagTekst) return;
+                chatHistory.push({ role: "user", parts: [{ text: vraagTekst }] });
+                inputField.value = ""; // Maak het invoerveld leeg
+            }
+
+            el('loader').classList.remove('hidden');
+            el('btn-send').disabled = true;
+            el('btn-send').textContent = "Versturen...";
+
+            try {
+                const profile = { 
+                    woning_type: el('woning_type').value, 
+                    afgiftesysteem: el('afgiftesysteem').value, 
+                    cv_ketel: el('cv_ketel').value, 
+                    thermostaat: el('thermostaat').value 
+                };
+
+                const r = await fetch(WORKER_URL, { 
+                    method: 'POST', 
+                    headers: { 'Content-Type': 'application/json' }, 
+                    body: JSON.stringify({ userProfile: profile, logData: activeLogData, messages: chatHistory }) 
+                });
+                
+                const d = await r.json();
+                
+                if (d.diagnose.includes("🚨 GOOGLE API FOUT") || d.diagnose.includes("🚨 SYSTEMISCHE CRASH")) {
+                    // Er ging weer iets mis: toon de fout en verander de knop in een herstelknop
+                    outputBox.innerHTML += `<br><br><span class="text-red-400 font-bold">${d.diagnose}</span>`;
+                    el('btn-send').textContent = "🔁 Opnieuw Proberen";
+                    el('btn-send').classList.remove('bg-orange-600', 'hover:bg-orange-700');
+                    el('btn-send').classList.add('bg-red-600', 'hover:bg-red-700');
+                } else {
+                    // Succes! Voeg het antwoord toe aan het scherm en herstel de knop naar normaal
+                    outputBox.innerHTML += `<br><br><strong class="text-orange-400">AI Assistent:</strong><br>${parseMarkdown(d.diagnose)}`;
+                    chatHistory.push({ role: "model", parts: [{ text: d.diagnose }] });
+                    
+                    el('btn-send').textContent = "Verstuur";
+                    el('btn-send').classList.remove('bg-red-600', 'hover:bg-red-700');
+                    el('btn-send').classList.add('bg-orange-600', 'hover:bg-orange-700');
+                }
+                
+                // Scroll automatisch mee naar beneden naar het nieuwste antwoord
+                outputBox.scrollTop = outputBox.scrollHeight;
+
+            } catch (err) { 
+                outputBox.innerHTML += `<br><br><span class="text-red-400 font-bold">🚨 SYSTEMISCHE CRASH: ${err.message}</span>`;
+                el('btn-send').textContent = "🔁 Opnieuw Proberen";
+            }
+            
+            el('loader').classList.add('hidden');
+            el('btn-send').disabled = false;
+        });
+
         el('chat-input').addEventListener('keypress', e => { if (e.key === 'Enter') verstuurVraag(); });
     </script>
 </body>
