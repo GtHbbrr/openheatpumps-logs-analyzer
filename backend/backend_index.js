@@ -135,20 +135,24 @@ export default {
         geminiJson = JSON.parse(responseText);
       }
 
-      // 4. VERWERK HET ANTWOORD OP DE VEILIGE MANIER
-      let aiText = "Geen resultaat gegenereerd.";
+      // 4. VERWERK HET ANTWOORD OP DE VEILIGE MANIER Geef ALTIJD het gebruikte model en eventuele foutcodes gestructureerd terug
       let gebruiktModel = typeof reserveModel !== 'undefined' ? reserveModel : primairModel;
-      if (geminiJson && geminiJson.candidates && geminiJson.candidates[0]?.content?.parts && geminiJson.candidates[0].content.parts[0]?.text) {
-        aiText = geminiJson.candidates[0].content.parts[0].text;
-        aiText = `🤖 [Model: ${gebruiktModel}]\n\n${geminiJson.candidates[0].content.parts[0].text}`;
+      let statusType = "success";
+
+      let aiText = "Geen resultaat gegenereerd.";
+      if (geminiJson && geminiJson.candidates && geminiJson.candidates?.content?.parts && geminiJson.candidates.content.parts?.text) {
+        aiText = geminiJson.candidates.content.parts.text;
       } else if (geminiJson && geminiJson.error) {
-        aiText = `🚨 GOOGLE API FOUT: ${geminiJson.error.message} met model-url: ${geminiUrl}`;
+        statusType = "error";
+        aiText = `🚨 GOOGLE API FOUT: ${geminiJson.error.message}`;
       }
 
-      return new Response(JSON.stringify({ diagnose: aiText }), { headers: corsHeaders });
+      return new Response(JSON.stringify({ 
+        status: statusType,
+        model: gebruiktModel,
+        diagnose: aiText 
+      }), { headers: corsHeaders });
 
-    } catch (error) {
-      return new Response(JSON.stringify({ diagnose: `🚨 SYSTEMISCHE CRASH: ${error.message}` }), { headers: corsHeaders });
     }
   },
 
