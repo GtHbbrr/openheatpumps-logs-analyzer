@@ -271,7 +271,7 @@
                     body: JSON.stringify({ messages: chatHistory, logData: null, userProfile: {} }) 
                 });
                 const d = await r.json();
-                el('output-box').innerHTML += `\n\n<strong>AI Assistent:</strong>\n${d.diagnose}`;
+                el('output-box').innerHTML += `\n\n<strong>AI Assistent:</strong><br><br>${parseMarkdown(d.diagnose)}`;
                 chatHistory.push({ role: "model", parts: [{ text: d.diagnose }] });
                 el('output-box').scrollTop = el('output-box').scrollHeight;
             } catch (err) { el('output-box').innerHTML += `\n\n<span class="text-red-500"><strong>Fout.</strong></span>`; }
