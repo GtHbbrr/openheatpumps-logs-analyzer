@@ -136,7 +136,7 @@ export default {
       let statusType = "success";
       let pureAiText = "Geen resultaat gegenereerd.";
 
-      if (geminiJson && geminiJson.candidates && geminiJson.candidates?.content?.parts && geminiJson.candidates.content.parts?.text) {
+      if (geminiJson && geminiJson.candidates && geminiJson.candidates[0]?.content?.parts[0] && geminiJson.candidates[0].content.parts[0].text)  
         pureAiText = geminiJson.candidates.content.parts.text;
       } else if (geminiJson && geminiJson.error) {
         statusType = "error";
