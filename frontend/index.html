@@ -142,98 +142,104 @@
     </footer>
 
     <script>
-        const WORKER_URL = "https://api.openheatpumps.nl";
-
-        // SLIMME EN LICHTE VERTALER OM MARKDOWN OM TE ZETTEN NAAR TAILWIND HTML [1.1]
-        function parseMarkdown(tekst) {
-            return tekst
-                // Vertaal ### Koppen naar oranje, dikgedrukte titels
-                .replace(/^### (.*$)/gim, '<h3 class="text-base font-bold text-orange-400 mt-6 mb-2 tracking-wide border-b border-gray-800 pb-1">$1</h3>')
-                // Vertaal **dikgedrukte tekst** naar wit en vetgedrukt
-                .replace(/\*\*(.*?)\*\*/g, '<strong class="font-bold text-white">$1</strong>')
-                // Vertaal * cursieve tekst of lijst-sterretjes
-                .replace(/^\*\s(.*$)/gim, '<span class="inline-block text-orange-500 mr-1">•</span> $1')
-                .replace(/\*(.*?)\*/g, '<em class="italic text-gray-300">$1</em>')
-                // Vertaal `code-backticks` naar een strak grijs computer-lettertype
-                .replace(/`(.*?)`/g, '<code class="bg-gray-900 border border-gray-800 text-orange-300 px-1.5 py-0.5 rounded font-mono text-xs">$1</code>')
-                // Zorg dat gewone regeleinden netjes worden afgebroken
-                .replace(/\n/g, '<br>');
-        }
-
+        const WORKER_URL = "https://api-dev.openheatpumps.nl";    
         let activeLogData = null, chatHistory = [];
 
         const el = id => document.getElementById(id);
 
-        // Universele Bestands- en Mapkoppeling
-        el('btn-map').addEventListener('click', async () => {
-        // DESKTOP & MOBIEL CHECK: Als de browser showDirectoryPicker NIET ondersteunt (zoals op mobiel of oudere browsers)
-            if (!window.showDirectoryPicker) {
-                el('mobile-file-input').click();
-                return;
-            }
-
-            // DESKTOP MET CHOICE: Als de browser het wél ondersteunt, geven we de desktop-gebruiker de keuze!
-            if (confirm("Wil je een héle map koppelen zodat we automatisch het nieuwste logboek zoeken?\n\n(Klik op 'Annuleren' om handmatig één specifiek los .json bestand te kiezen)")) {
-                try {
-                    const dir = await window.showDirectoryPicker();
-                    el('map-status').textContent = "Verbonden map: " + dir.name;
-                    
-                    let meestRecenteBestand = null;
-                    let hoogsteTijdstempel = 0;
-
-                    // Loop door ALLE bestanden in de gekoppelde map heen
-                    for await (const entry of dir.values()) {
-                        if (entry.kind === 'file' && entry.name.endsWith('.json')) {
-                            const file = await entry.getFile();
-                            
-                            // Vergelijk de wijzigingsdatum van het bestand
-                            if (file.lastModified > hoogsteTijdstempel) {
-                                hoogsteTijdstempel = file.lastModified;
-                                meestRecenteBestand = file;
-                            }
-                        }
-                    }
-
-                    // Laad pas het bestand in als de hele map is gescand
-                    if (meestRecenteBestand) {
-                        laadBestand(meestRecenteBestand);
-                    } else {
-                        alert("Geen .json logbestanden gevonden in deze map.");
-                    }
-                } catch (err) { 
-                    console.error(err);
-                    // Als de gebruiker de mappen-toegang halverwege weigert, crasht de boel niet maar openen we de bestandskiezer
-                    el('mobile-file-input').click();
-                }
-            } else {
-                // Als de desktop-gebruiker op 'Annuleren' klikt, openen we direct de Finder/Verkenner voor één los bestand!
-                el('mobile-file-input').click();
-            }
-        });
-
-        // MOBIELE OPVANGER: Zodra de gebruiker op zijn mobiel een bestand kiest, schieten we hem direct door de lader!
-        el('mobile-file-input').addEventListener('change', (e) => {
-            if (e.target.files && e.target.files.length > 0) {
-                laadBestand(e.target.files[0]);
-                el('map-status').textContent = "Bestand gekoppeld via mobiel";
-            }
-        });
-
-        el('drop-zone').addEventListener('dragover', e => e.preventDefault());
-        el('drop-zone').addEventListener('drop', e => { e.preventDefault(); if(e.dataTransfer.files.length) laadBestand(e.dataTransfer.files[0]); });
-
-        async function laadBestand(file) {
-            el('file-name').textContent = file.name;
-            activeLogData = JSON.parse(await file.text());
-            el('btn-diagnose').disabled = false;
-            el('btn-diagnose').classList.remove('opacity-50', 'cursor-not-allowed');
-            el('btn-diagnose').classList.add('hover:bg-green-600');
+        // 1. DE SLIMME EN UNIVERSELE MARKDOWN & LATEX PARSER
+        function parseMarkdown(tekst) {
+            if (!tekst) return "";
+            return tekst
+                // Rigoureuze LaTeX en wiskundige codes opschonen naar normale taal
+                .replace(/\\text\s*\{(.*?)\}/g, '$1')   // Verwijdert \text{...} wrappers
+                .replace(/\\approx/g, '±')              // Verandert \approx naar circa teken
+                .replace(/\\times/g, '×')               // Verandert \times naar vermenigvuldigingsteken
+                .replace(/\$(.*?)\$/g, '$1')            // Verwijdert wiskundige dollartekens
+                .replace(/\\Delta T/g, 'Delta T')       // Herstelt Delta T symbool
+                .replace(/\\circ/g, '°')                // Herstelt graden-tekens
+                // Standaard Markdown parsing naar Tailwind HTML
+                .replace(/^### (.*$)/gim, '<h3 class="text-base font-bold text-orange-400 mt-6 mb-2 tracking-wide border-b border-gray-800 pb-1">$1</h3>')
+                .replace(/\*\*(.*?)\*\*/g, '<strong class="font-bold text-white">$1</strong>')
+                .replace(/^\s*[•*]\s(.*$)/gim, '<span class="inline-block text-orange-500 mr-1">•</span> $1')
+                .replace(/`(.*?)`/g, '<code class="bg-gray-900 border border-gray-800 text-orange-300 px-1.5 py-0.5 rounded font-mono text-xs">$1</code>')
+                .replace(/\n/g, '<br>');
         }
 
+        // 2. FUNCTIE: HET BESTAND ECHT INLEZEN EN DE UI ACTIVEREN
+        async function laadBestand(file) {
+            try {
+                el('file-name').textContent = file.name;
+                activeLogData = JSON.parse(await file.text());
+                
+                // Activeer de grote groene analyse-knop
+                el('btn-diagnose').disabled = false;
+                el('btn-diagnose').classList.remove('opacity-50', 'cursor-not-allowed');
+                el('btn-diagnose').classList.add('hover:bg-green-600', 'bg-green-600');
+                el('btn-diagnose').classList.remove('bg-green-700');
+            } catch (jsonErr) {
+                alert("Fout bij het openen: Het geselecteerde bestand is geen geldig JSON-logbestand.");
+            }
+        }
+
+        // 3. KNOP 1: HELE MAP SCANNEN (PC/MAC)
+        el('btn-map').addEventListener('click', async () => {
+            try {
+                const dir = await window.showDirectoryPicker();
+                el('map-status').textContent = "Verbonden map: " + dir.name;
+                
+                let meestRecenteBestand = null;
+                let hoogsteTijdstempel = 0;
+
+                for await (const entry of dir.values()) {
+                    if (entry.kind === 'file' && entry.name.endsWith('.json')) {
+                        const file = await entry.getFile();
+                        if (file.lastModified > hoogsteTijdstempel) {
+                            hoogsteTijdstempel = file.lastModified;
+                            meestRecenteBestand = file;
+                        }
+                    }
+                }
+
+                if (meestRecenteBestand) {
+                    await laadBestand(meestRecenteBestand);
+                } else {
+                    alert("Geen .json logbestanden gevonden in deze map.");
+                }
+            } catch (err) { 
+                console.error(err);
+                alert("Map-koppeling afgebroken of niet ondersteund."); 
+            }
+        });
+
+        // 4. KNOP 2: LOSSE BESTANDSKIEZER (MAC, PC & MOBIEL)
+        el('mobile-file-input').addEventListener('change', async (e) => {
+            if (e.target.files && e.target.files.length > 0) {
+                await laadBestand(e.target.files[0]);
+                el('map-status').textContent = "Bestand handmatig gekoppeld";
+            }
+        });
+
+        // 5. DRAG & DROP LOGICA
+        el('drop-zone').addEventListener('dragover', e => e.preventDefault());
+        el('drop-zone').addEventListener('drop', async (e) => { 
+            e.preventDefault(); 
+            if (e.dataTransfer.files.length) {
+                await laadBestand(e.dataTransfer.files[0]); 
+            }
+        });
+
+        // 6. EERSTE ANALYSE STARTEN (NU MET LIVE STATUS LOGGING IN DE CONSOLE)
         el('btn-diagnose').addEventListener('click', async () => {
             if (!activeLogData) return;
             el('loader').classList.remove('hidden');
-            el('output-box').textContent = "Systeemanalyse wordt gegenereerd...";
+            
+            // Live Statusstappen tonen in de console terwijl de gebruiker wacht
+            const outputBox = el('output-box');
+            outputBox.innerHTML = `⚙️ <span class="text-gray-400">Verbinding maken met Cloudflare API-gateway...</span><br>` +
+                                  `🔍 <span class="text-gray-400">RAG-database raadplegen voor OpenQuatt-richtlijnen...</span><br>` +
+                                  `🎲 <span class="text-orange-400 animate-pulse">Model-rotatie activeert... Wachten op Google AI Studio...</span>`;
+            
             chatHistory = [];
 
             const profile = { 
@@ -243,43 +249,141 @@
                 thermostaat: el('thermostaat').value 
             };
 
+            el('btn-diagnose').disabled = true;
+            el('btn-diagnose').textContent = "AI analyseert het logboek...";
+
             try {
                 const r = await fetch(WORKER_URL, { 
                     method: 'POST', 
                     headers: { 'Content-Type': 'application/json' }, 
                     body: JSON.stringify({ userProfile: profile, logData: activeLogData, messages: null }) 
                 });
-                const d = await r.json();
-                el('output-box').innerHTML = `<strong>Analyse Resultaat:</strong><br><br>${parseMarkdown(d.diagnose)}`;
-                chatHistory.push({ role: "user", parts: [{ text: "Analyseer dit bestand." }] }, { role: "model", parts: [{ text: d.diagnose }] });
-                el('chat-container').classList.remove('hidden');
-            } catch (err) { el('output-box').textContent = "Fout: " + err.message; }
+                
+                const rauweTekst = await r.text();
+                let d = null;
+                let isTimeout = false;
+                
+                try { 
+                    d = JSON.parse(rauweTekst); 
+                } catch(pErr) { 
+                    isTimeout = true;
+                    d = { 
+                        model: "Onbekend (Cloudflare Timeout)",
+                        diagnose: `🚨 CLOUDFLARE NETWERKFOUT: De server reageerde te traag (Timeout). Klik hieronder om het opnieuw te proberen.\n\n(Rauw antwoord: ${rauweTekst.trim()})` 
+                    }; 
+                }
+
+                // CONTROLEER OF DE BACKEND EEN FOUT HEEFT GEMELD OF DAT ER EEN TIMEOUT WAS
+                if (isTimeout || d.status === "error" || d.diagnose.includes("🚨 GOOGLE API FOUT") || d.diagnose.includes("🚨 SYSTEMISCHE CRASH")) {
+                    outputBox.innerHTML = `❌ <span class="text-red-400 font-bold">Analyse afgebroken op model: ${d.model || "Geen"}</span><br><br>` +
+                                          `<span class="text-red-400 font-bold">${d.diagnose}</span>`;
+                    
+                    el('btn-diagnose').textContent = "🔁 Systeemanalyse Opnieuw Starten";
+                    el('btn-diagnose').classList.remove('bg-green-600', 'hover:bg-green-600');
+                    el('btn-diagnose').classList.add('bg-red-600', 'hover:bg-red-600');
+                    el('btn-diagnose').disabled = false;
+                } else {
+                    // SUCCES: Toon de modelnaam en de opgemaakte tekst in de console
+                    outputBox.innerHTML = `${parseMarkdown(d.diagnose)}`;
+                    chatHistory.push({ role: "user", parts: [{ text: "Analyseer dit bestand." }] }, { role: "model", parts: [{ text: d.diagnose }] });
+                    
+                    el('btn-diagnose').textContent = "Start AI Systeem Analyse";
+                    el('btn-diagnose').classList.remove('bg-red-600', 'hover:bg-red-600');
+                    el('btn-diagnose').classList.add('bg-green-600', 'hover:bg-green-600');
+                    el('btn-diagnose').disabled = false;
+                    
+                    el('chat-container').classList.remove('hidden');
+                }
+            } catch (err) { 
+                outputBox.innerHTML = `❌ <span class="text-red-400 font-bold">Verbindingsfout opgetreden</span><br><br>` +
+                                      `<span class="text-red-400 font-bold">🚨 VERBINDINGSFOUT: ${err.message}</span>`;
+                el('btn-diagnose').textContent = "🔁 Systeemanalyse Opnieuw Starten";
+                el('btn-diagnose').classList.remove('bg-green-600', 'hover:bg-green-600');
+                el('btn-diagnose').classList.add('bg-red-600', 'hover:bg-red-600');
+                el('btn-diagnose').disabled = false;
+            }
             el('loader').classList.add('hidden');
         });
 
-        async function verstuurVraag() {
-            const v = el('chat-input').value.trim(); if (!v) return;
-            el('chat-input').value = "";
-            el('output-box').innerHTML += `\n\n<span class="text-orange-400"><strong>Jij:</strong> ${v}</span>`;
+        // 7. VERVOLGVRAGEN VERSTUREN (NU OOK MET VISUELE MODEL-TRACKING)
+        el('btn-send').addEventListener('click', async () => {
+            const inputField = el('chat-input');
+            const outputBox = el('output-box');
+            
+            const isFoutGeweest = outputBox.innerHTML.includes("🚨 GOOGLE API FOUT") || outputBox.innerHTML.includes("🚨 SYSTEMISCHE CRASH") || outputBox.innerHTML.includes("🚨 NETWERKFOUT");
+            let vraagTekst = "";
+            
+            if (isFoutGeweest) {
+                const laatsteUserBericht = chatHistory.filter(m => m.role === "user").pop();
+                vraagTekst = laatsteUserBericht ? laatsteUserBericht.parts.text : inputField.value;
+            } else {
+                vraagTekst = inputField.value.trim();
+                if (!vraagTekst) return;
+                
+                outputBox.innerHTML += `<br><br><div class="text-right"><span class="bg-gray-800 text-gray-200 border border-gray-700 px-3 py-2 rounded-lg inline-block text-sm max-w-[85%] text-left"><strong>Jij:</strong><br>${vraagTekst}</span></div>`;
+                chatHistory.push({ role: "user", parts: [{ text: vraagTekst }] });
+                inputField.value = "";
+            }
+
             el('loader').classList.remove('hidden');
-            chatHistory.push({ role: "user", parts: [{ text: v }] });
+            el('btn-send').disabled = true;
+            el('btn-send').textContent = "Versturen...";
+
+            // Toon de live statusstappen onderaan de chat tijdens het wachten
+            outputBox.innerHTML += `<br><div id="live-chat-status" class="text-xs text-orange-400 animate-pulse mt-2">🎲 Model-rotatie activeert reserve-pijplijn... Wachten op antwoord...</div>`;
+            outputBox.scrollTop = outputBox.scrollHeight;
 
             try {
+                const profile = { 
+                    woning_type: el('woning_type').value, 
+                    afgiftesysteem: el('afgiftesysteem').value, 
+                    cv_ketel: el('cv_ketel').value, 
+                    thermostaat: el('thermostaat').value 
+                };
+
                 const r = await fetch(WORKER_URL, { 
                     method: 'POST', 
                     headers: { 'Content-Type': 'application/json' }, 
-                    body: JSON.stringify({ messages: chatHistory, logData: null, userProfile: {} }) 
+                    body: JSON.stringify({ userProfile: profile, logData: activeLogData, messages: chatHistory }) 
                 });
-                const d = await r.json();
-                el('output-box').innerHTML += `\n\n<strong>AI Assistent:</strong>\n${d.diagnose}`;
-                chatHistory.push({ role: "model", parts: [{ text: d.diagnose }] });
-                el('output-box').scrollTop = el('output-box').scrollHeight;
-            } catch (err) { el('output-box').innerHTML += `\n\n<span class="text-red-500"><strong>Fout.</strong></span>`; }
-            el('loader').classList.add('hidden');
-        }
+                
+                const rauweTekst = await r.text();
+                let d = null;
+                let isTimeout = false;
+                try { d = JSON.parse(rauweTekst); } catch(pErr) { isTimeout = true; d = { model: "Timeout-pijp", diagnose: `🚨 NETWERKFOUT: De server reageerde te traag.` }; }
+                
+                // Verwijder de tijdelijke chat-statusregel
+                const statusRegel = el('live-chat-status');
+                if (statusRegel) statusRegel.remove();
 
-        el('btn-send').addEventListener('click', verstuurVraag);
-        el('chat-input').addEventListener('keypress', e => { if (e.key === 'Enter') verstuurVraag(); });
+                if (isTimeout || d.status === "error" || d.diagnose.includes("🚨 GOOGLE API FOUT") || d.diagnose.includes("🚨 SYSTEMISCHE CRASH")) {
+                    outputBox.innerHTML += `<br><br><span class="text-red-400 font-bold">❌ Fout op model: ${d.model}</span><br><span class="text-red-400 font-bold">${d.diagnose}</span>`;
+                    el('btn-send').textContent = "🔁 Opnieuw Proberen";
+                    el('btn-send').classList.remove('bg-orange-600', 'hover:bg-orange-700');
+                    el('btn-send').classList.add('bg-red-600', 'hover:bg-red-700');
+                } else {
+                    // VOEG HET ANTWOORD TOE EN TOON DE MODELNAAM IN DE CHAT-TIJDLINJ
+                    outputBox.innerHTML += `<div><span class="inline-block text-sm max-w-[95%]">${parseMarkdown(d.diagnose)}</span></div>`;
+                    chatHistory.push({ role: "model", parts: [{ text: d.diagnose }] });
+                    
+                    el('btn-send').textContent = "Verstuur";
+                    el('btn-send').classList.remove('bg-red-600', 'hover:bg-red-700');
+                    el('btn-send').classList.add('bg-orange-600', 'hover:bg-orange-700');
+                }
+                outputBox.scrollTop = outputBox.scrollHeight;
+            } catch (err) { 
+                const statusRegel = el('live-chat-status');
+                if (statusRegel) statusRegel.remove();
+                
+                outputBox.innerHTML += `<br><br><span class="text-red-400 font-bold">🚨 VERBINDINGSFOUT: ${err.message}</span>`;
+                el('btn-send').textContent = "🔁 Opnieuw Proberen";
+                el('btn-send').classList.remove('bg-orange-600', 'hover:bg-orange-700');
+                el('btn-send').classList.add('bg-red-600', 'hover:bg-red-700');
+            }
+            el('loader').classList.add('hidden');
+            el('btn-send').disabled = false;
+        });
+
     </script>
 </body>
 </html>

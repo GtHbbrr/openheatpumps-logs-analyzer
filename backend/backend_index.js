@@ -135,18 +135,26 @@ export default {
         geminiJson = JSON.parse(responseText);
       }
 
-      // 4. VERWERK HET ANTWOORD OP DE VEILIGE MANIER
-      let aiText = "Geen resultaat gegenereerd.";
-      if (geminiJson && geminiJson.candidates && geminiJson.candidates[0]?.content?.parts && geminiJson.candidates[0].content.parts[0]?.text) {
-        aiText = geminiJson.candidates[0].content.parts[0].text;
+      // 4. VERWERK HET ANTWOORD EN GEEF HET MODEL APART MEE IN DE JSON
+      let gebruiktModel = typeof reserveModel !== 'undefined' ? reserveModel : primairModel;
+      let statusType = "success";
+      let pureAiText = "Geen resultaat gegenereerd.";
+
+      if (geminiJson && geminiJson.candidates && geminiJson.candidates?.content?.parts && geminiJson.candidates.content.parts?.text) {
+        // CRUCIAL: We houden de tekst hier PURE, zonder de model-badge tekst erin te plakken!
+        pureAiText = geminiJson.candidates.content.parts.text;
       } else if (geminiJson && geminiJson.error) {
-        aiText = `🚨 GOOGLE API FOUT: ${geminiJson.error.message} met model-url: ${geminiUrl}`;
+        statusType = "error";
+        pureAiText = `🚨 GOOGLE API FOUT: ${geminiJson.error.message}`;
       }
 
-      return new Response(JSON.stringify({ diagnose: aiText }), { headers: corsHeaders });
+      // Stuur de data gestructureerd terug. De frontend pakt 'model' en 'diagnose' apart uit!
+      return new Response(JSON.stringify({ 
+        status: statusType,
+        model: gebruiktModel,
+        diagnose: pureAiText 
+      }), { headers: corsHeaders });
 
-    } catch (error) {
-      return new Response(JSON.stringify({ diagnose: `🚨 SYSTEMISCHE CRASH: ${error.message}` }), { headers: corsHeaders });
     }
   },
 
