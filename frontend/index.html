@@ -229,13 +229,17 @@
             }
         });
 
-        // 6. EERSTE ANALYSE STARTEN (GROENE KNOP MET RETRY-BEVEILIGING)
+        // 6. EERSTE ANALYSE STARTEN (NU MET LIVE STATUS LOGGING IN DE CONSOLE)
         el('btn-diagnose').addEventListener('click', async () => {
             if (!activeLogData) return;
             el('loader').classList.remove('hidden');
-            el('output-box').textContent = "Systeemanalyse wordt gegenereerd...";
             
-            // RESET OF RETRY CHECK: Als we opnieuw proberen, behouden we de geschiedenis niet, we starten fris
+            // Live Statusstappen tonen in de console terwijl de gebruiker wacht
+            const outputBox = el('output-box');
+            outputBox.innerHTML = `⚙️ <span class="text-gray-400">Verbinding maken met Cloudflare API-gateway...</span><br>` +
+                                  `🔍 <span class="text-gray-400">RAG-database raadplegen voor OpenQuatt-richtlijnen...</span><br>` +
+                                  `🎲 <span class="text-orange-400 animate-pulse">Model-rotatie activeert... Wachten op Google AI Studio...</span>`;
+            
             chatHistory = [];
 
             const profile = { 
@@ -245,7 +249,6 @@
                 thermostaat: el('thermostaat').value 
             };
 
-            // Zet de knop tijdelijk op 'bezig'
             el('btn-diagnose').disabled = true;
             el('btn-diagnose').textContent = "AI analyseert het logboek...";
 
@@ -256,29 +259,32 @@
                     body: JSON.stringify({ userProfile: profile, logData: activeLogData, messages: null }) 
                 });
                 
-                // Veilig de tekst uitlezen om rauwe Cloudflare-fouten (zoals 524 timeouts) op te vangen
                 const rauweTekst = await r.text();
                 let d = null;
+                let isTimeout = false;
                 
                 try { 
                     d = JSON.parse(rauweTekst); 
                 } catch(pErr) { 
-                    // Vangt de "error code: 524" op en maakt er een nette melding van
-                    d = { diagnose: `🚨 NETWERKFOUT: De server reageerde te traag (Timeout). Klik hieronder om het nogmaals te proberen. (Rauw antwoord: ${rauweTekst.trim()})` }; 
+                    isTimeout = true;
+                    d = { 
+                        model: "Onbekend (Cloudflare Timeout)",
+                        diagnose: `🚨 CLOUDFLARE NETWERKFOUT: De server reageerde te traag (Timeout). Klik hieronder om het opnieuw te proberen.\n\n(Rauw antwoord: ${rauweTekst.trim()})` 
+                    }; 
                 }
 
-                // CONTROLEER OF ER EEN GOOGLE OF CLOUDFLARE FOUT IN HET ANTWOORD ZIT
-                if (d.diagnose.includes("🚨 GOOGLE API FOUT") || d.diagnose.includes("🚨 SYSTEMISCHE CRASH") || d.diagnose.includes("🚨 NETWERKFOUT")) {
-                    el('output-box').innerHTML = `<span class="text-red-400 font-bold">${d.diagnose}</span>`;
+                // CONTROLEER OF DE BACKEND EEN FOUT HEEFT GEMELD OF DAT ER EEN TIMEOUT WAS
+                if (isTimeout || d.status === "error" || d.diagnose.includes("🚨 GOOGLE API FOUT") || d.diagnose.includes("🚨 SYSTEMISCHE CRASH")) {
+                    outputBox.innerHTML = `❌ <span class="text-red-400 font-bold">Analyse afgebroken op model: ${d.model || "Geen"}</span><br><br>` +
+                                          `<span class="text-red-400 font-bold">${d.diagnose}</span>`;
                     
-                    // Transformeer de groene knop in een rode Herstartknop!
                     el('btn-diagnose').textContent = "🔁 Systeemanalyse Opnieuw Starten";
                     el('btn-diagnose').classList.remove('bg-green-600', 'hover:bg-green-600');
                     el('btn-diagnose').classList.add('bg-red-600', 'hover:bg-red-600');
                     el('btn-diagnose').disabled = false;
                 } else {
-                    // Succes! Toon het resultaat en herstel de knop naar de normale groene kleur
-                    el('output-box').innerHTML = `<strong>Analyse Resultaat:</strong><br><br>${parseMarkdown(d.diagnose)}`;
+                    // SUCCES: Toon de modelnaam en de opgemaakte tekst in de console
+                    outputBox.innerHTML = `🤖 <span class="text-green-400 font-medium">Succesvol geanalyseerd via model: ${d.model}</span><br>---<br><br>${parseMarkdown(d.diagnose)}`;
                     chatHistory.push({ role: "user", parts: [{ text: "Analyseer dit bestand." }] }, { role: "model", parts: [{ text: d.diagnose }] });
                     
                     el('btn-diagnose').textContent = "Start AI Systeem Analyse";
@@ -286,12 +292,11 @@
                     el('btn-diagnose').classList.add('bg-green-600', 'hover:bg-green-600');
                     el('btn-diagnose').disabled = false;
                     
-                    // Open pas bij succes de vervolg-chatomgeving
                     el('chat-container').classList.remove('hidden');
                 }
             } catch (err) { 
-                // Vangt zware browser/verbindingsfouten op
-                el('output-box').innerHTML = `<span class="text-red-400 font-bold">🚨 VERBINDINGSFOUT: ${err.message}</span>`;
+                outputBox.innerHTML = `❌ <span class="text-red-400 font-bold">Verbindingsfout opgetreden</span><br><br>` +
+                                      `<span class="text-red-400 font-bold">🚨 VERBINDINGSFOUT: ${err.message}</span>`;
                 el('btn-diagnose').textContent = "🔁 Systeemanalyse Opnieuw Starten";
                 el('btn-diagnose').classList.remove('bg-green-600', 'hover:bg-green-600');
                 el('btn-diagnose').classList.add('bg-red-600', 'hover:bg-red-600');
