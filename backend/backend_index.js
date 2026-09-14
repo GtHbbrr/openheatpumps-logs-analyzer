@@ -160,7 +160,7 @@ export default {
       throw new Error("Cloudflare AI of Vectorize binding ontbreekt.");
     }
 
-    const url = "https://github.io";
+    const url = "https://openquatt.github.io/OpenQuatt/problemen-oplossen.html";
     const response = await fetch(url);
     const html = await response.text();
 
