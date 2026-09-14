@@ -98,8 +98,8 @@ export default {
       } else {
         // Vervolgrun: we schonken de geschiedenis op en injecteren de verse systemInstruction dwingend in het laatste bericht
         contents = JSON.parse(JSON.stringify(messages)); // Diepe kopie om front-end niet te breken
-        const oorspronkelijkeTekst = contents[contents.length - 1].parts.text;
-        contents[contents.length - 1].parts.text = systemInstruction + "\n\nVolgends chat-geschiedenis loopt hieronder door. Beantwoord nu de specifieke gebruikersvraag:\n" + oorspronkelijkeTekst;
+        const oorspronkelijkeTekst = contents[contents.length - 1].parts[0].text;
+        contents[contents.length - 1].parts[0].text = systemInstruction + "\n\nVolgens de chat-geschiedenis loopt het hieronder door. Beantwoord nu de specifieke gebruikersvraag:\n" + oorspronkelijkeTekst;
       }
 
       // E. MODEL-ROTATIE EN FAILOVER MOTOR
