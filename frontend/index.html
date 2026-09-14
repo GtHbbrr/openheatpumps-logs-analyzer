@@ -305,7 +305,7 @@
             el('loader').classList.add('hidden');
         });
 
-        // 7. VERVOLGVRAGEN VERSTUREN (ORANJE/RODE KNOP)
+        // 7. VERVOLGVRAGEN VERSTUREN (NU OOK MET VISUELE MODEL-TRACKING)
         el('btn-send').addEventListener('click', async () => {
             const inputField = el('chat-input');
             const outputBox = el('output-box');
@@ -329,6 +329,10 @@
             el('btn-send').disabled = true;
             el('btn-send').textContent = "Versturen...";
 
+            // Toon de live statusstappen onderaan de chat tijdens het wachten
+            outputBox.innerHTML += `<br><div id="live-chat-status" class="text-xs text-orange-400 animate-pulse mt-2">🎲 Model-rotatie activeert reserve-pijplijn... Wachten op antwoord...</div>`;
+            outputBox.scrollTop = outputBox.scrollHeight;
+
             try {
                 const profile = { 
                     woning_type: el('woning_type').value, 
@@ -345,15 +349,21 @@
                 
                 const rauweTekst = await r.text();
                 let d = null;
-                try { d = JSON.parse(rauweTekst); } catch(pErr) { d = { diagnose: `🚨 NETWERKFOUT: De server reageerde te traag (Timeout). Probeer het nogmaals.` }; }
+                let isTimeout = false;
+                try { d = JSON.parse(rauweTekst); } catch(pErr) { isTimeout = true; d = { model: "Timeout-pijp", diagnose: `🚨 NETWERKFOUT: De server reageerde te traag.` }; }
                 
-                if (d.diagnose.includes("🚨 GOOGLE API FOUT") || d.diagnose.includes("🚨 SYSTEMISCHE CRASH") || d.diagnose.includes("🚨 NETWERKFOUT")) {
-                    outputBox.innerHTML += `<br><br><span class="text-red-400 font-bold">${d.diagnose}</span>`;
+                // Verwijder de tijdelijke chat-statusregel
+                const statusRegel = el('live-chat-status');
+                if (statusRegel) statusRegel.remove();
+
+                if (isTimeout || d.status === "error" || d.diagnose.includes("🚨 GOOGLE API FOUT") || d.diagnose.includes("🚨 SYSTEMISCHE CRASH")) {
+                    outputBox.innerHTML += `<br><br><span class="text-red-400 font-bold">❌ Fout op model: ${d.model}</span><br><span class="text-red-400 font-bold">${d.diagnose}</span>`;
                     el('btn-send').textContent = "🔁 Opnieuw Proberen";
                     el('btn-send').classList.remove('bg-orange-600', 'hover:bg-orange-700');
                     el('btn-send').classList.add('bg-red-600', 'hover:bg-red-700');
                 } else {
-                    outputBox.innerHTML += `<br><br><div><span class="inline-block text-sm max-w-[95%]">${parseMarkdown(d.diagnose)}</span></div>`;
+                    // VOEG HET ANTWOORD TOE EN TOON DE MODELNAAM IN DE CHAT-TIJDLINJ
+                    outputBox.innerHTML += `<br><br><div class="text-xs text-gray-500 mb-1">🤖 Beantwoord via model: ${d.model}</div><div><span class="inline-block text-sm max-w-[95%]">${parseMarkdown(d.diagnose)}</span></div>`;
                     chatHistory.push({ role: "model", parts: [{ text: d.diagnose }] });
                     
                     el('btn-send').textContent = "Verstuur";
@@ -362,6 +372,9 @@
                 }
                 outputBox.scrollTop = outputBox.scrollHeight;
             } catch (err) { 
+                const statusRegel = el('live-chat-status');
+                if (statusRegel) statusRegel.remove();
+                
                 outputBox.innerHTML += `<br><br><span class="text-red-400 font-bold">🚨 VERBINDINGSFOUT: ${err.message}</span>`;
                 el('btn-send').textContent = "🔁 Opnieuw Proberen";
                 el('btn-send').classList.remove('bg-orange-600', 'hover:bg-orange-700');
