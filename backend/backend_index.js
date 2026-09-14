@@ -135,22 +135,24 @@ export default {
         geminiJson = JSON.parse(responseText);
       }
 
-      // 4. VERWERK HET ANTWOORD OP DE VEILIGE MANIER Geef ALTIJD het gebruikte model en eventuele foutcodes gestructureerd terug
+      // 4. VERWERK HET ANTWOORD EN GEEF HET MODEL APART MEE IN DE JSON
       let gebruiktModel = typeof reserveModel !== 'undefined' ? reserveModel : primairModel;
       let statusType = "success";
+      let pureAiText = "Geen resultaat gegenereerd.";
 
-      let aiText = "Geen resultaat gegenereerd.";
       if (geminiJson && geminiJson.candidates && geminiJson.candidates?.content?.parts && geminiJson.candidates.content.parts?.text) {
-        aiText = geminiJson.candidates.content.parts.text;
+        // We houden de tekst hier puur, want de frontend zet het model nu in de statusbalk!
+        pureAiText = geminiJson.candidates.content.parts.text;
       } else if (geminiJson && geminiJson.error) {
         statusType = "error";
-        aiText = `🚨 GOOGLE API FOUT: ${geminiJson.error.message}`;
+        pureAiText = `🚨 GOOGLE API FOUT: ${geminiJson.error.message}`;
       }
 
+      // Stuur de data gestructureerd terug naar de browser
       return new Response(JSON.stringify({ 
         status: statusType,
         model: gebruiktModel,
-        diagnose: aiText 
+        diagnose: pureAiText 
       }), { headers: corsHeaders });
 
     }
