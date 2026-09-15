@@ -40,32 +40,42 @@ export default {
       }
     }
 
-    // ENDPOINT 2: HAAL DE LIJST MET GELECTORISEERDE URL'S OP [1.5]
+    // ENDPOINT 2: HAAL DE LIJST MET GEVECTORISEERDE URL'S OP [1]
     if (request.method === "GET" && urlObj.pathname === "/sources") {
       try {
-        if (!env.VECTOR_INDEX) throw new Error("Vectorize index ontbreekt.");
-        const overzicht = await env.VECTOR_INDEX.list({ count: 100 });
-        const vectorIds = overzicht.vectors.map(v => v.id);
-        
         let uniekeBronnen = [
-          "https://openquatt.github.io/OpenQuatt/problemen-oplossen.html",
+          "openquatt.github.io/OpenQuatt/problemen-oplossen.html",
           "OpenQuatt SKILL Expert-Matrix"
         ];
 
-        if (vectorIds.length > 0) {
-          const detailData = await env.VECTOR_INDEX.getByIds(vectorIds);
-          const gescrapteUrls = detailData
-            .filter(v => v.metadata && v.metadata.source)
-            .map(v => v.metadata.source);
-          uniekeBronnen = [...new Set([...uniekeBronnen, ...gescrapteUrls])];
+        if (env.VECTOR_INDEX) {
+          // GECORRIGEERD: Veilig de IDs ophalen volgens de Cloudflare Vectorize standaarden [1]
+          const overzicht = await env.VECTOR_INDEX.list({ count: 100 });
+          const vectorIds = overzicht.vectorIds || (overzicht.keys ? overzicht.keys.map(k => k.id) : []);
+          
+          if (vectorIds && vectorIds.length > 0) {
+            // Pak maximaal de eerste 20 om netwerkdruk te voorkomen [1]
+            const detailData = await env.VECTOR_INDEX.getByIds(vectorIds.slice(0, 20));
+            if (detailData && detailData.length > 0) {
+              const gescrapteUrls = detailData
+                .filter(v => v && v.metadata && v.metadata.source)
+                .map(v => v.metadata.source);
+              uniekeBronnen = [...new Set([...uniekeBronnen, ...gescrapteUrls])];
+            }
+          }
         }
 
         return new Response(JSON.stringify({ status: "success", bronnen: uniekeBronnen }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" }
         });
       } catch (err) {
-        return new Response(JSON.stringify({ status: "error", fout: err.message }), {
-          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" }
+        // FALLBACK: Als Cloudflare list() weigert, sturen we alsnog de basisbronnen mee zodat de UI nooit blijft hangen [1]
+        const basisFallback = [
+          "openquatt.github.io/OpenQuatt/problemen-oplossen.html",
+          "OpenQuatt SKILL Expert-Matrix"
+        ];
+        return new Response(JSON.stringify({ status: "success", bronnen: basisFallback, waarschuwing: err.message }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
         });
       }
     }
