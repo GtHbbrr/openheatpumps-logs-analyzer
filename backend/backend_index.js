@@ -1,7 +1,7 @@
 export default {
   // 1. HANDEL AUTOMATISCHE CRON-TRIGGERS AF (Elke nacht om 03:00 uur)
   async scheduled(event, env, ctx) {
-    ctx.waitUntil(this.voerIngestieUit(env));
+    ctx.waitUntil(this.voerIngestieUit(env, null));
   },
 
   // 2. HANDEL HTTP-VERKEER AF
@@ -16,21 +16,74 @@ export default {
       return new Response(null, { headers: corsHeaders });
     }
 
-    if (request.method === "GET") {
+    const urlObj = new URL(request.url);
+
+    // ENDPOINT 1: VECTORISEER-ENDPOINT VANUIT DE FRONTEND [1.5]
+    if (request.method === "POST" && urlObj.pathname === "/ingest") {
       try {
-        const resultaatTxt = await this.voerIngestieUit(env);
-        return new Response(JSON.stringify({ status: "success", melding: resultaatTxt }), {
+        const body = await request.json();
+        const { customUrls } = body;
+        
+        if (!customUrls || customUrls.length === 0) {
+          return new Response(JSON.stringify({ status: "error", diagnose: "Geen URL's meegegeven om te vectoriseren." }), { headers: corsHeaders });
+        }
+
+        const resultaatTxt = await this.voerIngestieUit(env, customUrls);
+        return new Response(JSON.stringify({ status: "success", diagnose: resultaatTxt }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" }
         });
       } catch (err) {
-        return new Response(JSON.stringify({ status: "error", fout: err.message }), {
+        return new Response(JSON.stringify({ status: "error", diagnose: `🚨 INGESTIE FOUT: ${err.message}` }), {
           status: 500,
           headers: { ...corsHeaders, "Content-Type": "application/json" }
         });
       }
     }
 
-    // HANDEL "POST" VERZOEKEN AF (DIAGNOSE & CHAT)
+    // ENDPOINT 2: HAAL DE LIJST MET GELECTORISEERDE URL'S OP [1.5]
+    if (request.method === "GET" && urlObj.pathname === "/sources") {
+      try {
+        if (!env.VECTOR_INDEX) throw new Error("Vectorize index ontbreekt.");
+        const overzicht = await env.VECTOR_INDEX.list({ count: 100 });
+        const vectorIds = overzicht.vectors.map(v => v.id);
+        
+        let uniekeBronnen = [
+          "https://openquatt.github.io/OpenQuatt/problemen-oplossen.html",
+          "OpenQuatt SKILL Expert-Matrix"
+        ];
+
+        if (vectorIds.length > 0) {
+          const detailData = await env.VECTOR_INDEX.getByIds(vectorIds);
+          const gescrapteUrls = detailData
+            .filter(v => v.metadata && v.metadata.source)
+            .map(v => v.metadata.source);
+          uniekeBronnen = [...new Set([...uniekeBronnen, ...gescrapteUrls])];
+        }
+
+        return new Response(JSON.stringify({ status: "success", bronnen: uniekeBronnen }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
+      } catch (err) {
+        return new Response(JSON.stringify({ status: "error", fout: err.message }), {
+          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
+      }
+    }
+
+    // STANDAARD GET FALLBACK: Voor de handmatige cron-test aanroep
+    if (request.method === "GET") {
+      try {
+        const resultaatTxt = await this.voerIngestieUit(env, null);
+        return new Response(JSON.stringify({ status: "success", melding: resultaatTxt }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
+      } catch (err) {
+        return new Response(JSON.stringify({ status: "error", fout: err.message }), {
+          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
+      }
+    }
+    // HANDEL HIERONDER DE NORMALE CHAT EN DIAGNOSE AF (POST)
     try {
       const body = await request.json();
       const { userProfile, logData, messages } = body;
@@ -39,7 +92,6 @@ export default {
         return new Response(JSON.stringify({ status: "error", diagnose: "🚨 CONFIGURATIEFOUT: GEMINI_API_KEY ontbreekt." }), { headers: corsHeaders });
       }
 
-      // A. BEPAAL DYNAMISCH DE RELEVANTE VRAAG (EERSTE RUN OF VERVOLGVRAAG)
       let actueleVraag = "Analyseer dit bestand.";
       if (messages && messages.length > 0) {
         const laatsteBericht = messages[messages.length - 1];
@@ -50,25 +102,17 @@ export default {
 
       let dynamischeKennisContext = "";
 
-      // B. GECORRIGEERD: DOORZOEK DE DATABASE BIJ *ELK* VERZOEK (DUS OOK BIJ CHAT VRAGEN!)
       if (env.VECTOR_INDEX && env.AI) {
         try {
-          const embeddingResponse = await env.AI.run("@cf/baai/bge-base-en-v1.5", {
-            text: [actueleVraag]
-          });
+          const embeddingResponse = await env.AI.run("@cf/baai/bge-base-en-v1.5", { text: [actueleVraag] });
           const queryVector = embeddingResponse.data;
-
           const vectorMatches = await env.VECTOR_INDEX.query(queryVector, { topK: 3, returnMetadata: true });
-          
-          dynamischeKennisContext = vectorMatches.matches
-            .map(match => `[Geverifieerde Richtlijn]: ${match.metadata.text}`)
-            .join("\n");
+          dynamischeKennisContext = vectorMatches.matches.map(match => `[Geverifieerde Richtlijn]: ${match.metadata.text}`).join("\n");
         } catch (ragErr) {
           console.error("Vectorize Query Error:", ragErr.message);
         }
       }
 
-      // C. GECORRIGEERD: PROFIEL EN INSTRUCTIES WORDEN HIER ENKELDRAADS EN DWINGEND OPGEBOUWD
       const systemInstruction = `
         Je bent de 'OpenHeatPumps AI Assistent'. Je analyseert .oqdebug JSON logbestanden van OpenQuatt warmtepomp-controllers.
         
@@ -80,29 +124,25 @@ export default {
         
         STRIKTE RAG INSTRUCTIE:
         Hieronder staat live kennis uit de handleidingen en de 'Power House' software-matrix. Dit is de absolute waarheid.
-        OpenQuatt werkt VERMOGENSGESTUURD op basis van huisverlies (phouseHouse) en de actuele vraag (phouseReq). Er is GEEN sprake van een klassieke stooklijn of vast aanvoerdoel (supply target)! Als de pomp bijv. 2,4 kW stookt terwijl de warmtevraag 4 kW is, komt dit omdat het berekende huisverlies (phouseHouse) op dat moment aangeeft dat 2,4 kW voldoende is om de comfort-band te bewaken (Power House comfort-band wetten).
+        OpenQuatt werkt VERMOGENSGESTUURD op basis van huisverlies (phouseHouse) en de actuele vraag (phouseReq). Er is GEEN sprake van een klassieke stooklijn of vast aanvoerdoel (supply target)!
         
         DYNAMISCH GEPROMPTE KENNIS UIT DATABASE:
-        ${dynamischeKennisContext || "Geen specifieke documentatie-matches gevonden voor deze vraag. Gebruik de algemene OpenQuatt wetten."}
+        ${dynamischeKennisContext || "Geen specifieke documentatie-matches gevonden voor deze vraag."}
 
         ANALYSEVOLGORDE VOOR EERSTE RUN:
         1. WARMTEVRAAG: Binnentemperatuur vs setpoint.
         2. STATUS: In Standby is 0-flow normaal.
       `;
-      // D. BOUW DE CONVERSATIE OP VOOR GOOGLE GEMINI (ZONDER PROFIEL-VERLIES)
       let contents = [];
       if (!messages || messages.length === 0) {
-        // Eerste run: stuur profiel + logboek
         const initieelBericht = `LOGDATA:\n${JSON.stringify(logData)}`;
         contents.push({ role: "user", parts: [{ text: systemInstruction + "\n\n" + initieelBericht }] });
       } else {
-        // Vervolgrun: we schonken de geschiedenis op en injecteren de verse systemInstruction dwingend in het laatste bericht
-        contents = JSON.parse(JSON.stringify(messages)); // Diepe kopie om front-end niet te breken
-        const oorspronkelijkeTekst = contents[contents.length - 1].parts[0].text;
-        contents[contents.length - 1].parts[0].text = systemInstruction + "\n\nVolgens de chat-geschiedenis loopt het hieronder door. Beantwoord nu de specifieke gebruikersvraag:\n" + oorspronkelijkeTekst;
+        contents = JSON.parse(JSON.stringify(messages));
+        const oorspronkelijkeTekst = contents[contents.length - 1].parts.text;
+        contents[contents.length - 1].parts.text = systemInstruction + "\n\nVolgens de chat-geschiedenis loopt het hieronder door. Beantwoord nu de specifieke gebruikersvraag:\n" + oorspronkelijkeTekst;
       }
 
-      // E. MODEL-ROTATIE EN FAILOVER MOTOR
       const beschikbareModellen = ["gemini-3.5-flash", "gemini-3.6-flash", "gemini-3.7-flash", "gemini-3.8-flash"];
       let gekozenIndex = Math.floor(Math.random() * beschikbareModellen.length);
       let primairModel = beschikbareModellen[gekozenIndex];
@@ -132,42 +172,23 @@ export default {
         geminiJson = JSON.parse(responseText);
       }
 
-      // ====================================================================
-      // RESPONSE GATEWAY MET LIVE PROMPT- & TELEMETRIE-INSPECTIE
-      // ====================================================================
       let gebruiktModel = typeof reserveModel !== 'undefined' ? reserveModel : primairModel;
       let statusType = "success";
-      let pureAiText = "";
+      let pureAiText = "Geen resultaat gegenereerd.";
 
       if (geminiJson && geminiJson.candidates && geminiJson.candidates[0] && geminiJson.candidates[0].content && geminiJson.candidates[0].content.parts && geminiJson.candidates[0].content.parts[0] && geminiJson.candidates[0].content.parts[0].text) {
-        // Het normale succes-pad
         pureAiText = geminiJson.candidates[0].content.parts[0].text;
       } else if (geminiJson && geminiJson.error) {
-        // Het normale fout-pad
         statusType = "error";
         pureAiText = `🚨 GOOGLE API FOUT: ${geminiJson.error.message}`;
-      } else {
-        // DE TOTALE INSPECTIE-UPGRADE: Toon exact de response én de meegestuurde prompt!
-        statusType = "error";
-        const aanwezigeKeys = Object.keys(geminiJson).join(', ') || "Geen keys gevonden";
-        const ruweInhoud = JSON.stringify(geminiJson).substring(0, 300);
-        
-        // Haal de onbewerkte prompt-tekst op die we naar Google hebben gestuurd
-        const verzondenPrompt = contents && contents[0] && contents[0].parts && contents[0].parts[0] ? contents[0].parts[0].text : "Prompt onleesbaar";
-        const ingekortePrompt = verzondenPrompt.substring(0, 600); // Pak de eerste 600 tekens voor inspectie
-        
-        pureAiText = `🚨 ONVERWACHT ANTWOORD VAN GOOGLE (Geen tekst gegenereerd).\n` +
-                     `• Model gebruikt: ${gebruiktModel}\n` +
-                     `• Beschikbare JSON data-velden: [${aanwezigeKeys}]\n` +
-                     `• Ruwe inspectie-data van Google: ${ruweInhoud}...\n\n` +
-                     `--- LIVE INSPECTIE VERZONDEN PROMPT (EERSTE DEEL) ---\n` +
-                     `${ingekortePrompt}...`;
       }
 
+      // Stuur de complete prompt-matrix (contents) mee terug voor de openheid! [1.5]
       return new Response(JSON.stringify({ 
         status: statusType,
         model: gebruiktModel,
-        diagnose: pureAiText 
+        diagnose: pureAiText,
+        verzondenPrompt: contents
       }), { headers: corsHeaders });
 
     } catch (error) {
@@ -175,59 +196,74 @@ export default {
     }
   },
 
-  // 3. DE GEAUTOMATISEERDE RECHTTREEKSE INGESTIE-MOTOR (GEERD OP LOKALE EMBEDDINGS)
-  async voerIngestieUit(env) {
+  // 3. DE GEAUTOMATISEERDE INGESTIE ENGINE (NU UNIVERSEEL EN INTERACTIEF) [1.5]
+  async voerIngestieUit(env, customUrls) {
     if (!env.VECTOR_INDEX || !env.AI) {
       throw new Error("Cloudflare AI of Vectorize binding ontbreekt.");
     }
 
-    const url = "https://openquatt.github.io/OpenQuatt/problemen-oplossen.html";
-    const response = await fetch(url);
-    const html = await response.text();
+    let targets = [];
+    let isHandmatig = false;
 
-    const alineas = html
-      .split("<p>")
-      .map(p => p.split("</p>").replace(/<[^>]*>/g, '').trim())
-      .filter(text => text.length > 50 && !text.includes("javascript") && !text.includes("css"));
+    if (customUrls && customUrls.length > 0) {
+      targets = customUrls;
+      isHandmatig = true;
+    } else {
+      targets = ["https://github.io"];
+    }
 
-    const expertSecties = [
-      "OpenQuatt logboeken gebruiken een speciale deltamix encoding (device-psram-delta-json-v1). Waarden in de samples zijn geen absolute totalen, maar wijzigingen ten opzichte van de startstatus (t=0). De analyzer moet een lopende status bijhouden per kolom.",
-      "De warmtepomp werkt via de Power House-strategie. Dit is vermogensgestuurd op basis van huisverlies (phouseHouse) en interne vraag (phouseReq). Er is GEEN vaste aanvoertemperatuur (supply target) zoals bij klassieke stooklijnen. Als de pomp minder kW levert dan de thermostaat vraagt, regelt de Cicero dat autonoom in omdat phouseHouse leidend is.",
-      "Als de warmtepomp snel stopt (kort cyclen), vergelijk dan het gevraagde vermogen (strategyRequestedPower) met de laagste fysieke stand van de compressor (pmin in lowLoadDynamicThresholds). Levert de pomp op zijn laagste stand al te veel warmte bij zacht weer? Dan stopt de actuator logischerwijs via de off-drempel.",
-      "De start en herstart van de warmtepomp wordt bepaald door de warmte-intentie (Heat Intent). Zodra de binnentemperatuur zakt onder het setpoint minus de comfort-band (standaard 0,1 graden), schiet de vraag via het fast_floor_w_ mechanisme direct omhoog naar het minimale startvermogen om een gezonde run te starten.",
-      "Het compressor-niveau (hp1Compressor) is de stand die via Modbus-register 1999 naar de buitenunit wordt gestuurd. De gemeten frequentie (hp1Freq) is what de buitenunit daadwerkelijk doet. Er is geen vaste 48 Hz minimumlimiet in de code; de laagste stand van het modelanker is always 20 Hz."
-    ];
+    const alineas = [];
 
-    expertSecties.forEach(txt => alineas.push(txt));
+    for (const url of targets) {
+      try {
+        const res = await fetch(url, { headers: { "User-Agent": "OpenHeatPumps-RAG-Engine" } });
+        const html = await res.text();
+        const rauweSecties = html
+          .split(/<p>|\n/g)
+          .map(t => t.replace(/<[^>]*>/g, '').trim())
+          .filter(t => t.length > 60 && !t.includes("javascript") && !t.includes("css"));
+        rauweSecties.forEach(txt => alineas.push({ bron: url, tekst: txt }));
+      } catch (err) {
+        console.error(`Fout bij scrapen van ${url}: ${err.message}`);
+      }
+    }
+
+    if (!isHandmatig) {
+      const expertSecties = [
+        "OpenQuatt logboeken gebruiken een speciale deltamix encoding (device-psram-delta-json-v1). Waarden in de samples zijn geen absolute totalen, maar wijzigingen ten opzichte van de startstatus (t=0). De analyzer moet een lopende status bijhouden per kolom.",
+        "De warmtepomp werkt via de Power House-strategie. Dit is vermogensgestuurd op basis van huisverlies (phouseHouse) en interne vraag (phouseReq). Er is GEEN vaste aanvoertemperatuur (supply target) zoals bij klassieke stooklijnen. Als de pomp minder kW levert dan de thermostaat vraagt, regelt de Cicero dat autonoom in omdat phouseHouse leidend is.",
+        "Als de warmtepomp snel stopt (kort cyclen), vergelijk dan het gevraagde vermogen (strategyRequestedPower) met de laagste fysieke stand van de compressor (pmin in lowLoadDynamicThresholds). Levert de pomp op zijn laagste stand al te veel warmte bij zacht weer? Dan stopt de actuator logischerwijs via de off-drempel.",
+        "De start en herstart van de warmtepomp wordt bepaald door de warmte-intentie (Heat Intent). Zodra de binnentemperatuur zakt onder het setpoint minus de comfort-band (standaard 0,1 graden), schiet de vraag via het fast_floor_w_ mechanisme direct omhoog naar het minimale startvermogen om een gezonde run te starten.",
+        "Het compressor-niveau (hp1Compressor) is the stand die via Modbus-register 1999 naar de buitenunit wordt gestuurd. De gemeten frequentie (hp1Freq) is what de buitenunit daadwerkelijk doet. Er is geen vaste 48 Hz minimumlimiet in de code; de laagste stand van het modelanker is altijd 20 Hz."
+      ];
+      expertSecties.forEach(txt => alineas.push({ bron: "OpenQuatt SKILL Expert-Matrix", tekst: txt }));
+    }
+
     const cloudflarePayload = [];
 
     for (let i = 0; i < alineas.length; i++) {
-      const tekstSectie = alineas[i];
+      const item = alineas[i];
       try {
-        const embeddingResponse = await env.AI.run("@cf/baai/bge-base-en-v1.5", {
-          text: [tekstSectie]
-        });
+        const embeddingResponse = await env.AI.run("@cf/baai/bge-base-en-v1.5", { text: [item.tekst] });
         const vectorValues = embeddingResponse.data;
 
         if (vectorValues && vectorValues.length === 768) {
+          const uniekeId = `custom_doc_${Date.now()}_${i}`;
           cloudflarePayload.push({
-            id: `expert_doc_${i}`,
+            id: uniekeId,
             values: vectorValues,
-            metadata: {
-              source: i >= alineas.length - expertSecties.length ? "OpenQuatt SKILL Expert-Matrix" : "OpenQuatt Live Documentatie",
-              text: tekstSectie
-            }
+            metadata: { source: item.bron, text: item.tekst }
           });
         }
       } catch (e) {
-        console.error(`Sectie ${i} fout: ${e.message}`);
+        console.error(`Sectie ${i} vector-fout: ${e.message}`);
       }
     }
 
     if (cloudflarePayload.length > 0) {
       await env.VECTOR_INDEX.insert(cloudflarePayload);
-      return `Succesvol ${cloudflarePayload.length} documentatie- en expert-secties gevectoriseerd en opgeslagen!`;
+      return `Succesvol ${cloudflarePayload.length} nieuwe documentatie-secties gevectoriseerd en permanent opgeslagen in Cloudflare Vectorize!`;
     }
-    return "Geen geschikte alineas gevonden.";
+    return "Geen geschikte alineas gevonden om te importeren.";
   }
 };
