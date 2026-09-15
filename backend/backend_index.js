@@ -224,14 +224,19 @@ export default {
 
     const alineas = [];
 
+    // Scrape alle opgegeven bronnen parallel of serieus
     for (const url of targets) {
       try {
         const res = await fetch(url, { headers: { "User-Agent": "OpenHeatPumps-RAG-Engine" } });
         const html = await res.text();
+        
+        // GECORRIGEERD: Knip nu ook op koppen, lijsten en paragrafen om geen data te missen
         const rauweSecties = html
-          .split(/<p>|\n/g)
-          .map(t => t.replace(/<[^>]*>/g, '').trim())
-          .filter(t => t.length > 60 && !t.includes("javascript") && !t.includes("css"));
+          .split(/<p>|<li id="[^"]*">|<li>|<h3>|<h4>|\n/g)
+          .map(t => t.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim())
+          // GECORRIGEERD: Filtergrens verlaagd naar 40 tekens voor kortere expert-lijst-items
+          .filter(t => t.length > 40 && !t.includes("javascript") && !t.includes("css") && !t.includes("Search"));
+          
         rauweSecties.forEach(txt => alineas.push({ bron: url, tekst: txt }));
       } catch (err) {
         console.error(`Fout bij scrapen van ${url}: ${err.message}`);
