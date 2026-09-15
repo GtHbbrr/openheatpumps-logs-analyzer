@@ -289,6 +289,15 @@ export default {
       await env.VECTOR_INDEX.insert(cloudflarePayload);
       return `Succesvol ${cloudflarePayload.length} nieuwe documentatie-secties gevectoriseerd en permanent opgeslagen in Cloudflare Vectorize!`;
     }
-    return "Geen geschikte alineas gevonden om te importeren.";
+
+    // DE FEITELIJKE 5WHY DIAGNOSE: Toon de gebruiker wat de scraper ÉCHT heeft binnengekregen!
+    const ruweHTMLEersteDeel = html ? html.substring(0, 500).replace(/</g, "&lt;").replace(/>/g, "&gt;") : "Helemaal leeg";
+    const aantalAlineasVoorFilter = html ? html.split('\n').length : 0;
+    
+    throw new Error(
+      `GitHub leverde geen platte tekst op. De pagina is waarschijnlijk dynamisch (JS-rendered).\n` +
+      `• Aantal regels binnengekregen: ${aantalAlineasVoorFilter}\n` +
+      `• Eerste 500 tekens van de broncode:\n${ruweHTMLEersteDeel}`
+    );
   }
 };
