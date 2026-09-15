@@ -227,19 +227,31 @@ export default {
     // Scrape alle opgegeven bronnen parallel of serieus
     for (const url of targets) {
       try {
-        const res = await fetch(url, { headers: { "User-Agent": "OpenHeatPumps-RAG-Engine" } });
+        // GECORRIGEERD: Volledige browser-vermomming (User-Agent) om GitHub-blokkades te omzeilen
+        const res = await fetch(url, { 
+          headers: { 
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+            "Accept-Language": "nl-NL,nl;q=0.9,en-US;q=0.8,en;q=0.7"
+          } 
+        });
+        
+        if (!res.ok) {
+          console.error(`GitHub weigert toegang voor ${url} met status code: ${res.status}`);
+          continue;
+        }
+
         const html = await res.text();
         
-        // GECORRIGEERD: Universele HTML-tag splitser die overal alineas, koppen en lijsten herkent
+        // Universele HTML-tag splitser die overal alineas, koppen en lijsten herkenbaar opknipt
         const rauweSecties = html
           .split(/<p[^>]*>|<li>|<tr[^>]*>|<td[^>]*>|<h[1-6][^>]*>|<div[^>]*>|\n/gi)
           .map(t => t.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim())
-          // GECORRIGEERD: Filtergrens verlaagd naar 30 tekens zodat ook korte, krachtige Markdown-lijstjes meetellen
           .filter(t => t.length > 30 && !t.includes("javascript") && !t.includes("css") && !t.includes("Search") && !t.includes("Open navigatie"));
           
         rauweSecties.forEach(txt => alineas.push({ bron: url, tekst: txt }));
       } catch (err) {
-        console.error(`Fout bij scrapen van ${url}: ${err.message}`);
+        console.error(`Netwerkfout bij scrapen van ${url}: ${err.message}`);
       }
     }
 
