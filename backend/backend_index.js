@@ -230,12 +230,12 @@ export default {
         const res = await fetch(url, { headers: { "User-Agent": "OpenHeatPumps-RAG-Engine" } });
         const html = await res.text();
         
-        // GECORRIGEERD: Knip nu ook op koppen, lijsten en paragrafen om geen data te missen
+        // GECORRIGEERD: Universele HTML-tag splitser die overal alineas en lijsten herkent
         const rauweSecties = html
-          .split(/<p>|<li id="[^"]*">|<li>|<h3>|<h4>|\n/g)
+          .split(/<p[^>]*>|<li>|<tr[^>]*>|<td[^>]*>|<h[1-6][^>]*>|<div[^>]*>|\n/gi)
           .map(t => t.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim())
-          // GECORRIGEERD: Filtergrens verlaagd naar 40 tekens voor kortere expert-lijst-items
-          .filter(t => t.length > 40 && !t.includes("javascript") && !t.includes("css") && !t.includes("Search"));
+          // Filtergrens verlaagd naar 30 tekens zodat ook korte, krachtige instructies meetellen
+          .filter(t => t.length > 30 && !t.includes("javascript") && !t.includes("css") && !t.includes("Search") && !t.startsWith("import "));
           
         rauweSecties.forEach(txt => alineas.push({ bron: url, tekst: txt }));
       } catch (err) {
