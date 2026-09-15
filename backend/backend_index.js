@@ -224,30 +224,28 @@ export default {
 
     const alineas = [];
 
-    // Scrape alle opgegeven bronnen parallel of serieus
+    // 3. THE UNIVERSELE HYBRIDE HTML & MARKDOWN SCRAPER
     for (const url of targets) {
       try {
-        // GECORRIGEERD: Volledige browser-vermomming (User-Agent) om GitHub-blokkades te omzeilen
         const res = await fetch(url, { 
           headers: { 
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
-            "Accept-Language": "nl-NL,nl;q=0.9,en-US;q=0.8,en;q=0.7"
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
           } 
         });
         
         if (!res.ok) {
-          console.error(`GitHub weigert toegang voor ${url} met status code: ${res.status}`);
+          console.error(`Scrape-fout voor ${url}: Status ${res.status}`);
           continue;
         }
 
         const html = await res.text();
         
-        // Universele HTML-tag splitser die overal alineas, koppen en lijsten herkenbaar opknipt
+        // GECORRIGEERD: We splitsen nu EERST op regeleinden (\n) en HTML-tags om Markdown-veilig te zijn!
         const rauweSecties = html
-          .split(/<p[^>]*>|<li>|<tr[^>]*>|<td[^>]*>|<h[1-6][^>]*>|<div[^>]*>|\n/gi)
+          .split(/<p[^>]*>|<li>|<tr[^>]*>|<td[^>]*>|<h[1-6][^>]*>|\n/gi)
           .map(t => t.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim())
-          .filter(t => t.length > 30 && !t.includes("javascript") && !t.includes("css") && !t.includes("Search") && !t.includes("Open navigatie"));
+          // Schone filtergrens: gooi alleen hele korte fragmenten of menu-knoppen weg
+          .filter(t => t.length > 40 && !t.includes("javascript") && !t.includes("css") && !t.startsWith("import ") && t !== "Open navigatie" && t !== "Kies je route");
           
         rauweSecties.forEach(txt => alineas.push({ bron: url, tekst: txt }));
       } catch (err) {
