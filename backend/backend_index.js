@@ -209,7 +209,7 @@ export default {
       targets = customUrls;
       isHandmatig = true;
     } else {
-      targets = ["https://github.io"];
+      targets = ["openquatt.github.io/OpenQuatt/problemen-oplossen.html"];
     }
 
     const alineas = [];
