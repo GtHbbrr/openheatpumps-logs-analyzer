@@ -40,28 +40,32 @@ export default {
       }
     }
 
-    // ENDPOINT 2: HAAL DE LIJST MET GEVECTORISEERDE URL'S OP [1]
+    // ENDPOINT 2: HAAL DE LIJST MET GEVECTORISEERDE URL'S OP (100% DYNAMISCH)
     if (request.method === "GET" && urlObj.pathname === "/sources") {
       try {
-        let uniekeBronnen = [
-          "openquatt.github.io/OpenQuatt/problemen-oplossen.html",
-          "OpenQuatt SKILL Expert-Matrix"
-        ];
+        let uniekeBronnen = [];
 
         if (env.VECTOR_INDEX) {
-          // GECORRIGEERD: Veilig de IDs ophalen volgens de Cloudflare Vectorize standaarden [1]
-          const overzicht = await env.VECTOR_INDEX.list({ count: 100 });
-          const vectorIds = overzicht.vectorIds || (overzicht.keys ? overzicht.keys.map(k => k.id) : []);
+          // Haal maximaal 1000 vector-ID's op uit de index (Vectorize limiet per pagina)
+          const overzicht = await env.VECTOR_INDEX.list({ count: 1000 });
+          const vectorIds = overzicht.vectorIds || [];
           
           if (vectorIds && vectorIds.length > 0) {
-            // Pak maximaal de eerste 20 om netwerkdruk te voorkomen [1]
-            const detailData = await env.VECTOR_INDEX.getByIds(vectorIds.slice(0, 20));
-            if (detailData && detailData.length > 0) {
-              const gescrapteUrls = detailData
-                .filter(v => v && v.metadata && v.metadata.source)
-                .map(v => v.metadata.source);
-              uniekeBronnen = [...new Set([...uniekeBronnen, ...gescrapteUrls])];
-            }
+            const gedecodeerdeUrls = vectorIds
+              .map(id => {
+                try {
+                  // Pak het gedeelte vóór de chunk-onderbreking (_)
+                  const base64Part = id.split("_")[0];
+                  // Decodeer dit terug naar de normale URL of bronnaam string
+                  return atob(base64Part);
+                } catch {
+                  return null; // Sla oude of ongeldige ID-structuren veilig over
+                }
+              })
+              .filter(url => url !== null); // Filter mislukte decoderingen eruit
+
+            // Haal alle dubbele bronnen direct weg
+            uniekeBronnen = [...new Set(gedecodeerdeUrls)];
           }
         }
 
@@ -69,12 +73,8 @@ export default {
           headers: { ...corsHeaders, "Content-Type": "application/json" }
         });
       } catch (err) {
-        // FALLBACK: Als Cloudflare list() weigert, sturen we alsnog de basisbronnen mee zodat de UI nooit blijft hangen [1]
-        const basisFallback = [
-          "openquatt.github.io/OpenQuatt/problemen-oplossen.html",
-          "OpenQuatt SKILL Expert-Matrix"
-        ];
-        return new Response(JSON.stringify({ status: "success", bronnen: basisFallback, waarschuwing: err.message }), {
+        // Geen hardcoded fallback meer: bij een fout sturen we een lege lijst met de foutmelding mee
+        return new Response(JSON.stringify({ status: "success", bronnen: [], waarschuwing: err.message }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" }
         });
       }
