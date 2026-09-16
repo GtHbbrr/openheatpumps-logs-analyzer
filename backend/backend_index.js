@@ -34,16 +34,16 @@ export default {
         const inputCommando = typeof inputString === "string" ? inputString.trim().toLowerCase() : "";
 
         // FASE 1 VAN DE EASTER EGG: DE VRAAG
-        if (inputCommando === "delete all vectors") {
+        if (inputCommando === "https://delete.all") {
           return new Response(JSON.stringify({ 
             status: "warning", 
-            diagnose: "⚠️ ARE YOU SURE? Deze actie wist de gehele index en herstart de basis documentatie. Stuur 'yes' om te bevestigen of 'no' om te annuleren." 
+            diagnose: "⚠️ ARE YOU SURE? Deze actie wist de gehele index en herstart de basis documentatie. Stuur 'https:yes.com' om te bevestigen of 'https://no.com' om te annuleren." 
           }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
         }
 
         // FASE 2 VAN DE EASTER EGG: DE CONFIRMATIE
-        if (inputCommando === "yes" || inputCommando === "no") {
-          if (inputCommando === "no") {
+        if (inputCommando === "https://yes.com" || inputCommando === "https://no.com") {
+          if (inputCommando === "https://no.com") {
             return new Response(JSON.stringify({ status: "success", diagnose: "❌ Actie geannuleerd. De database is ongewijzigd gebleven." }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
           }
 
