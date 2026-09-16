@@ -274,7 +274,8 @@ export default {
         const vectorValues = embeddingResponse.data[0];
 
         if (vectorValues && vectorValues.length === 768) {
-          const uniekeId = `custom_doc_${Date.now()}_${i}`;
+          const urlHash = btoa(item.bron).replace(/=/g, "").substring(0, 45); 
+          const uniekeId = `${urlHash}_${i}`; // Bijvoorbeeld: aHR0cHM6..._0
           cloudflarePayload.push({
             id: uniekeId,
             values: vectorValues,
