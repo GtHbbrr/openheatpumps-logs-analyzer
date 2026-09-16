@@ -206,7 +206,7 @@ export default {
     }
   },
 
-  // 3. DE GEAUTOMATISEERDE INGESTIE ENGINE (NU UNIVERSEEL EN INTERACTIEF) [1.5]
+    // 3. DE GEAUTOMATISEERDE INGESTIE ENGINE (DEFINITIEVE HYBRIDE SCRAIPER) [1.5]
   async voerIngestieUit(env, customUrls) {
     if (!env.VECTOR_INDEX || !env.AI) {
       throw new Error("Cloudflare AI of Vectorize binding ontbreekt.");
@@ -219,12 +219,12 @@ export default {
       targets = customUrls;
       isHandmatig = true;
     } else {
-      targets = ["openquatt.github.io/OpenQuatt/problemen-oplossen.html"];
+      targets = ["https://openquatt.github.io/OpenQuatt/problemen-oplossen.html"];
     }
 
     const alineas = [];
 
-    // 3. THE UNIVERSELE HYBRIDE HTML & MARKDOWN SCRAPER
+    // Loop door alle targets heen met browser-vermomming om firewalls te omzeilen [1.5]
     for (const url of targets) {
       try {
         const res = await fetch(url, { 
@@ -238,13 +238,13 @@ export default {
           continue;
         }
 
-        const html = await res.text();
+        const binnengekomenHtml = await res.text();
         
-        // GECORRIGEERD: We splitsen nu EERST op regeleinden (\n) en HTML-tags om Markdown-veilig te zijn!
-        const rauweSecties = html
+        // We splitsen op zowel HTML-tags als regeleinden (\n) om Markdown-pagina's perfect te verwerken [1.5]
+        const rauweSecties = binnengekomenHtml
           .split(/<p[^>]*>|<li>|<tr[^>]*>|<td[^>]*>|<h[1-6][^>]*>|\n/gi)
           .map(t => t.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim())
-          // Schone filtergrens: gooi alleen hele korte fragmenten of menu-knoppen weg
+          // Houd korte, krachtige Markdown-lijstjes en expertregels intact (>40 tekens) [1.5]
           .filter(t => t.length > 40 && !t.includes("javascript") && !t.includes("css") && !t.startsWith("import ") && t !== "Open navigatie" && t !== "Kies je route");
           
         rauweSecties.forEach(txt => alineas.push({ bron: url, tekst: txt }));
@@ -259,13 +259,14 @@ export default {
         "De warmtepomp werkt via de Power House-strategie. Dit is vermogensgestuurd op basis van huisverlies (phouseHouse) en interne vraag (phouseReq). Er is GEEN vaste aanvoertemperatuur (supply target) zoals bij klassieke stooklijnen. Als de pomp minder kW levert dan de thermostaat vraagt, regelt de Cicero dat autonoom in omdat phouseHouse leidend is.",
         "Als de warmtepomp snel stopt (kort cyclen), vergelijk dan het gevraagde vermogen (strategyRequestedPower) met de laagste fysieke stand van de compressor (pmin in lowLoadDynamicThresholds). Levert de pomp op zijn laagste stand al te veel warmte bij zacht weer? Dan stopt de actuator logischerwijs via de off-drempel.",
         "De start en herstart van de warmtepomp wordt bepaald door de warmte-intentie (Heat Intent). Zodra de binnentemperatuur zakt onder het setpoint minus de comfort-band (standaard 0,1 graden), schiet de vraag via het fast_floor_w_ mechanisme direct omhoog naar het minimale startvermogen om een gezonde run te starten.",
-        "Het compressor-niveau (hp1Compressor) is the stand die via Modbus-register 1999 naar de buitenunit wordt gestuurd. De gemeten frequentie (hp1Freq) is what de buitenunit daadwerkelijk doet. Er is geen vaste 48 Hz minimumlimiet in de code; de laagste stand van het modelanker is altijd 20 Hz."
+        "Het compressor-niveau (hp1Compressor) is de stand die via Modbus-register 1999 naar de buitenunit wordt gestuurd. De gemeten frequentie (hp1Freq) is what de buitenunit daadwerkelijk doet. Er is geen vaste 48 Hz minimumlimiet in de code; de laagste stand van het modelanker is altijd 20 Hz."
       ];
       expertSecties.forEach(txt => alineas.push({ bron: "OpenQuatt SKILL Expert-Matrix", tekst: txt }));
     }
 
     const cloudflarePayload = [];
 
+    // Genereer de embeddings en sla ze op in Vectorize [1.5]
     for (let i = 0; i < alineas.length; i++) {
       const item = alineas[i];
       try {
@@ -289,15 +290,6 @@ export default {
       await env.VECTOR_INDEX.insert(cloudflarePayload);
       return `Succesvol ${cloudflarePayload.length} nieuwe documentatie-secties gevectoriseerd en permanent opgeslagen in Cloudflare Vectorize!`;
     }
-
-    // DE FEITELIJKE 5WHY DIAGNOSE: Toon de gebruiker wat de scraper ÉCHT heeft binnengekregen!
-    const ruweHTMLEersteDeel = html ? html.substring(0, 500).replace(/</g, "&lt;").replace(/>/g, "&gt;") : "Helemaal leeg";
-    const aantalAlineasVoorFilter = html ? html.split('\n').length : 0;
-    
-    throw new Error(
-      `GitHub leverde geen platte tekst op. De pagina is waarschijnlijk dynamisch (JS-rendered).\n` +
-      `• Aantal regels binnengekregen: ${aantalAlineasVoorFilter}\n` +
-      `• Eerste 500 tekens van de broncode:\n${ruweHTMLEersteDeel}`
-    );
+    return "Geen geschikte alineas gevonden om te importeren.";
   }
 };
