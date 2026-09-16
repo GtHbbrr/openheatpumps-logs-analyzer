@@ -271,7 +271,7 @@ export default {
       const item = alineas[i];
       try {
         const embeddingResponse = await env.AI.run("@cf/baai/bge-base-en-v1.5", { text: [item.tekst] });
-        const vectorValues = embeddingResponse.data;
+        const vectorValues = embeddingResponse.data[0];
 
         if (vectorValues && vectorValues.length === 768) {
           const uniekeId = `custom_doc_${Date.now()}_${i}`;
