@@ -18,24 +18,66 @@ export default {
 
     const urlObj = new URL(request.url);
 
-    // ENDPOINT 1: VECTORISEER-ENDPOINT VANUIT DE FRONTEND [1.5]
+        // ENDPOINT 1: VECTORISEER-ENDPOINT & VERBORGEN EASTER EGG REBOOT (BUGFIXED)
     if (request.method === "POST" && urlObj.pathname === "/ingest") {
       try {
         const body = await request.json();
-        const { customUrls } = body;
+        let { customUrls } = body;
         
         if (!customUrls || customUrls.length === 0) {
-          return new Response(JSON.stringify({ status: "error", diagnose: "Geen URL's meegegeven om te vectoriseren." }), { headers: corsHeaders });
+          return new Response(JSON.stringify({ status: "error", diagnose: "Geen URL's of commando's meegegeven." }), { headers: corsHeaders });
         }
 
-        const resultaatTxt = await this.voerIngestieUit(env, customUrls);
+        // BUGFIX: Zorg dat we altijd met een schone string werken voor de commando-check
+        // Als de frontend een array stuurt (bijv. ["delete all vectors"]), pakken we het eerste element.
+        const inputString = Array.isArray(customUrls) ? customUrls[0] : customUrls;
+        const inputCommando = typeof inputString === "string" ? inputString.trim().toLowerCase() : "";
+
+        // FASE 1 VAN DE EASTER EGG: DE VRAAG
+        if (inputCommando === "delete all vectors") {
+          return new Response(JSON.stringify({ 
+            status: "warning", 
+            diagnose: "⚠️ ARE YOU SURE? Deze actie wist de gehele index en herstart de basis documentatie. Stuur 'yes' om te bevestigen of 'no' om te annuleren." 
+          }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
+
+        // FASE 2 VAN DE EASTER EGG: DE CONFIRMATIE
+        if (inputCommando === "yes" || inputCommando === "no") {
+          if (inputCommando === "no") {
+            return new Response(JSON.stringify({ status: "success", diagnose: "❌ Actie geannuleerd. De database is ongewijzigd gebleven." }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+          }
+
+          // Gebruiker stuurde 'yes': Tijd voor de harde reset!
+          if (env.VECTOR_INDEX) {
+            const overzicht = await env.VECTOR_INDEX.list({ count: 1000 });
+            const vectorIds = overzicht.vectorIds || [];
+            
+            if (vectorIds.length > 0) {
+              await env.VECTOR_INDEX.deleteByIds(vectorIds);
+            }
+
+            // Reset naar defaults
+            const herstelBericht = await this.voerIngestieUit(env, null);
+            
+            return new Response(JSON.stringify({ 
+              status: "success", 
+              diagnose: `💥 DATABASE VOLLEDIG GEWIST (${vectorIds.length} oude vectoren verwijderd). ${herstelBericht}` 
+            }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+          }
+        }
+
+        // BUGFIX: Zorg dat 'targets' in voerIngestieUit ALTIJD een Array krijgt, 
+        // ook als de frontend per ongeluk een pure string stuurde.
+        const veiligeUrlArray = Array.isArray(customUrls) ? customUrls : [customUrls];
+
+        const resultaatTxt = await this.voerIngestieUit(env, veiligeUrlArray);
         return new Response(JSON.stringify({ status: "success", diagnose: resultaatTxt }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" }
         });
+
       } catch (err) {
         return new Response(JSON.stringify({ status: "error", diagnose: `🚨 INGESTIE FOUT: ${err.message}` }), {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" }
+          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" }
         });
       }
     }
