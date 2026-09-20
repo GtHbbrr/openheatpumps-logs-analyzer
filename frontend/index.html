@@ -278,7 +278,7 @@
 
                     if (isAutoCheck) {
                         // GEEL BLOK: Hoge contrast letters op een gele achtergrond voor de automatische actie
-                        statusEl.textContent = "Logboek automatisch ingeladen uit OpenQuatt";
+                        statusEl.innerHTML = 'Logboek automatisch ingeladen uit <a href="javascript:history.back()" class="underline hover:text-black transition-colors">OpenQuatt</a>';
                         statusEl.classList.add('bg-amber-400', 'text-gray-950', 'shadow-md', 'animate-pulse');
                     } else {
                         // GROEN BLOK: Voor handmatige acties via de paarse knop
