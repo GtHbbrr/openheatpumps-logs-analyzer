@@ -253,39 +253,67 @@
             }
         });
 
-        // 6. KNOP 3: PLAKKEN VANAF KLEMBORD
+        // HELPERS: Valideer en laad klembord-data (Toekomstbestendige versie)
+        async function verwerkKlembordTekst(text, isAutoCheck = false) {
+            if (!text || text.trim() === "") {
+                if (!isAutoCheck) alert("Het klembord is leeg. Kopieer eerst de debug log-data van je OpenQuatt.");
+                return;
+            }
+
+            try {
+                const logData = JSON.parse(text);
+                
+                // FLEXIBELE CONTROLE: Start de format-string met 'openquatt-debug-device'?
+                const isValideFormat = logData && typeof logData.format === 'string' && logData.format.startsWith("openquatt-debug");
+                const isValideKind = logData && logData.kind === "openquatt_debug_recording";
+
+                if (isValideFormat && isValideKind) {
+                    const virtueelBestand = new File([text], "clipboard.json", { type: "application/json" });
+                    await laadBestand(virtueelBestand);
+                    
+                    el('map-status').textContent = isAutoCheck 
+                        ? "Logboek automatisch ingeladen vanaf klembord" 
+                        : "Log-data succesvol geplakt vanaf klembord";
+                        
+                    if (!isAutoCheck) alert("Logboek succesvol ingeladen vanaf het klembord!");
+                } else if (!isAutoCheck) {
+                    alert("De tekst op het klembord is geen geldig OpenQuatt debug-formaat.");
+                }
+            } catch (e) {
+                if (!isAutoCheck) alert("De tekst op het klembord is geen geldige JSON. Zorg dat je de volledige log kopieert.");
+            }
+        }
+
+
+        // 6. HANDMATIGE KLIK OP PLAKKNOP
         el('btn-clipboard').addEventListener('click', async () => {
             try {
-                // 1. Lees de tekst uit het klembord van de gebruiker
                 const text = await navigator.clipboard.readText();
-                
-                if (!text || text.trim() === "") {
-                    alert("Het klembord is leeg. Kopieer eerst de inhoud van een OpenQuatt logbestand.");
-                    return;
-                }
-
-                // 2. Snelle validatie: is het geldige JSON?
-                try {
-                    JSON.parse(text);
-                } catch (e) {
-                    alert("De tekst op het klembord is geen geldige JSON. Zorg ervoor dat je de volledige tekst van een .json of .oqdebug bestand kopieert.");
-                    return;
-                }
-
-                // 3. Zet de tekst om in een virtueel File-object zodat 'laadBestand' ermee overweg kan
-                const virtueelBestand = new File([text], "clipboard.json", { type: "application/json" });
-
-                // 4. Verwerk het bestand via je bestaande logica
-                await laadBestand(virtueelBestand);
-                
-                // 5. Update de status-tekst in de UI
-                el('map-status').textContent = "Log-data succesvol geplakt vanaf klembord";
-                
+                await verwerkKlembordTekst(text, false);
             } catch (err) {
                 console.error("Klembordfout:", err);
                 alert("Kon het klembord niet openen. Geef de browser toestemming om het klembord te lezen.");
             }
         });
+
+        // 7. AUTOMATISCH SCANNEN BIJ LADEN VAN DE PAGINA
+        async function checkClipboardOnLoad() {
+            try {
+                if (!navigator.clipboard || !navigator.permissions) return;
+                const permissionStatus = await navigator.permissions.query({ name: "clipboard-read" });
+
+                if (permissionStatus.state === "granted" || permissionStatus.state === "prompt") {
+                    const text = await navigator.clipboard.readText();
+                    await verwerkKlembordTekst(text, true); // Wordt stilletjes uitgevoerd
+                }
+            } catch (err) {
+                console.debug("Automatische klembord-check overgeslagen:", err);
+            }
+        }
+
+        // Activeer de check zodra de pagina klaar is
+        document.addEventListener('DOMContentLoaded', checkClipboardOnLoad);
+
 
         // 6. EERSTE ANALYSE STARTEN (NU MET OPTIONELE BEGINVRAAG MEEGEVOERD)
         el('btn-diagnose').addEventListener('click', async () => {
