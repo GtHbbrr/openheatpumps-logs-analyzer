@@ -75,10 +75,10 @@
                 <div class="border-t border-gray-800 pt-6">
                     <h2 class="text-lg font-semibold mb-3 text-gray-200">2. Logboek Koppelen</h2>
                     
-                    <!-- GECORRIGEERD: Knoppen staan nu op desktop netjes naast elkaar via grid -->
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <!-- Knoppen netjes verticaal gestapeld voor optimale leesbaarheid in het zijpaneel -->
+                    <div class="flex flex-col gap-2">
                         <!-- Knop 1: Voor de hele map (Alleen zichtbaar op PC/Mac) -->
-                        <button id="btn-map" class="w-full bg-orange-600 hover:bg-orange-700 text-white font-medium p-3 rounded transition shadow-lg text-sm hidden md:block">
+                        <button id="btn-map" class="w-full bg-orange-600 hover:bg-orange-700 text-white font-medium p-3 rounded transition shadow-lg text-sm hidden md:block text-center">
                             📂 Koppel hele Log-map
                         </button>
                         
@@ -87,10 +87,16 @@
                             📄 Kies los .json bestand
                         </label>
                         <input type="file" id="mobile-file-input" accept=".json" class="hidden">
+                
+                        <!-- Knop 3: De nieuwe klembord plakknop (Altijd zichtbaar, overal bruikbaar) -->
+                        <button id="btn-clipboard" type="button" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium p-3 rounded transition shadow-lg text-sm text-center border border-indigo-500 block">
+                            📋 Plak vanaf klembord
+                        </button>
                     </div>
                     
-                    <p id="map-status" class="text-xs text-gray-500 mt-2 text-center">Nog geen map of bestand gekoppeld</p>
+                    <p id="map-status" class="text-xs text-gray-500 mt-2 text-center">Nog geen map, bestand of klembord-data gekoppeld</p>
                 </div>
+
             </div>
             
             <!-- Right: AI Console & Chat -->
@@ -244,6 +250,40 @@
             e.preventDefault(); 
             if (e.dataTransfer.files.length) {
                 await laadBestand(e.dataTransfer.files[0]); 
+            }
+        });
+
+        // 6. KNOP 3: PLAKKEN VANAF KLEMBORD
+        el('btn-clipboard').addEventListener('click', async () => {
+            try {
+                // 1. Lees de tekst uit het klembord van de gebruiker
+                const text = await navigator.clipboard.readText();
+                
+                if (!text || text.trim() === "") {
+                    alert("Het klembord is leeg. Kopieer eerst de inhoud van een OpenQuatt logbestand.");
+                    return;
+                }
+
+                // 2. Snelle validatie: is het geldige JSON?
+                try {
+                    JSON.parse(text);
+                } catch (e) {
+                    alert("De tekst op het klembord is geen geldige JSON. Zorg ervoor dat je de volledige tekst van een .json of .oqdebug bestand kopieert.");
+                    return;
+                }
+
+                // 3. Zet de tekst om in een virtueel File-object zodat 'laadBestand' ermee overweg kan
+                const virtueelBestand = new File([text], "clipboard.json", { type: "application/json" });
+
+                // 4. Verwerk het bestand via je bestaande logica
+                await laadBestand(virtueelBestand);
+                
+                // 5. Update de status-tekst in de UI
+                el('map-status').textContent = "Log-data succesvol geplakt vanaf klembord";
+                
+            } catch (err) {
+                console.error("Klembordfout:", err);
+                alert("Kon het klembord niet openen. Geef de browser toestemming om het klembord te lezen.");
             }
         });
 
