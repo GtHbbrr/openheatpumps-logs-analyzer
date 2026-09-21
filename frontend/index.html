@@ -91,6 +91,29 @@
                     </div>
                 </div>
 
+                <div class="border-t border-gray-800 pt-6">
+                    <h2 class="text-lg font-semibold mb-3 text-gray-200">2. Logboek Koppelen</h2>
+                    
+                    <!-- Knoppen netjes verticaal gestapeld voor optimale leesbaarheid in het zijpaneel -->
+                    <div class="flex flex-col gap-2">
+                        <!-- Knop 1: Voor de hele map (Alleen zichtbaar op PC/Mac) -->
+                        <button id="btn-map" class="w-full bg-orange-600 hover:bg-orange-700 text-white font-medium p-3 rounded transition shadow-lg text-sm hidden md:block text-center">
+                            📂 Koppel hele Log-map
+                        </button>
+                        
+                        <!-- Knop 2: De losse bestandskiezer (Altijd zichtbaar, overal bruikbaar) -->
+                        <label for="mobile-file-input" class="w-full bg-gray-800 hover:bg-gray-700 text-gray-200 font-medium p-3 rounded transition shadow-lg text-sm text-center cursor-pointer border border-gray-700 block">
+                            📄 Kies los .json bestand
+                        </label>
+                        <input type="file" id="mobile-file-input" accept=".json" class="hidden">
+                
+                        <!-- Knop 3: De nieuwe klembord plakknop (Altijd zichtbaar, overal bruikbaar) -->
+                        <button id="btn-clipboard" type="button" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium p-3 rounded transition shadow-lg text-sm text-center border border-indigo-500 block">
+                            📋 Plak vanaf klembord
+                        </button>
+                    </div>
+                    
+                    <p id="map-status" class="text-xs text-gray-500 mt-2 text-center">Nog geen map, bestand of klembord-data gekoppeld</p>
                 <!-- Dynamisch RAG Prompt-Settings vak met Live Bibliotheek -->
                 <div class="border-t border-gray-900 pt-4">
                     <details class="group cursor-pointer">
@@ -117,6 +140,7 @@
                         </div>
                     </details>
                 </div>
+
             </div>
             <!-- Rechter Kolom: AI Console & Chat-interface (2/3 breedte) -->
             <div class="md:col-span-2 flex flex-col space-y-4">
@@ -274,7 +298,80 @@
                 await laadBestand(e.dataTransfer.files[0]); 
             }
         });
-        // 6. EERSTE ANALYSE STARTEN (GROENE KNOP MET INTERACTIEVE STATUS)
+
+        // HELPERS: Valideer en laad klembord-data (Met opvallende gele badge voor auto-check)
+        async function verwerkKlembordTekst(text, isAutoCheck = false) {
+            if (!text || text.trim() === "") {
+                if (!isAutoCheck) alert("Het klembord is leeg. Kopieer eerst de debug log-data van je OpenQuatt.");
+                return;
+            }
+
+            try {
+                const logData = JSON.parse(text);
+                
+                // FLEXIBELE CONTROLE
+                const isValideFormat = logData && typeof logData.format === 'string' && logData.format.startsWith("openquatt-debug-device");
+                const isValideKind = logData && logData.kind === "openquatt_debug_recording";
+
+                if (isValideFormat && isValideKind) {
+                    const virtueelBestand = new File([text], "clipboard.json", { type: "application/json" });
+                    await laadBestand(virtueelBestand);
+                    
+                    const statusEl = el('map-status');
+                    
+                    // Reset eventuele oude styling-klassen
+                    statusEl.className = "text-xs text-center mt-2 p-2 rounded font-semibold transition-all duration-300";
+
+                    if (isAutoCheck) {
+                        // GEEL BLOK: Hoge contrast letters op een gele achtergrond voor de automatische actie
+                        statusEl.innerHTML = 'Logboek automatisch ingeladen uit <a href="javascript:history.back()" class="underline hover:text-black transition-colors">OpenQuatt</a>';
+                        statusEl.classList.add('bg-amber-400', 'text-gray-950', 'shadow-md', 'animate-pulse');
+                    } else {
+                        // GROEN BLOK: Voor handmatige acties via de paarse knop
+                        statusEl.textContent = "Log-data succesvol geplakt vanaf klembord";
+                        statusEl.classList.add('bg-green-600', 'text-white', 'shadow-md');
+                        alert("Logboek succesvol ingeladen vanaf het klembord!");
+                    }
+                    
+                } else if (!isAutoCheck) {
+                    alert("De tekst op het klembord is geen geldig OpenQuatt debug-formaat.");
+                }
+            } catch (e) {
+                if (!isAutoCheck) alert("De tekst op het klembord is geen geldige JSON. Zorg dat je de volledige log kopieert.");
+            }
+        }
+
+        // 6. HANDMATIGE KLIK OP PLAKKNOP
+        el('btn-clipboard').addEventListener('click', async () => {
+            try {
+                const text = await navigator.clipboard.readText();
+                await verwerkKlembordTekst(text, false);
+            } catch (err) {
+                console.error("Klembordfout:", err);
+                alert("Kon het klembord niet openen. Geef de browser toestemming om het klembord te lezen.");
+            }
+        });
+
+        // 7. AUTOMATISCH SCANNEN BIJ LADEN VAN DE PAGINA
+        async function checkClipboardOnLoad() {
+            try {
+                if (!navigator.clipboard || !navigator.permissions) return;
+                const permissionStatus = await navigator.permissions.query({ name: "clipboard-read" });
+
+                if (permissionStatus.state === "granted" || permissionStatus.state === "prompt") {
+                    const text = await navigator.clipboard.readText();
+                    await verwerkKlembordTekst(text, true); // Wordt stilletjes uitgevoerd
+                }
+            } catch (err) {
+                console.debug("Automatische klembord-check overgeslagen:", err);
+            }
+        }
+
+        // Activeer de check zodra de pagina klaar is
+        document.addEventListener('DOMContentLoaded', checkClipboardOnLoad);
+
+
+        // 6. EERSTE ANALYSE STARTEN (NU MET OPTIONELE BEGINVRAAG MEEGEVOERD)
         el('btn-diagnose').addEventListener('click', async () => {
             if (!activeLogData) return;
             el('loader').classList.remove('hidden');
