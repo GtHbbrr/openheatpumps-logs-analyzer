@@ -276,16 +276,20 @@
                     // Reset eventuele oude styling-klassen
                     statusEl.className = "text-xs text-center mt-2 p-2 rounded font-semibold transition-all duration-300";
 
-                    if (isAutoCheck) {
-                        // GEEL BLOK: Hoge contrast letters op een gele achtergrond voor de automatische actie
-                        statusEl.innerHTML = 'Logboek automatisch ingeladen uit <a href="javascript:history.back()" class="underline hover:text-black transition-colors">OpenQuatt</a>';
-                        statusEl.classList.add('bg-amber-400', 'text-gray-950', 'shadow-md', 'animate-pulse');
-                    } else {
-                        // GROEN BLOK: Voor handmatige acties via de paarse knop
-                        statusEl.textContent = "Log-data succesvol geplakt vanaf klembord";
-                        statusEl.classList.add('bg-green-600', 'text-white', 'shadow-md');
-                        alert("Logboek succesvol ingeladen vanaf het klembord!");
-                    }
+                if (isAutoCheck) {
+                    // De exacte deep link naar de systeemrecorder in de lokale OpenQuatt dev-versie
+                    const openQuattDeepLink = 'http://openquatt.local/?view=diagnosis&modal=systeemrecorder';
+                
+                    // GEEL BLOK: Hoge contrast letters op een gele achtergrond voor de automatische actie
+                    statusEl.innerHTML = `Logboek automatisch ingeladen uit <a href="${openQuattDeepLink}" class="underline hover:text-black transition-colors">OpenQuatt</a>`;
+                    statusEl.classList.add('bg-amber-400', 'text-gray-950', 'shadow-md', 'animate-pulse');
+                } else {
+                    // GROEN BLOK: Voor handmatige acties via de paarse knop
+                    statusEl.textContent = "Log-data succesvol geplakt vanaf klembord";
+                    statusEl.classList.add('bg-green-600', 'text-white', 'shadow-md');
+                    alert("Logboek succesvol ingeladen vanaf het klembord!");
+                }
+
                     
                 } else if (!isAutoCheck) {
                     alert("De tekst op het klembord is geen geldig OpenQuatt debug-formaat.");
