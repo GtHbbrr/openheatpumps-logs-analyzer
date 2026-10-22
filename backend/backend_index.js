@@ -102,34 +102,66 @@ export default {
         contents[contents.length - 1].parts[0].text = systemInstruction + "\n\nVolgens de chat-geschiedenis loopt het hieronder door. Beantwoord nu de specifieke gebruikersvraag:\n" + oorspronkelijkeTekst;
       }
 
-      // E. MODEL-ROTATIE EN FAILOVER MOTOR
-      const beschikbareModellen = ["gemini-3.5-flash", "gemini-3.6-flash", "gemini-3.7-flash", "gemini-3.8-flash"];
+      // ====================================================================
+      // E. MODEL-ROTATIE EN FAILOVER MOTOR (GEOPTIMALISEERD & VEILIG)
+      // ====================================================================
+      const beschikbareModellen = [
+        "gemini-3.8-flash",       // Primair actueel model
+        "gemini-3.6-flash",       // Actieve 3.x backup
+        "gemini-3.1-flash-lite",  // Snelle fallback (korte redeneertijd, voorkomt time-outs)
+        "gemini-2.5-flash"        // Ultieme backup buiten de zware Gemini 3-infrastructuur
+      ];
+      
       let gekozenIndex = Math.floor(Math.random() * beschikbareModellen.length);
       let primairModel = beschikbareModellen[gekozenIndex];
       let reserveModel = undefined;
 
       let geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${primairModel}:generateContent`;
-      let geminiResponse = await fetch(geminiUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
-        body: JSON.stringify({ contents: contents })
-      });
+      let geminiResponse;
+      let responseText;
+      let geminiJson = null;
 
-      let responseText = await geminiResponse.text();
-      let geminiJson = JSON.parse(responseText);
-
-      if (geminiJson && (geminiJson.error?.code === 503 || geminiJson.error?.code === 429 || geminiJson.error?.message?.includes("quota") || geminiJson.error?.message?.includes("high demand"))) {
-        const reserveModellen = beschikbareModellen.filter(m => m !== primairModel);
-        reserveModel = reserveModellen[Math.floor(Math.random() * reserveModellen.length)];
-        
-        geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${reserveModel}:generateContent`;
+      try {
         geminiResponse = await fetch(geminiUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
           body: JSON.stringify({ contents: contents })
         });
+        
         responseText = await geminiResponse.text();
-        geminiJson = JSON.parse(responseText);
+        // Beveiliging: controleer eerst of de response wel JSON is voordat we parsen
+        if (responseText.trim().startsWith("{")) {
+          geminiJson = JSON.parse(responseText);
+        }
+      } catch (e) {
+        console.warn(`Eerste poging met ${primairModel} netwerktechnisch mislukt.`);
+      }
+
+      // TRIGGER FAILOVER: Activeer als HTTP-status niet goed is, parsing faalde, of Google een overload-code teruggeeft
+      if (!geminiResponse || !geminiResponse.ok || !geminiJson || geminiJson.error?.code === 503 || geminiJson.error?.code === 429 || geminiJson.error?.message?.includes("quota") || geminiJson.error?.message?.includes("high demand")) {
+        
+        const reserveModellen = beschikbareModellen.filter(m => m !== primairModel);
+        reserveModel = reserveModellen[Math.floor(Math.random() * reserveModellen.length)];
+        console.log(`🔄 Schakelen naar reservemodel: ${reserveModel}`);
+        
+        geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${reserveModel}:generateContent`;
+        
+        try {
+          geminiResponse = await fetch(geminiUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
+            body: JSON.stringify({ contents: contents })
+          });
+          
+          responseText = await geminiResponse.text();
+          if (responseText.trim().startsWith("{")) {
+            geminiJson = JSON.parse(responseText);
+          } else {
+            geminiJson = { error: { message: `Server stuurde geen JSON terug maar: ${responseText.substring(0, 100)}` } };
+          }
+        } catch (e) {
+          geminiJson = { error: { message: `Netwerkfout tijdens failover: ${e.message}` } };
+        }
       }
 
       // ====================================================================
@@ -149,8 +181,8 @@ export default {
       } else {
         // DE TOTALE INSPECTIE-UPGRADE: Toon exact de response én de meegestuurde prompt!
         statusType = "error";
-        const aanwezigeKeys = Object.keys(geminiJson).join(', ') || "Geen keys gevonden";
-        const ruweInhoud = JSON.stringify(geminiJson).substring(0, 300);
+        const aanwezigeKeys = geminiJson ? Object.keys(geminiJson).join(', ') : "Geen JSON data beschikbaar";
+        const ruweInhoud = responseText ? responseText.substring(0, 300) : "Geen ruwe data";
         
         // Haal de onbewerkte prompt-tekst op die we naar Google hebben gestuurd
         const verzondenPrompt = contents && contents[0] && contents[0].parts && contents[0].parts[0] ? contents[0].parts[0].text : "Prompt onleesbaar";
@@ -174,6 +206,7 @@ export default {
       return new Response(JSON.stringify({ status: "error", model: "Crash-pijp", diagnose: `🚨 SYSTEMISCHE CRASH: ${error.message}` }), { headers: corsHeaders });
     }
   },
+
 
   // 3. DE GEAUTOMATISEERDE RECHTTREEKSE INGESTIE-MOTOR (GEERD OP LOKALE EMBEDDINGS)
   async voerIngestieUit(env) {
