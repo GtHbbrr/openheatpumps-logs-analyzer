@@ -149,7 +149,7 @@ export default {
 
     // A. MAP-LOOP: Vraag de complete mappenstructuur recursief op via de GitHub Trees API
     try {
-      const treeUrl = `https://github.com{githubRepo}/git/trees/${targetBranch}?recursive=1`;
+      const treeUrl = `https://api.github.com/repos/${githubRepo}/git/trees/${targetBranch}?recursive=1`;
       const treeResponse = await fetch(treeUrl, {
         headers: { "User-Agent": "OpenHeatPumps-Log-Analyzer-Ingest" }
       });
@@ -169,7 +169,7 @@ export default {
 
       // B. CONTENT FETCH LOOP: Download en chunk elk Markdown-bestand automatisch
       for (const bestand of markdownBestanden) {
-        const rawUrl = `https://githubusercontent.com{targetBranch}/${bestand.path}`;
+        const rawUrl = `https://raw.githubusercontent.com/${githubRepo}/${targetBranch}/${bestand.path}`;
         
         try {
           const res = await fetch(rawUrl, {
@@ -216,7 +216,7 @@ export default {
         });
         
         // REPARATIE: Direct de array uit .data trekken (Voorkomt de .data crash)
-        const vectorValues = embeddingResponse.data;
+        const vectorValues = embeddingResponse.data[0];
 
         if (vectorValues && vectorValues.length === 768) {
           // Genereer een stabiele ID op basis van het bestandspad om duplicatie te blokkeren
