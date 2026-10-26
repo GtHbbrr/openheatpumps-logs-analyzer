@@ -14,3 +14,7 @@ index_name = "openquatt-docs-preview"
 # GECORRIGEERD: Enkele haken in plaats van dubbele haken voor de AI-configuratie[1.5]
 [ai]
 binding = "AI"
+
+[triggers]
+crons = [ "0 3 * * *" ] # Dit activeert de scheduled-handler elke nacht om 03:00 uur UTC
+
