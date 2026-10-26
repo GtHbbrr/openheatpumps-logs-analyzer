@@ -1,4 +1,4 @@
-name = "openheatpumps-backend-dev"
+name = "openheatpumps-backend"
 main = "backend/backend_index.js"
 compatibility_date = "2024-03-01"
 
