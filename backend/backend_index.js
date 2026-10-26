@@ -46,8 +46,8 @@ export default {
       if (!messages || messages.length === 0) {
         if (env.VECTOR_INDEX && env.AI) {
           try {
-            const embeddingResponse = await env.AI.run("@cf/baai/bge-base-en-v1.5", { text: [actueleVraag] });
-            const queryVector = embeddingResponse.data; // GECORRIGEERD naar platte array
+            const Response = await env.AI.run("@cf/baai/bge-base-en-v1.5", { text: [actueleVraag] });
+            const queryVector = embeddingResponse.data[0]; // GECORRIGEERD naar platte array
             const vectorMatches = await env.VECTOR_INDEX.query(queryVector, { topK: 3, returnMetadata: true });
             
             dynamischeKennisContext = vectorMatches.matches
