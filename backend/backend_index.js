@@ -1,10 +1,10 @@
 export default {
-  // 1. HANDEL AUTOMATISCHE CRON-TRIGGERS AF (Elke nacht om 03:00 uur)
+  // 1. AUTOMATISCHE CRON-TRIGGER (Elke nacht om 03:00 uur UTC)
   async scheduled(event, env, ctx) {
     ctx.waitUntil(this.voerIngestieUit(env));
   },
 
-  // 2. HANDEL HTTP-VERKEER AF
+  // 2. HTTP-VERKEER AFHANDELEN (DIAGNOSE & CHAT)
   async fetch(request, env) {
     const corsHeaders = {
       "Access-Control-Allow-Origin": "*",
@@ -17,20 +17,13 @@ export default {
     }
 
     if (request.method === "GET") {
-      try {
-        const resultaatTxt = await this.voerIngestieUit(env);
-        return new Response(JSON.stringify({ status: "success", melding: resultaatTxt }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" }
-        });
-      } catch (err) {
-        return new Response(JSON.stringify({ status: "error", fout: err.message }), {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" }
-        });
-      }
+      return new Response(JSON.stringify({ 
+        status: "success", 
+        melding: "OpenHeatPumps AI Engine Online. Scope: LSV v0.55. Dagelijkse Cron actief." 
+      }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // HANDEL "POST" VERZOEKEN AF (DIAGNOSE & CHAT)
+    // HANDEL "POST" VERZOEKEN AF
     try {
       const body = await request.json();
       const { userProfile, logData, messages } = body;
@@ -39,7 +32,6 @@ export default {
         return new Response(JSON.stringify({ status: "error", diagnose: "🚨 CONFIGURATIEFOUT: GEMINI_API_KEY ontbreekt." }), { headers: corsHeaders });
       }
 
-      // A. BEPAAL DYNAMISCH DE RELEVANTE VRAAG (EERSTE RUN OF VERVOLGVRAAG)
       let actueleVraag = "Analyseer dit bestand.";
       if (messages && messages.length > 0) {
         const laatsteBericht = messages[messages.length - 1];
@@ -50,76 +42,56 @@ export default {
 
       let dynamischeKennisContext = "";
 
-      // B. GECORRIGEERD: DOORZOEK DE DATABASE BIJ *ELK* VERZOEK (DUS OOK BIJ CHAT VRAGEN!)
-      if (env.VECTOR_INDEX && env.AI) {
-        try {
-          const embeddingResponse = await env.AI.run("@cf/baai/bge-base-en-v1.5", {
-            text: [actueleVraag]
-          });
-          const queryVector = embeddingResponse.data;
-
-          const vectorMatches = await env.VECTOR_INDEX.query(queryVector, { topK: 3, returnMetadata: true });
-          
-          dynamischeKennisContext = vectorMatches.matches
-            .map(match => `[Geverifieerde Richtlijn]: ${match.metadata.text}`)
-            .join("\n");
-        } catch (ragErr) {
-          console.error("Vectorize Query Error:", ragErr.message);
+      // FREE TIER OPTIMALISATIE: Alleen Vectorize doorzoeken bij de ALLEREERSTE run!
+      if (!messages || messages.length === 0) {
+        if (env.VECTOR_INDEX && env.AI) {
+          try {
+            const embeddingResponse = await env.AI.run("@cf/baai/bge-base-en-v1.5", { text: [actueleVraag] });
+            const queryVector = embeddingResponse.data; // GECORRIGEERD naar platte array
+            const vectorMatches = await env.VECTOR_INDEX.query(queryVector, { topK: 3, returnMetadata: true });
+            
+            dynamischeKennisContext = vectorMatches.matches
+              .map(match => `[Geverifieerde Richtlijn uit ${match.metadata.source}]: ${match.metadata.text}`)
+              .join("\n");
+          } catch (ragErr) {
+            console.error("Vectorize Query Error:", ragErr.message);
+          }
         }
       }
 
-      // C. GECORRIGEERD: PROFIEL EN INSTRUCTIES WORDEN HIER ENKELDRAADS EN DWINGEND OPGEBOUWD
       const systemInstruction = `
-        Je bent de 'OpenHeatPumps AI Assistent'. Je analyseert .oqdebug JSON logbestanden van OpenQuatt warmtepomp-controllers.
+        Je bent de 'OpenHeatPumps AI Assistent'. Je analyseert .oqdebug JSON logbestanden van OpenQuatt warmtepomp-controllers (Last Stable Version v0.55).
         
-        STRIKTE GEBRUIKERSCONTEXT (NEGEER DIT NIET!):
+        STRIKTE GEBRUIKERSCONTEXT:
         * Woningtype: ${userProfile?.woning_type || "Onbekend"}
         * Afgiftesysteem: ${userProfile?.afgiftesysteem || "Onbekend"}
         * Aanwezige CV-ketel: ${userProfile?.cv_ketel || "GEEN KETEL AANWEZIG"}
         * Thermostaat: ${userProfile?.thermostaat || "Onbekend"}
         
         STRIKTE RAG INSTRUCTIE:
-        Hieronder staat live kennis uit de handleidingen en de 'Power House' software-matrix. Dit is de absolute waarheid.
-        OpenQuatt werkt VERMOGENSGESTUURD op basis van huisverlies (phouseHouse) en de actuele vraag (phouseReq). Er is GEEN sprake van een klassieke stooklijn of vast aanvoerdoel (supply target)! Als de pomp bijv. 2,4 kW stookt terwijl de warmtevraag 4 kW is, komt dit omdat het berekende huisverlies (phouseHouse) op dat moment aangeeft dat 2,4 kW voldoende is om de comfort-band te bewaken (Power House comfort-band wetten).
+        OpenQuatt werkt VERMOGENSGESTUURD op basis van huisverlies (phouseHouse) en de actuele vraag (phouseReq). Er is GEEN sprake van een klassieke stooklijn of vast aanvoerdoel!
         
-        DYNAMISCH GEPROMPTE KENNIS UIT DATABASE:
-        ${dynamischeKennisContext || "Geen specifieke documentatie-matches gevonden voor deze vraag. Gebruik de algemene OpenQuatt wetten."}
-
-        ANALYSEVOLGORDE VOOR EERSTE RUN:
-        1. WARMTEVRAAG: Binnentemperatuur vs setpoint.
-        2. STATUS: In Standby is 0-flow normaal.
+        DYNAMISCH GEPROMPTE KENNIS UIT DATABASE (ALLEEN BIJ RUN 1):
+        ${dynamischeKennisContext || "Gebruik de algemene OpenQuatt v0.55 regels."}
       `;
-      // D. BOUW DE CONVERSATIE OP VOOR GOOGLE GEMINI (ZONDER PROFIEL-VERLIES)
+
+      // FREE TIER OPTIMALISATIE: Voorkom prompt-stapeling bij vervolgvragen (TPM Besparing)
       let contents = [];
       if (!messages || messages.length === 0) {
-        // Eerste run: stuur profiel + logboek
         const initieelBericht = `LOGDATA:\n${JSON.stringify(logData)}`;
         contents.push({ role: "user", parts: [{ text: systemInstruction + "\n\n" + initieelBericht }] });
       } else {
-        // Vervolgrun: we schonken de geschiedenis op en injecteren de verse systemInstruction dwingend in het laatste bericht
-        contents = JSON.parse(JSON.stringify(messages)); // Diepe kopie om front-end niet te breken
-        const oorspronkelijkeTekst = contents[contents.length - 1].parts[0].text;
-        contents[contents.length - 1].parts[0].text = systemInstruction + "\n\nVolgens de chat-geschiedenis loopt het hieronder door. Beantwoord nu de specifieke gebruikersvraag:\n" + oorspronkelijkeTekst;
+        contents = JSON.parse(JSON.stringify(messages)); // Schone duplicatie van de reeds gevulde historie
       }
 
-      // ====================================================================
-      // E. MODEL-ROTATIE EN FAILOVER MOTOR (GEOPTIMALISEERD & VEILIG)
-      // ====================================================================
-      const beschikbareModellen = [
-        "gemini-3.8-flash",       // Primair actueel model
-        "gemini-3.6-flash",       // Actieve 3.x backup
-        "gemini-3.1-flash-lite",  // Snelle fallback (korte redeneertijd, voorkomt time-outs)
-        "gemini-2.5-flash"        // Ultieme backup buiten de zware Gemini 3-infrastructuur
-      ];
-      
+      // MODEL-ROTATIE EN FAILOVER MOTOR
+      const beschikbareModellen = ["gemini-3.8-flash", "gemini-3.6-flash", "gemini-3.1-flash-lite", "gemini-2.5-flash"];
       let gekozenIndex = Math.floor(Math.random() * beschikbareModellen.length);
       let primairModel = beschikbareModellen[gekozenIndex];
       let reserveModel = undefined;
 
-      let geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${primairModel}:generateContent`;
-      let geminiResponse;
-      let responseText;
-      let geminiJson = null;
+      let geminiUrl = `https://googleapis.com{primairModel}:generateContent`;
+      let geminiResponse; let responseText; let geminiJson = null;
 
       try {
         geminiResponse = await fetch(geminiUrl, {
@@ -127,24 +99,15 @@ export default {
           headers: { "Content-Type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
           body: JSON.stringify({ contents: contents })
         });
-        
         responseText = await geminiResponse.text();
-        // Beveiliging: controleer eerst of de response wel JSON is voordat we parsen
-        if (responseText.trim().startsWith("{")) {
-          geminiJson = JSON.parse(responseText);
-        }
-      } catch (e) {
-        console.warn(`Eerste poging met ${primairModel} netwerktechnisch mislukt.`);
-      }
+        if (responseText.trim().startsWith("{")) { geminiJson = JSON.parse(responseText); }
+      } catch (e) { console.warn(`Eerste poging met ${primairModel} mislukt.`); }
 
-      // TRIGGER FAILOVER: Activeer als HTTP-status niet goed is, parsing faalde, of Google een overload-code teruggeeft
-      if (!geminiResponse || !geminiResponse.ok || !geminiJson || geminiJson.error?.code === 503 || geminiJson.error?.code === 429 || geminiJson.error?.message?.includes("quota") || geminiJson.error?.message?.includes("high demand")) {
-        
+      // FAILOVER ACTIVEREN BIJ DRUKTE / QUOTA LIMITS
+      if (!geminiResponse || !geminiResponse.ok || !geminiJson || geminiJson.error?.code === 429 || geminiJson.error?.code === 503) {
         const reserveModellen = beschikbareModellen.filter(m => m !== primairModel);
         reserveModel = reserveModellen[Math.floor(Math.random() * reserveModellen.length)];
-        console.log(`🔄 Schakelen naar reservemodel: ${reserveModel}`);
-        
-        geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${reserveModel}:generateContent`;
+        geminiUrl = `https://googleapis.com{reserveModel}:generateContent`;
         
         try {
           geminiResponse = await fetch(geminiUrl, {
@@ -152,115 +115,133 @@ export default {
             headers: { "Content-Type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
             body: JSON.stringify({ contents: contents })
           });
-          
           responseText = await geminiResponse.text();
-          if (responseText.trim().startsWith("{")) {
-            geminiJson = JSON.parse(responseText);
-          } else {
-            geminiJson = { error: { message: `Server stuurde geen JSON terug maar: ${responseText.substring(0, 100)}` } };
-          }
-        } catch (e) {
-          geminiJson = { error: { message: `Netwerkfout tijdens failover: ${e.message}` } };
-        }
+          if (responseText.trim().startsWith("{")) { geminiJson = JSON.parse(responseText); }
+        } catch (e) { geminiJson = { error: { message: e.message } }; }
       }
 
-      // ====================================================================
-      // RESPONSE GATEWAY MET LIVE PROMPT- & TELEMETRIE-INSPECTIE
-      // ====================================================================
       let gebruiktModel = typeof reserveModel !== 'undefined' ? reserveModel : primairModel;
-      let statusType = "success";
-      let pureAiText = "";
+      let statusType = "success"; let pureAiText = "";
 
-      if (geminiJson && geminiJson.candidates && geminiJson.candidates[0] && geminiJson.candidates[0].content && geminiJson.candidates[0].content.parts && geminiJson.candidates[0].content.parts[0] && geminiJson.candidates[0].content.parts[0].text) {
-        // Het normale succes-pad
+      if (geminiJson && geminiJson.candidates && geminiJson.candidates[0]?.content?.parts[0]?.text) {
         pureAiText = geminiJson.candidates[0].content.parts[0].text;
-      } else if (geminiJson && geminiJson.error) {
-        // Het normale fout-pad
-        statusType = "error";
-        pureAiText = `🚨 GOOGLE API FOUT: ${geminiJson.error.message}`;
       } else {
-        // DE TOTALE INSPECTIE-UPGRADE: Toon exact de response én de meegestuurde prompt!
-        statusType = "error";
-        const aanwezigeKeys = geminiJson ? Object.keys(geminiJson).join(', ') : "Geen JSON data beschikbaar";
-        const ruweInhoud = responseText ? responseText.substring(0, 300) : "Geen ruwe data";
-        
-        // Haal de onbewerkte prompt-tekst op die we naar Google hebben gestuurd
-        const verzondenPrompt = contents && contents[0] && contents[0].parts && contents[0].parts[0] ? contents[0].parts[0].text : "Prompt onleesbaar";
-        const ingekortePrompt = verzondenPrompt.substring(0, 600); // Pak de eerste 600 tekens voor inspectie
-        
-        pureAiText = `🚨 ONVERWACHT ANTWOORD VAN GOOGLE (Geen tekst gegenereerd).\n` +
-                     `• Model gebruikt: ${gebruiktModel}\n` +
-                     `• Beschikbare JSON data-velden: [${aanwezigeKeys}]\n` +
-                     `• Ruwe inspectie-data van Google: ${ruweInhoud}...\n\n` +
-                     `--- LIVE INSPECTIE VERZONDEN PROMPT (EERSTE DEEL) ---\n` +
-                     `${ingekortePrompt}...`;
+        statusType = "error"; pureAiText = geminiJson?.error ? `🚨 API FOUT: ${geminiJson.error.message}` : "🚨 GEEN OUTPUT GEGENEREERD.";
       }
 
-      return new Response(JSON.stringify({ 
-        status: statusType,
-        model: gebruiktModel,
-        diagnose: pureAiText 
-      }), { headers: corsHeaders });
-
+      return new Response(JSON.stringify({ status: statusType, model: gebruiktModel, diagnose: pureAiText }), { headers: corsHeaders });
     } catch (error) {
       return new Response(JSON.stringify({ status: "error", model: "Crash-pijp", diagnose: `🚨 SYSTEMISCHE CRASH: ${error.message}` }), { headers: corsHeaders });
     }
   },
 
-
-  // 3. DE GEAUTOMATISEERDE RECHTTREEKSE INGESTIE-MOTOR (GEERD OP LOKALE EMBEDDINGS)
+  // ====================================================================
+  // 3. GEAUTOMATISEERDE RECHTTREEKSE INGESTIE-MOTOR (DAGELIJKSE MAP-LOOP)
+  // ====================================================================
   async voerIngestieUit(env) {
     if (!env.VECTOR_INDEX || !env.AI) {
       throw new Error("Cloudflare AI of Vectorize binding ontbreekt.");
     }
 
-    const url = "https://openquatt.github.io/OpenQuatt/problemen-oplossen.html";
-    const response = await fetch(url);
-    const html = await response.text();
+    const githubRepo = "OpenQuatt/OpenQuatt";
+    const targetBranch = "main"; // Gelinkt aan de Last Stable Version (v0.55) distributie
+    const alineas = [];
 
-    const alineas = html
-      .split("<p>")
-      .map(p => p.split("</p>").replace(/<[^>]*>/g, '').trim())
-      .filter(text => text.length > 50 && !text.includes("javascript") && !text.includes("css"));
+    // A. MAP-LOOP: Vraag de complete mappenstructuur recursief op via de GitHub Trees API
+    try {
+      const treeUrl = `https://github.com{githubRepo}/git/trees/${targetBranch}?recursive=1`;
+      const treeResponse = await fetch(treeUrl, {
+        headers: { "User-Agent": "OpenHeatPumps-Log-Analyzer-Ingest" }
+      });
 
+      if (!treeResponse.ok) {
+        throw new Error(`GitHub API boomstructuur niet bereikbaar: Status ${treeResponse.status}`);
+      }
+
+      const treeJson = await treeResponse.json();
+      
+      // Isoleer alle bestanden die in 'docs/' of submappen staan en eindigen op '.md'
+      const markdownBestanden = treeJson.tree.filter(file => 
+        file.path.startsWith("docs/") && 
+        file.path.endsWith(".md") && 
+        file.type === "blob"
+      );
+
+      // B. CONTENT FETCH LOOP: Download en chunk elk Markdown-bestand automatisch
+      for (const bestand of markdownBestanden) {
+        const rawUrl = `https://githubusercontent.com{targetBranch}/${bestand.path}`;
+        
+        try {
+          const res = await fetch(rawUrl, {
+            headers: { "User-Agent": "OpenHeatPumps-Log-Analyzer-Ingest" }
+          });
+          
+          if (!res.ok) continue;
+          const markdownTekst = await res.text();
+
+          // Splits tekst op dubbele regeleinden (paragrafen)
+          const secties = markdownTekst
+            .split(/\n\s*\n/)
+            .map(t => t.replace(/[\#\*\_>]/g, ' ').replace(/\s+/g, ' ').trim()) // Zuiver Markdown-karakters op
+            .filter(t => t.length > 50 && !t.includes("javascript") && !t.includes("css"));
+
+          secties.forEach(txt => alineas.push({ bron: bestand.path, tekst: txt }));
+        } catch (fileErr) {
+          console.error(`Fout bij downloaden van ${bestand.path}: ${fileErr.message}`);
+        }
+      }
+    } catch (apiErr) {
+      console.error(`🚨 Algemene GitHub API- of netwerkfout: ${apiErr.message}`);
+      return `Ingestie afgebroken: ${apiErr.message}`;
+    }
+
+    // C. EXPERT SKILLS: Voeg de 5 onmisbare wetten voor log-interpretatie toe aan de hoop
     const expertSecties = [
       "OpenQuatt logboeken gebruiken een speciale deltamix encoding (device-psram-delta-json-v1). Waarden in de samples zijn geen absolute totalen, maar wijzigingen ten opzichte van de startstatus (t=0). De analyzer moet een lopende status bijhouden per kolom.",
       "De warmtepomp werkt via de Power House-strategie. Dit is vermogensgestuurd op basis van huisverlies (phouseHouse) en interne vraag (phouseReq). Er is GEEN vaste aanvoertemperatuur (supply target) zoals bij klassieke stooklijnen. Als de pomp minder kW levert dan de thermostaat vraagt, regelt de Cicero dat autonoom in omdat phouseHouse leidend is.",
       "Als de warmtepomp snel stopt (kort cyclen), vergelijk dan het gevraagde vermogen (strategyRequestedPower) met de laagste fysieke stand van de compressor (pmin in lowLoadDynamicThresholds). Levert de pomp op zijn laagste stand al te veel warmte bij zacht weer? Dan stopt de actuator logischerwijs via de off-drempel.",
       "De start en herstart van de warmtepomp wordt bepaald door de warmte-intentie (Heat Intent). Zodra de binnentemperatuur zakt onder het setpoint minus de comfort-band (standaard 0,1 graden), schiet de vraag via het fast_floor_w_ mechanisme direct omhoog naar het minimale startvermogen om een gezonde run te starten.",
-      "Het compressor-niveau (hp1Compressor) is de stand die via Modbus-register 1999 naar de buitenunit wordt gestuurd. De gemeten frequentie (hp1Freq) is what de buitenunit daadwerkelijk doet. Er is geen vaste 48 Hz minimumlimiet in de code; de laagste stand van het modelanker is always 20 Hz."
+      "Het compressor-niveau (hp1Compressor) is de stand die via Modbus-register 1999 naar de buitenunit wordt gestuurd. De gemeten frequentie (hp1Freq) is what de buitenunit daadwerkelijk doet. Er is geen vaste 48 Hz minimumlimiet in de code; de laagste stand van het modelanker is altijd 20 Hz."
     ];
+    expertSecties.forEach(txt => alineas.push({ bron: "OpenQuatt SKILL Expert-Matrix", tekst: txt }));
 
-    expertSecties.forEach(txt => alineas.push(txt));
+    // D. EMBEDDINGS BEREKENEN & PAYLOAD GENEREREN
     const cloudflarePayload = [];
 
     for (let i = 0; i < alineas.length; i++) {
-      const tekstSectie = alineas[i];
+      const item = alineas[i];
       try {
         const embeddingResponse = await env.AI.run("@cf/baai/bge-base-en-v1.5", {
-          text: [tekstSectie]
+          text: [item.tekst]
         });
+        
+        // REPARATIE: Direct de array uit .data trekken (Voorkomt de .data crash)
         const vectorValues = embeddingResponse.data;
 
         if (vectorValues && vectorValues.length === 768) {
+          // Genereer een stabiele ID op basis van het bestandspad om duplicatie te blokkeren
+          const pathHash = btoa(item.bron).replace(/=/g, "").substring(0, 30);
+          const uniekeId = `doc_${pathHash}_${i}`;
+
           cloudflarePayload.push({
-            id: `expert_doc_${i}`,
+            id: uniekeId,
             values: vectorValues,
             metadata: {
-              source: i >= alineas.length - expertSecties.length ? "OpenQuatt SKILL Expert-Matrix" : "OpenQuatt Live Documentatie",
-              text: tekstSectie
+              source: item.bron.startsWith("docs") ? `v0.55 Repo: ${item.bron}` : item.bron,
+              text: item.tekst
             }
           });
         }
       } catch (e) {
-        console.error(`Sectie ${i} fout: ${e.message}`);
+        console.error(`Sectie i=${i} embedding-fout: ${e.message}`);
       }
     }
 
+    // E. REPARATIE BULK-UPSERT: Verfris de database zonder duplicate-errors te genereren
     if (cloudflarePayload.length > 0) {
-      await env.VECTOR_INDEX.insert(cloudflarePayload);
-      return `Succesvol ${cloudflarePayload.length} documentatie- en expert-secties gevectoriseerd en opgeslagen!`;
+      await env.VECTOR_INDEX.upsert(cloudflarePayload);
+      return `Succesvol een geautomatiseerde synchronisatie uitgevoerd. ${cloudflarePayload.length} secties up-to-date gebracht in Vectorize!`;
     }
-    return "Geen geschikte alineas gevonden.";
+    return "Geen geschikte documentatie-secties gevonden.";
   }
 };
