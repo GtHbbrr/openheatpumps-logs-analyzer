@@ -90,7 +90,7 @@ export default {
       let primairModel = beschikbareModellen[gekozenIndex];
       let reserveModel = undefined;
 
-      let geminiUrl = `https://googleapis.com{primairModel}:generateContent`;
+      let geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${primairModel}:generateContent`;
       let geminiResponse; let responseText; let geminiJson = null;
 
       try {
@@ -107,7 +107,7 @@ export default {
       if (!geminiResponse || !geminiResponse.ok || !geminiJson || geminiJson.error?.code === 429 || geminiJson.error?.code === 503) {
         const reserveModellen = beschikbareModellen.filter(m => m !== primairModel);
         reserveModel = reserveModellen[Math.floor(Math.random() * reserveModellen.length)];
-        geminiUrl = `https://googleapis.com{reserveModel}:generateContent`;
+        geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${reserveModel}:generateContent`;
         
         try {
           geminiResponse = await fetch(geminiUrl, {
