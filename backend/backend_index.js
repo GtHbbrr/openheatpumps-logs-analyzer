@@ -85,7 +85,7 @@ export default {
       }
 
       // MODEL-ROTATIE EN FAILOVER MOTOR
-      const beschikbareModellen = ["gemini-3.8-flash", "gemini-3.6-flash", "gemini-3.1-flash-lite", "gemini-2.5-flash"];
+      const beschikbareModellen = ["gemini-3.8-flash", "gemini-3.6-flash", "gemini-3.1-flash-lite"];
       let gekozenIndex = Math.floor(Math.random() * beschikbareModellen.length);
       let primairModel = beschikbareModellen[gekozenIndex];
       let reserveModel = undefined;
