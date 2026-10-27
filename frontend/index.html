@@ -50,10 +50,10 @@
                                 <option value="Intergas">Intergas</option>
                                 <option value="Remeha">Remeha</option>
                                 <option value="Vaillant">Vaillant</option>
-                                <option value="Vaillant">Andere gas-ketel</option>
-                                <option value="Vaillant">E-ketel</option>
-                                <option value="Vaillant">Doorstroomverwarmer</option>
-                                <option value="Vaillant">Geen</option>
+                                <option value="andere">Andere gas-ketel</option>
+                                <option value="E-ketel">E-ketel</option>
+                                <option value="doorstroomverwarmer">Doorstroomverwarmer</option>
+                                <option value="geen">Geen</option>
                             </select>
                         </div>
                         <div>
@@ -62,7 +62,7 @@
                                 <option value="Honeywell">Honeywell</option>
                                 <option value="Tado">Tado</option>
                                 <option value="Nest">Google Nest</option>
-                                <option value="Nest">Anders</option>
+                                <option value="andere">Anders</option>
                             </select>
                         </div>
                         <!-- Optioneel tekstvak voor de beginvraag / klachttekst -->
@@ -374,10 +374,15 @@ function parseMarkdown(tekst) {
 
 
             try {
+
                 const r = await fetch(WORKER_URL, { 
                     method: 'POST', 
                     headers: { 'Content-Type': 'application/json' }, 
-                    body: JSON.stringify({ userProfile: profile, logData: activeLogData, messages: null }) 
+                    body: JSON.stringify({ 
+                        userProfile: profile, 
+                        logData: activeLogData, 
+                        messages: chatHistory.length > 0 ? chatHistory : null 
+                    }) 
                 });
                 
                 const rauweTekst = await r.text();
