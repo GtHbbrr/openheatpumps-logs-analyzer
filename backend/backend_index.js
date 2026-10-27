@@ -38,17 +38,13 @@ export default {
       let actueleVraag = "Analyseer dit bestand.";
       
       if (messages && messages.length > 0) {
-        // Vervolgvraag in de chat: pak het laatste bericht uit de historie
         const laatsteBericht = messages[messages.length - 1];
-        if (laatsteBericht && laatsteBericht.parts && laatsteBericht.parts.text) {
+        // REPARATIE: Lees text correct uit de parts[0] array-index die de front-end meestuurt
+        if (laatsteBericht && laatsteBericht.parts && laatsteBericht.parts[0] && laatsteBericht.parts[0].text) {
+          actueleVraag = laatsteBericht.parts[0].text;
+        } else if (laatsteBericht && laatsteBericht.parts && laatsteBericht.parts.text) {
           actueleVraag = laatsteBericht.parts.text;
         }
-      } else if (body.query) {
-        // EERSTE RUN: Pak de klacht/vraag rechtstreeks uit het tekstveld van de front-end
-        actueleVraag = body.query;
-      } else if (body.message) {
-        // Fallback mocht de front-end de variabele 'message' noemen
-        actueleVraag = body.message;
       }
 
       let dynamischeKennisContext = "";
