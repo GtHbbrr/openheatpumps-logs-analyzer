@@ -78,7 +78,9 @@ export default {
       // FREE TIER OPTIMALISATIE: Voorkom prompt-stapeling bij vervolgvragen (TPM Besparing)
       let contents = [];
       if (!messages || messages.length === 0) {
-        const initieelBericht = `LOGDATA:\n${JSON.stringify(logData)}`;
+
+        // Eerste run: stuur profiel + logboek + de specifieke gebruikersvraag/klacht
+        const initieelBericht = `GEBRUIKERSVRAAG/KLACHT:\n${actueleVraag}\n\nLOGDATA:\n${JSON.stringify(logData)}`;
         contents.push({ role: "user", parts: [{ text: systemInstruction + "\n\n" + initieelBericht }] });
       } else {
         contents = JSON.parse(JSON.stringify(messages)); // Schone duplicatie van de reeds gevulde historie
