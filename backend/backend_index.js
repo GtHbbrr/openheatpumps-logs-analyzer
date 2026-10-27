@@ -32,12 +32,23 @@ export default {
         return new Response(JSON.stringify({ status: "error", diagnose: "🚨 CONFIGURATIEFOUT: GEMINI_API_KEY ontbreekt." }), { headers: corsHeaders });
       }
 
+      // ====================================================================
+      // 1. BEPAAL DYNAMISCH DE RELEVANTE VRAAG (EERSTE RUN OF VERVOLGVRAAG)
+      // ====================================================================
       let actueleVraag = "Analyseer dit bestand.";
+      
       if (messages && messages.length > 0) {
+        // Vervolgvraag in de chat: pak het laatste bericht uit de historie
         const laatsteBericht = messages[messages.length - 1];
         if (laatsteBericht && laatsteBericht.parts && laatsteBericht.parts.text) {
           actueleVraag = laatsteBericht.parts.text;
         }
+      } else if (body.query) {
+        // EERSTE RUN: Pak de klacht/vraag rechtstreeks uit het tekstveld van de front-end
+        actueleVraag = body.query;
+      } else if (body.message) {
+        // Fallback mocht de front-end de variabele 'message' noemen
+        actueleVraag = body.message;
       }
 
       let dynamischeKennisContext = "";
@@ -46,8 +57,9 @@ export default {
       if (!messages || messages.length === 0) {
         if (env.VECTOR_INDEX && env.AI) {
           try {
-            const Response = await env.AI.run("@cf/baai/bge-base-en-v1.5", { text: [actueleVraag] });
-            const queryVector = embeddingResponse.data[0]; // GECORRIGEERD naar platte array
+            // REPARATIE: 'Response' hernoemd naar 'embeddingResponse' om de crash te voorkomen
+            const embeddingResponse = await env.AI.run("@cf/baai/bge-base-en-v1.5", { text: [actueleVraag] });
+            const queryVector = embeddingResponse.data[0];       
             const vectorMatches = await env.VECTOR_INDEX.query(queryVector, { topK: 3, returnMetadata: true });
             
             dynamischeKennisContext = vectorMatches.matches
