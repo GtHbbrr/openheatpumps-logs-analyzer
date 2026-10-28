@@ -12,6 +12,7 @@ enabled = false
 [[rules]]
 type = "Text"
 globs = ["**/*.txt"]
+fallthrough = false
 
 [triggers]
 # TIJDELIJKE AANPASSING: Extra trigger toegevoegd om iedere 5 minuten te testen
