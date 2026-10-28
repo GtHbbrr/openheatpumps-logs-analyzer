@@ -1,118 +1,18 @@
+// REPARATIE: De OpenQuatt-documentatie wordt direct als platte tekst meegecompileerd uit het universele snapshot
+import openquattDocsSnapshot from "./openquatt_docs_snapshot.txt"; 
+
 export default {
   // ====================================================================
-  // 1. AUTOMATISCHE CRON-TRIGGER (Elke nacht om 03:00 uur UTC)
+  // 1. AUTOMATISCHE CRON-TRIGGER (Passieve herinnering)
   // ====================================================================
   async scheduled(event, env, ctx) {
-    ctx.waitUntil(this.voerIngestieUit(env));
+    // Omdat we geen embeddings meer berekenen in Cloudflare, is deze cron
+    // in de runtime leeg. De documentatie zit permanent verankerd in de build.
+    console.log("Dagelijkse cron-prikkel ontvangen. OpenQuatt snapshot draait mee in de actieve build.");
   },
 
   // ====================================================================
-  // 2. GEAUTOMATISEERDE RECHTSTREEKSE INGESTIE-MOTOR (DAGELIJKSE MAP-LOOP)
-  // ====================================================================
-  async voerIngestieUit(env) {
-    if (!env.VECTOR_INDEX || !env.AI) {
-      throw new Error("Cloudflare AI of Vectorize binding ontbreekt.");
-    }
-
-    const githubRepo = "OpenQuatt/OpenQuatt";
-    const targetBranch = "main"; // Gelinkt aan de Last Stable Version (v0.55) distributie
-    const alineas = [];
-
-    // A. MAP-LOOP: Vraag de complete mappenstructuur recursief op via de GitHub Trees API
-    try {
-      const treeUrl = `https://api.github.com/repos/${githubRepo}/git/trees/${targetBranch}?recursive=1`;
-      const treeResponse = await fetch(treeUrl, {
-        headers: { "User-Agent": "OpenHeatPumps-Log-Analyzer-Ingest" }
-      });
-
-      if (!treeResponse.ok) {
-        throw new Error(`GitHub API boomstructuur niet bereikbaar: Status ${treeResponse.status}`);
-      }
-
-      const treeJson = await treeResponse.json();
-      
-      // AANGESCHERPTE FILTER: Exclueer development-docs, testverslagen en meta-AGENTS.md bestanden
-      const markdownBestanden = treeJson.tree.filter(file => 
-        file.path.startsWith("docs/") && 
-        file.path.endsWith(".md") && 
-        file.type === "blob" &&
-        !file.path.startsWith("docs/development/") &&
-        !file.path.endsWith("AGENTS.md")
-      );
-
-      // B. CONTENT FETCH LOOP: Download en chunk elk Markdown-bestand automatisch
-      for (const bestand of markdownBestanden) {
-        const rawUrl = `https://raw.githubusercontent.com/${githubRepo}/${targetBranch}/${bestand.path}`;
-        
-        try {
-          const res = await fetch(rawUrl, {
-            headers: { "User-Agent": "OpenHeatPumps-Log-Analyzer-Ingest" }
-          });
-          
-          if (!res.ok) continue;
-          const markdownTekst = await res.text();
-
-          // Splits tekst op dubbele regeleinden (paragrafen)
-          const secties = markdownTekst
-            .split(/\n\s*\n/)
-            // REPARATIE: We slopen # en | niet meer! Alleen *, _ en > gaan weg voor loepzuivere tabellen.
-            .map(t => t.replace(/[\*\_>]/g, ' ').replace(/\s+/g, ' ').trim()) 
-            .filter(t => t.length > 50 && !t.includes("javascript") && !t.includes("css"));
-
-          secties.forEach(txt => alineas.push({ bron: bestand.path, tekst: txt }));
-        } catch (fileErr) {
-          console.error(`Fout bij downloaden van ${bestand.path}: ${fileErr.message}`);
-        }
-      }
-    } catch (apiErr) {
-      console.error(`🚨 Algemene GitHub API- of netwerkfout: ${apiErr.message}`);
-      return `Ingestie afgebroken: ${apiErr.message}`;
-    }
-
-    // C. EXPERT SKILLS: Volledig verwijderd uit de database om prompt-vervuiling en 
-    // foutieve tabel-matches in Vectorize te voorkomen. Ze staan nu permanent in de systemInstruction!
-    
-    // D. EMBEDDINGS BEREKENEN & PAYLOAD GENEREREN
-    const cloudflarePayload = [];
-
-    for (let i = 0; i < alineas.length; i++) {
-      const item = alineas[i];
-      try {
-        const embeddingResponse = await env.AI.run("@cf/baai/bge-base-en-v1.5", {
-          text: [item.tekst]
-        });
-        
-        const vectorValues = embeddingResponse.data[0];
-
-        if (vectorValues && vectorValues.length === 768) {
-          // Genereer een stabiele ID op basis van het bestandspad om duplicatie te blokkeren
-          const pathHash = btoa(item.bron).replace(/=/g, "").substring(0, 30);
-          const uniekeId = `doc_${pathHash}_${i}`;
-
-          cloudflarePayload.push({
-            id: uniekeId,
-            values: vectorValues,
-            metadata: {
-              source: `v0.55 Repo: ${item.bron}`,
-              text: item.tekst
-            }
-          });
-        }
-      } catch (e) {
-        console.error(`Sectie i=${i} embedding-fout: ${e.message}`);
-      }
-    }
-
-    // E. REPARATIE BULK-UPSERT: Verfris de database zonder duplicate-errors te genereren
-    if (cloudflarePayload.length > 0) {
-      await env.VECTOR_INDEX.upsert(cloudflarePayload);
-      return `Succesvol een geautomatiseerde synchronisatie uitgevoerd. ${cloudflarePayload.length} secties up-to-date gebracht in Vectorize!`;
-    }
-    return "Geen geschikte documentatie-secties gevonden.";
-  },
-
-  // ====================================================================
-  // 3. HTTP-VERKEER AFHANDELEN (DIAGNOSE & CHAT STREAMING HANDLER)
+  // 2. HTTP-VERKEER AFHANDELEN (DIAGNOSE & CHAT STREAMING HANDLER)
   // ====================================================================
   async fetch(request, env, ctx) {
     const corsHeaders = {
@@ -128,7 +28,7 @@ export default {
     if (request.method === "GET") {
       return new Response(JSON.stringify({ 
         status: "success", 
-        melding: "OpenHeatPumps AI Engine Online. Scope: LSV v0.55. Dagelijkse Cron actief." 
+        melding: "OpenHeatPumps AI Engine Online. Scope: OpenQuatt Docs Snapshot-Context actief." 
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
@@ -137,7 +37,7 @@ export default {
       const { userProfile, logData, messages } = body;
 
       if (!env.GEMINI_API_KEY) {
-        return new Response(JSON.stringify({ status: "error", diagnose: "🚨 CONFIGURATIEFOUT: GEMINI_API_KEY ontbreekt." }), { headers: corsHeaders });
+        return new Response(JSON.stringify({ status: "error", diagnose: "🚨 CONFIGURATIEFOUT: GEMINI_API_KEY ontbreeken." }), { headers: corsHeaders });
       }
 
       // ====================================================================
@@ -148,30 +48,16 @@ export default {
       
       if (!isEersteRun) {
         const laatsteBericht = messages[messages.length - 1];
-        if (laatsteBericht && laatsteBericht.parts && laatsteBericht.parts[0] && laatsteBericht.parts[0].text) {
-          actueleVraag = laatsteBericht.parts[0].text;
+        if (laatsteBericht && laatsteBericht.parts && laatsteBericht.parts && laatsteBericht.parts.text) {
+          actueleVraag = laatsteBericht.parts.text;
         } else if (laatsteBericht && laatsteBericht.parts && laatsteBericht.parts.text) {
           actueleVraag = laatsteBericht.parts.text;
         }
       }
 
-      let dynamischeKennisContext = "";
-      let vectorMatches = null;
-
-      // FREE TIER OPTIMALISATIE: Alleen Vectorize doorzoeken bij de ALLEREERSTE run!
-      if (isEersteRun && env.VECTOR_INDEX && env.AI) {
-        try {
-          const embeddingResponse = await env.AI.run("@cf/baai/bge-base-en-v1.5", { text: [actueleVraag] });
-          const queryVector = embeddingResponse.data[0];       
-          vectorMatches = await env.VECTOR_INDEX.query(queryVector, { topK: 3, returnMetadata: true });
-          
-          dynamischeKennisContext = vectorMatches.matches
-            .map(match => `[Geverifieerde Richtlijn uit ${match.metadata.source}]: ${match.metadata.text}`)
-            .join("\n");
-        } catch (ragErr) {
-          console.error("Vectorize Query Error:", ragErr.message);
-        }
-      }
+      // ULTIEME SIMPLICITEIT: Geen Vectorize query, geen runtime embedding vertraging!
+      // We zetten de complete openquattDocsSnapshot tekst direct door naar de systeemprompt.
+      const dynamischeKennisContext = openquattDocsSnapshot;
 
       // GEOPTIMALISEERDE SYSTEEMPROMPT MET STRIKTE OPENQUATT HARDWARE-CONTEXT
       const systemInstruction = `
