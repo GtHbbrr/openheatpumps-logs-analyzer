@@ -55,7 +55,6 @@ export default {
         }
       }
 
-      // ULTIEME SIMPLICITEIT: Geen Vectorize query, geen runtime embedding vertraging!
       // We zetten de complete openquattDocsSnapshot tekst direct door naar de systeemprompt.
       const dynamischeKennisContext = openquattDocsSnapshot;
 
@@ -109,12 +108,10 @@ export default {
       ctx.waitUntil((async () => {
         let gebruiktModel = primairModel;
         try {
-          // STAP 1: Duw DIRECT de RAG-context naar buiten over de actieve verbinding (Binnen <500ms!)
-          const geselecteerdeDocs = vectorMatches?.matches?.map(match => ({
-            source: match.metadata.source,
-            text: match.metadata.text
-          })) || [];
-
+          // STAP 1: Stuur direct een signaal dat de documenten-scroller klaarstaat
+          // Omdat we de complete snapshot meesturen, geven we aan de front-end door 
+          // dat de volledige OpenQuatt bibliotheek succesvol is geladen!
+          const geselecteerdeDocs = [{ source: "Volledige OpenQuatt Repository-Snapshot", text: "Alle handleidingen en tabellen succesvol geladen in het AI-brein." }];
           await writer.write(encoder.encode(`---CONTEXT_DOCS_START---\n${JSON.stringify(geselecteerdeDocs)}\n---CONTEXT_DOCS_END---\n`));
 
           // STAP 2: Roep de zware Gemini API run aan
