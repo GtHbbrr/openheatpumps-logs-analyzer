@@ -612,7 +612,7 @@ function parseMarkdown(tekst) {
                 wrapper.innerHTML += `
                     <div class="bg-gray-950 p-2 rounded border border-gray-800 text-[11px] leading-relaxed">
                         <span class="text-orange-400 font-bold block mb-0.5">📄 ${doc.source}</span>
-                        <div class="text-gray-400 font-normal italic max-h-14 overflow-y-auto whitespace-pre-wrap break-words">${doc.text.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
+                        <div class="text-gray-400 font-normal italic max-h-28 overflow-y-auto whitespace-pre-wrap break-words">${doc.text.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
                     </div>
                 `;
             });
