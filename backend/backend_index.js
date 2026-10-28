@@ -162,7 +162,7 @@ export default {
       if (isEersteRun && env.VECTOR_INDEX && env.AI) {
         try {
           const embeddingResponse = await env.AI.run("@cf/baai/bge-base-en-v1.5", { text: [actueleVraag] });
-          const queryVector = embeddingResponse.data;       
+          const queryVector = embeddingResponse.data[0];       
           vectorMatches = await env.VECTOR_INDEX.query(queryVector, { topK: 3, returnMetadata: true });
           
           dynamischeKennisContext = vectorMatches.matches
@@ -192,13 +192,6 @@ export default {
         STRIKTE RAG INSTRUCTIE:
         OpenQuatt werkt naar keuze VERMOGENSGESTUURD op basis van huisverlies (phouseHouse) en de actuele vraag (phouseReq) of op basis van een klassieke stooklijn
         
-        5 ONMISBARE REGELEXPERT WETTEN VOOR LOG-INTERPRETATIE:
-        1. Regelmodi Hiërarchie: Systeemgedrag volgt de Control Mode (CM). CM0 (standby) en CM1 (pre/postflow) sturen geen vlam/warmtepompactiviteit naar de thermostaat. CM2 is normaal verwarmen, CM3 activeert ketelondersteuning (boiler assist) en CM4 is uitsluitend foutfallback bij volledige warmtepompuitval.
-        2. PH Woningbehoefte vs Kamercorrectie: Power House berekent de warmtevraag uit woningbehoefte (buitentemperatuur) en kamercorrectie. Het bereiken van de gewenste kamertemperatuur is geen automatische uitknop of compressorstop; de pomp kunnen modulerend op laag vermogen blijven draaien om warmteverlies te compenseren.
-        3. Hydraulische Grenzen: De absolute minimumflow voor compressorbedrijf is hard vastgelegd op 400 L/h. Elk flowsetpoint onder de 400 L/h blokkeert de compressor. In de ontluchtingsservice (CM100) leidt 120 seconden aaneengesloten flow onder 20 L/h tot een harde foutafbreking.
-        4. Ingress Freshness & Heartbeats: Externe API/MQTT inputs hebben een strikte geldigheid (kamertemperatuur 10 min, warmtevraag 15 min). Home Assistant bronnen vereisen een actieve heartbeat (sensor.openquatt ha ingress heartbeat); blijft deze 15 minuten uit, dan worden waarden ongeldig en volgt herstel naar het lokale huismodel of lokale stooklijn.
-        5. Start-Stop Rate Limiter: OpenQuatt begrenst de compressoren tot maximaal 6 startopdrachten per voortschrijdend uur. Een 7e start wacht tot de oudste start een uur geleden is, onafhankelijk van de warmtevraag. Fysieke frequentiebegrenzingen liggen bij de ODU; OpenQuatt blokkeert de pomp boven 12 °C buitenlucht niet met een extra envelop.
-
         DYNAMISCH GEPROMPTE KENNIS UIT DATABASE:
         ${isEersteRun ? dynamischeKennisContext : "Gebruik de specifieke geverifieerde richtlijnen die aan het begin van deze chatgeschiedenis zijn meegegeven."}
       `;
