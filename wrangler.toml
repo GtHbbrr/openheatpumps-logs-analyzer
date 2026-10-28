@@ -7,7 +7,7 @@ enabled = true
 invocation_logs = true
 persist = true
 
-[rules]
+[[rules]]
 type = "Text"
 globs = ["**/*.txt"]
 
