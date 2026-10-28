@@ -78,7 +78,7 @@ export default {
         OpenQuatt werkt naar keuze VERMOGENSGESTUURD op basis van huisverlies (phouseHouse) en de actuele vraag (phouseReq) of op basis van een klassieke stooklijn
         
         DYNAMISCH GEPROMPTE KENNIS UIT DATABASE:
-        ${isEersteRun ? dynamischeKennisContext : "Gebruik de specifieke geverifieerde richtlijnen die aan het begin van deze chatgeschiedenis zijn meegegeven."}
+        ${dynamischeKennisContext}
       `;
 
 
@@ -111,7 +111,8 @@ export default {
           // STAP 1: Stuur direct een signaal dat de documenten-scroller klaarstaat
           // Omdat we de complete snapshot meesturen, geven we aan de front-end door 
           // dat de volledige OpenQuatt bibliotheek succesvol is geladen!
-          const geselecteerdeDocs = [{ source: "Volledige OpenQuatt Repository-Snapshot", text: "Alle handleidingen en tabellen succesvol geladen in het AI-brein." }];
+          // const geselecteerdeDocs = [{ source: "Volledige OpenQuatt Repository-Snapshot", text: "Alle handleidingen en tabellen succesvol geladen in het AI-brein." }];
+          const geselecteerdeDocs = [{ source: "Volledige OpenQuatt Repository-Snapshot", text: dynamischeKennisContext }];
           await writer.write(encoder.encode(`---CONTEXT_DOCS_START---\n${JSON.stringify(geselecteerdeDocs)}\n---CONTEXT_DOCS_END---\n`));
 
           // STAP 2: Roep de zware Gemini API run aan
@@ -143,7 +144,7 @@ export default {
 
           let pureAiText = geminiJson?.candidates[0]?.content?.parts[0]?.text;
           if (!pureAiText) {
-            pureAiText = geminiJson?.error ? `🚨 API FOUT: ${geminiJson.error.message}` : "🚨 GEEN ANTWOORD GEGENERERD.";
+            pureAiText = geminiJson?.error ? `🚨 API FOUT: ${geminiJson.error.message}` : "🚨 GEEN ANTWOORD GEGENEREERD.";
           }
 
           // STAP 4: Schrijf de eindreproductie naar de stream
