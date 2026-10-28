@@ -7,13 +7,9 @@ enabled = true
 invocation_logs = true
 persist = true
 
-[[vectorize]]
-binding = "VECTOR_INDEX"
-index_name = "openquatt-docs-preview"
-
-# GECORRIGEERD: Enkele haken in plaats van dubbele haken voor de AI-configuratie[1.5]
-[ai]
-binding = "AI"
+[rules]
+type = "Text"
+globs = ["**/*.txt"]
 
 [triggers]
 # TIJDELIJKE AANPASSING: Extra trigger toegevoegd om iedere 5 minuten te testen
