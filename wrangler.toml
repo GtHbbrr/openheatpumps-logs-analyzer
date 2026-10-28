@@ -17,6 +17,6 @@ globs = ["**/*.txt"]
 # TIJDELIJKE AANPASSING: Extra trigger toegevoegd om iedere 5 minuten te testen
 crons = [ 
   "0 3 * * *",   # Standaard dagelijkse synchronisatie om 03:00 uur UTC
-  "*/5 * * * *",   # tijdelijk voor testen iedere 5 minuten synchronisatie
+#  "*/5 * * * *",   # tijdelijk voor testen iedere 5 minuten synchronisatie
 ]
 
