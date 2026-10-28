@@ -471,56 +471,50 @@ function parseMarkdown(tekst) {
             el('loader').classList.add('hidden');
         });
 
-        // 6. EERSTE ANALYSE STARTEN (NU MET PRIVACY-FIRST STREAMING EN CORREKTE PAYLOAD-MAPPING)
-        el('btn-diagnose').addEventListener('click', async () => {
-            if (!activeLogData) return;
-            el('loader').classList.remove('hidden');
-            
+        // 7. VERVOLGVRAGEN VERSTUREN (NU OOK MET PRIVACY-FIRST STREAMING EN CORREKTE PAYLOAD-MAPPING)
+        el('btn-send').addEventListener('click', async () => {
+            const inputField = el('chat-input');
             const outputBox = el('output-box');
-            const contextScroller = el('context-scroller');
+            const loader = el('loader');
             const usedModelBadge = el('used-model-badge');
-
-            outputBox.innerHTML = `⚙️ <span class="text-gray-400">Verbinding maken met Cloudflare API-gateway...</span><br>` +
-                                  `🔍 <span class="text-gray-400">RAG-database raadplegen voor OpenQuatt-richtlijnen...</span><br>` +
-                                  `🎲 <span class="text-orange-400 animate-pulse">Model-rotatie activeert... Wachten op Google AI Studio...</span>`;
             
-            if (contextScroller) {
-                contextScroller.classList.remove("hidden");
-                contextScroller.innerHTML = "<div class='text-gray-500 italic animate-pulse text-xs'>RAG-richtlijnen ophalen uit Cloudflare Vectorize...</div>";
-            }
-            if (usedModelBadge) usedModelBadge.innerHTML = "";
-
-            chatHistory = [];
-
-            const profile = { 
-                woning_type: el('woning_type').value, 
-                afgiftesysteem: el('afgiftesysteem').value, 
-                cv_ketel: el('cv_ketel').value, 
-                thermostaat: el('thermostaat').value 
-            };
-
-            const beginVraagTekst = el('begin_vraag').value.trim();
+            const isFoutGeweest = outputBox.innerHTML.includes("🚨 GOOGLE API FOUT") || outputBox.innerHTML.includes("🚨 SYSTEMISCHE CRASH") || outputBox.innerHTML.includes("🚨 NETWERKFOUT") || outputBox.innerHTML.includes("🚨 VERBINDINGSFOUT");
+            let vraagTekst = "";
             
-            if (beginVraagTekst) {
-                chatHistory.push({ role: "user", parts: [{ text: `Specifieke klacht/vraag van de gebruiker: ${beginVraagTekst}` }] });
-                outputBox.innerHTML += `<br><br><div><span class="text-xs text-gray-500">Omgevings-klacht meegegeven: "${beginVraagTekst}"</span></div>`;
+            if (isFoutGeweest) {
+                const laatsteUserBericht = chatHistory.filter(m => m.role === "user").pop();
+                vraagTekst = laatsteUserBericht ? laatsteUserBericht.parts[0].text : inputField.value;
+            } else {
+                vraagTekst = inputField.value.trim();
+                if (!vraagTekst) return;
+                
+                outputBox.innerHTML += `<br><br><div class="text-right"><span class="bg-gray-800 text-gray-200 border border-gray-700 px-3 py-2 rounded-lg inline-block text-sm max-w-[85%] text-left"><strong>Jij:</strong><br>${vraagTekst}</span></div>`;
+                chatHistory.push({ role: "user", parts: [{ text: vraagTekst }] });
+                inputField.value = "";
             }
 
-            el('btn-diagnose').disabled = true;
-            el('btn-diagnose').textContent = "AI analyseert het logboek...";
+            if (loader) loader.classList.remove('hidden');
+            el('btn-send').disabled = true;
+            el('btn-send').textContent = "Versturen...";
+
+            // Toon de live statusstappen onderaan de chat tijdens het wachten
+            outputBox.innerHTML += `<br><div id="live-chat-status" class="text-xs text-orange-400 animate-pulse mt-2">🎲 Model-rotatie activeert reserve-pijplijn... Wachten op antwoord...</div>`;
+            outputBox.scrollTop = outputBox.scrollHeight;
 
             try {
-                // Roep de streaming endpoint van je Cloudflare worker aan
+                const profile = { 
+                    woning_type: el('woning_type').value, 
+                    afgiftesysteem: el('afgiftesysteem').value, 
+                    cv_ketel: el('cv_ketel').value, 
+                    thermostaat: el('thermostaat').value 
+                };
+
                 const response = await fetch(WORKER_URL, { 
                     method: 'POST', 
                     headers: { 'Content-Type': 'application/json' }, 
-                    body: JSON.stringify({ 
-                        userProfile: profile, 
-                        logData: activeLogData, 
-                        messages: chatHistory.length > 0 ? chatHistory : null 
-                    }) 
+                    body: JSON.stringify({ userProfile: profile, logData: activeLogData, messages: chatHistory }) 
                 });
-
+                
                 if (!response.ok) {
                     throw new Error(`Engine weigerde verbinding met status: ${response.status}`);
                 }
@@ -536,59 +530,93 @@ function parseMarkdown(tekst) {
 
                     buffer += textDecoder.decode(value, { stream: true });
 
-                    // ENVELOP 1: Verwerk direct de binnengekomen RAG-kennis chunks
+                    // ENVELOP 1: Verwerk de RAG-documenten (bij vervolgvragen stuurt de backend [] mee)
                     if (!contextDocsVerwerkt && buffer.includes("---CONTEXT_DOCS_END---")) {
                         const parts = buffer.split("---CONTEXT_DOCS_END---\n");
-                        const headerPart = parts[0];
-                        buffer = parts[1] || "";
+                        const headerPart = parts;
+                        buffer = parts || "";
                         contextDocsVerwerkt = true;
 
                         const jsonString = headerPart.replace("---CONTEXT_DOCS_START---\n", "");
                         try {
                             const geselecteerdeDocumenten = JSON.parse(jsonString);
                             renderGevondenDocumenten(geselecteerdeDocumenten);
-                        } catch (jsonErr) {
-                            console.warn("RAG JSON parsing mislukt:", jsonErr.message);
+                        } catch (e) {
+                            console.warn("RAG JSON parsing mislukt:", e.message);
                         }
                     }
 
-                    // ENVELOP 2: Verwerk de uiteindelijke Gemini AI-analyse en de modelnaam
+                    // ENVELOP 2: Verwerk de finale respons voor de vervolgvraag
                     if (buffer.includes("---FINAL_RESPONSE---")) {
                         const parts = buffer.split("---FINAL_RESPONSE---\n");
-                        const finalJsonString = parts[1];
+                        const finalJsonString = parts;
 
                         if (finalJsonString && finalJsonString.trim().endsWith("}")) {
                             const d = JSON.parse(finalJsonString.trim());
                             
-                            // SUCCES: Verwerk het resultaat via JOUW eigen parseMarkdown() functie!
-                            outputBox.innerHTML = `${parseMarkdown(d.diagnose)}`;
-                            chatHistory.push({ role: "user", parts: [{ text: "Analyseer dit bestand." }] }, { role: "model", parts: [{ text: d.diagnose }] });
+                            // Verwijder de tijdelijke chat-statusregel en oude foutmeldingen
+                            const statusRegel = el('live-chat-status');
+                            if (statusRegel) statusRegel.remove();
+                            const oudeFouten = outputBox.querySelectorAll('.error-msg');
+                            oudeFouten.forEach(fout => fout.remove());
+
+                            // VOEG HET ANTWOORD TOE EN TOON DE PARSER-OUTPUT IN DE TIJDLINJL
+                            outputBox.innerHTML += `<br><br><div class="text-xs text-gray-500 mb-1">🤖 Beantwoord via model: ${d.model.toUpperCase()}</div><div><span class="inline-block text-sm max-w-[95%]">${parseMarkdown(d.diagnose)}</span></div>`;
+                            chatHistory.push({ role: "model", parts: [{ text: d.diagnose }] });
                             
                             if (usedModelBadge) {
                                 usedModelBadge.innerHTML = `ENGINE MOTOR: ${d.model.toUpperCase()} (FREE ROTATION)`;
                             }
 
-                            el('btn-diagnose').textContent = "Start AI Systeem Analyse";
-                            el('btn-diagnose').classList.remove('bg-red-600', 'hover:bg-red-600');
-                            el('btn-diagnose').classList.add('bg-green-600', 'hover:bg-green-600');
-                            el('btn-diagnose').disabled = false;
+                            el('btn-send').textContent = "Verstuur";
+                            el('btn-send').classList.remove('bg-red-600', 'hover:bg-red-700');
+                            el('btn-send').classList.add('bg-orange-600', 'hover:bg-orange-700');
                             
-                            el('chat-container').classList.remove('hidden');
-                            el('loader').classList.add('hidden');
-                            return; // Sluit de streaming loop succesvol af
+                            if (loader) loader.classList.add('hidden');
+                            el('btn-send').disabled = false;
+                            outputBox.scrollTop = outputBox.scrollHeight;
+                            return;
                         }
                     }
                 }
             } catch (err) { 
-                outputBox.innerHTML = `❌ <span class="text-red-400 font-bold">Verbindingsfout opgetreden</span><br><br>` +
-                                      `<span class="text-red-400 font-bold">🚨 VERBINDINGSFOUT: ${err.message}</span>`;
-                el('btn-diagnose').textContent = "🔁 Systeemanalyse Opnieuw Starten";
-                el('btn-diagnose').classList.remove('bg-green-600', 'hover:bg-green-600');
-                el('btn-diagnose').classList.add('bg-red-600', 'hover:bg-red-600');
-                el('btn-diagnose').disabled = false;
+                const statusRegel = el('live-chat-status');
+                if (statusRegel) statusRegel.remove();
+                
+                outputBox.innerHTML += `<br><div class="error-msg text-red-400 font-bold"><br>🚨 VERBINDINGSFOUT: ${err.message}</div>`;
+                el('btn-send').textContent = "🔁 Opnieuw Proberen";
+                el('btn-send').classList.remove('bg-orange-600', 'hover:bg-orange-700');
+                el('btn-send').classList.add('bg-red-600', 'hover:bg-red-700');
             }
-            el('loader').classList.add('hidden');
+            if (loader) loader.classList.add('hidden');
+            el('btn-send').disabled = false;
+            outputBox.scrollTop = outputBox.scrollHeight;
         });
+
+        // 8. RAG DOCUMENT CONTEXT RENDERER (TAILWIND COMPATIBLE)
+        function renderGevondenDocumenten(documenten) {
+            const scroller = el("context-scroller");
+            if (!scroller) return;
+
+            scroller.classList.remove("hidden");
+
+            if (documenten.length === 0) {
+                scroller.innerHTML = "<div class='text-gray-500 italic text-[11px]'>🔄 Vervolgvraag: lopende RAG-context uit chatgeschiedenis hergebruikt.</div>";
+                return;
+            }
+
+            scroller.innerHTML = "<div class='font-semibold text-orange-400 mb-1.5 text-[11px] uppercase tracking-wider'>🔍 Ingezette OpenQuatt Systeemrichtlijnen (RAG Instruction):</div><div class='space-y-2'></div>";
+            const wrapper = scroller.querySelector(".space-y-2") || scroller;
+
+            documenten.forEach(doc => {
+                wrapper.innerHTML += `
+                    <div class="bg-gray-950 p-2 rounded border border-gray-800 text-[11px] leading-relaxed">
+                        <span class="text-orange-400 font-bold block mb-0.5">📄 ${doc.source}</span>
+                        <span class="text-gray-400 font-normal italic">${doc.text.substring(0, 130)}...</span>
+                    </div>
+                `;
+            });
+        }
 
     </script>
 </body>
