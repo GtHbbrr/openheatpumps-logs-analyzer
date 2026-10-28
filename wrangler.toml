@@ -16,5 +16,10 @@ index_name = "openquatt-docs-preview"
 binding = "AI"
 
 [triggers]
-crons = [ "0 3 * * *" ] # Dit activeert de scheduled-handler elke nacht om 03:00 uur UTC
+# TIJDELIJKE AANPASSING: Extra triggers toegevoegd voor 14:36 uur (zowel UTC als lokaal) om over 2 minuten te testen
+crons = [ 
+  "0 3 * * *",   # Standaard dagelijkse synchronisatie om 03:00 uur UTC
+  "37 14 * * *", # TIJDELIJK: Activeert de ingestie-motor vandaag om exact 14:36 uur
+  "37 13 * * *"  # TIJDELIJK: Fallback trigger (indien de Cloudflare-omgeving op pure UTC-tijd draait)
+]
 
