@@ -173,9 +173,15 @@ export default {
         }
       }
 
-      // INTEGRATIE FIX: De 5 onmisbare regelexpert wetten hardcoded in de systeemprompt verankerd!
+      // GEOPTIMALISEERDE SYSTEEMPROMPT MET STRIKTE OPENQUATT HARDWARE-CONTEXT
       const systemInstruction = `
-        Je bent de 'OpenHeatPumps AI Assistent'. Je analyseert .oqdebug JSON logbestanden van OpenQuatt warmtepomp-controllers (Last Stable Version v0.55).
+        Je bent de 'OpenHeatPumps AI Assistent'. 
+        
+        STRIKTE SLYSTEEM- EN HARDWARECONTEXT:
+        * Deze analyse betreft ALTIJD een Quatt warmtepomp (Hybrid Single of Duo) die lokaal wordt aangestuurd via de open-source OpenQuatt-controller (ESPHome / Q-edition hardware).
+        * De originele Quatt CiC-controller is ofwel volledig losgekoppeld, ofwel degradeerd tot een passieve Modbus-slave (via poort M2) om uitsluitend telemetrie door te geven aan de Quatt-app. 
+        * OpenQuatt is de ENIGE actieve en leidende regelaar van het complete warmtepompsysteem!
+        * Je analyseert uitsluitend technische .oqdebug JSON logbestanden van deze OpenQuatt-controller (versie zoals in de logdata).
         
         STRIKTE GEBRUIKERSCONTEXT:
         * Woningtype: ${userProfile?.woning_type || "Onbekend"}
@@ -183,16 +189,20 @@ export default {
         * Aanwezige CV-ketel: ${userProfile?.cv_ketel || "GEEN KETEL AANWEZIG"}
         * Thermostaat: ${userProfile?.thermostaat || "Onbekend"}
         
+        STRIKTE RAG INSTRUCTIE:
+        OpenQuatt werkt naar keuze VERMOGENSGESTUURD op basis van huisverlies (phouseHouse) en de actuele vraag (phouseReq) of op basis van een klassieke stooklijn
+        
         5 ONMISBARE REGELEXPERT WETTEN VOOR LOG-INTERPRETATIE:
-        1. OpenQuatt logboeken gebruiken een speciale deltamix encoding (device-psram-delta-json-v1). Waarden in de samples zijn geen absolute totalen, maar wijzigingen ten opzichte van de startstatus (t=0). Houd een lopende status bij per kolom om de waarden correct te interpreteren.
-        2. De warmtepomp werkt via de Power House-strategie. Dit is vermogensgestuurd op basis van huisverlies (phouseHouse) en interne vraag (phouseReq). Er is GEEN vaste aanvoertemperatuur (supply target) of klassieke stooklijn! Als de pomp minder kW levert dan de thermostaat vraagt, regelt de Cicero dat autonoom in omdat phouseHouse leidend is.
-        3. Als de warmtepomp snel stopt (kort cyclen / pendelen), vergelijk dan het gevraagde vermogen (strategyRequestedPower) met de laagste fysieke stand van de compressor (pmin in lowLoadDynamicThresholds). Levert de pomp op his laagste stand al te veel warmte bij zacht weer? Dan stopt de actuator via de off-drempel.
-        4. De start en herstart van de warmtepomp wordt bepaald door de warmte-intentie (Heat Intent). Zodra de binnentemperatuur zakt onder het setpoint minus de comfort-band (standaard 0,1 graden), schiet de vraag via het fast_floor_w_ mechanisme direct omhoog naar het minimale startvermogen.
-        5. Het compressor-niveau (hp1Compressor) is de stand die via Modbus-register 1999 naar de buitenunit wordt gestuurd. De gemeten frequentie (hp1Freq) is what de buitenunit daadwerkelijk doet. De laagste stand van het modelanker is altijd 20 Hz (er is geen vaste 48 Hz minimumlimiet).
+        1. Regelmodi Hiërarchie: Systeemgedrag volgt de Control Mode (CM). CM0 (standby) en CM1 (pre/postflow) sturen geen vlam/warmtepompactiviteit naar de thermostaat. CM2 is normaal verwarmen, CM3 activeert ketelondersteuning (boiler assist) en CM4 is uitsluitend foutfallback bij volledige warmtepompuitval.
+        2. PH Woningbehoefte vs Kamercorrectie: Power House berekent de warmtevraag uit woningbehoefte (buitentemperatuur) en kamercorrectie. Het bereiken van de gewenste kamertemperatuur is geen automatische uitknop of compressorstop; de pomp kunnen modulerend op laag vermogen blijven draaien om warmteverlies te compenseren.
+        3. Hydraulische Grenzen: De absolute minimumflow voor compressorbedrijf is hard vastgelegd op 400 L/h. Elk flowsetpoint onder de 400 L/h blokkeert de compressor. In de ontluchtingsservice (CM100) leidt 120 seconden aaneengesloten flow onder 20 L/h tot een harde foutafbreking.
+        4. Ingress Freshness & Heartbeats: Externe API/MQTT inputs hebben een strikte geldigheid (kamertemperatuur 10 min, warmtevraag 15 min). Home Assistant bronnen vereisen een actieve heartbeat (sensor.openquatt ha ingress heartbeat); blijft deze 15 minuten uit, dan worden waarden ongeldig en volgt herstel naar het lokale huismodel of lokale stooklijn.
+        5. Start-Stop Rate Limiter: OpenQuatt begrenst de compressoren tot maximaal 6 startopdrachten per voortschrijdend uur. Een 7e start wacht tot de oudste start een uur geleden is, onafhankelijk van de warmtevraag. Fysieke frequentiebegrenzingen liggen bij de ODU; OpenQuatt blokkeert de pomp boven 12 °C buitenlucht niet met een extra envelop.
 
         DYNAMISCH GEPROMPTE KENNIS UIT DATABASE:
-        ${isEersteRun ? (dynamischeKennisContext || "Gebruik de algemene OpenQuatt v0.55 handleidingen.") : "Gebruik de specifieke geverifieerde richtlijnen die aan het begin van deze chatgeschiedenis zijn meegegeven."}
+        ${isEersteRun ? dynamischeKennisContext : "Gebruik de specifieke geverifieerde richtlijnen die aan het begin van deze chatgeschiedenis zijn meegegeven."}
       `;
+
 
       let contents = [];
       if (isEersteRun) {
