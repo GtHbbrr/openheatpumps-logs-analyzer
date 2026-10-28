@@ -20,7 +20,7 @@ export default {
 
     // A. MAP-LOOP: Vraag de complete mappenstructuur recursief op via de GitHub Trees API
     try {
-      const treeUrl = `https://github.com{githubRepo}/git/trees/${targetBranch}?recursive=1`;
+      const treeUrl = `https://api.github.com/repos/{githubRepo}/git/trees/${targetBranch}?recursive=1`;
       const treeResponse = await fetch(treeUrl, {
         headers: { "User-Agent": "OpenHeatPumps-Log-Analyzer-Ingest" }
       });
@@ -42,7 +42,7 @@ export default {
 
       // B. CONTENT FETCH LOOP: Download en chunk elk Markdown-bestand automatisch
       for (const bestand of markdownBestanden) {
-        const rawUrl = `https://githubusercontent.com{githubRepo}/${targetBranch}/${bestand.path}`;
+        const rawUrl = `https://raw.githubusercontent.com/{githubRepo}/${targetBranch}/${bestand.path}`;
         
         try {
           const res = await fetch(rawUrl, {
@@ -229,7 +229,7 @@ export default {
           await writer.write(encoder.encode(`---CONTEXT_DOCS_START---\n${JSON.stringify(geselecteerdeDocs)}\n---CONTEXT_DOCS_END---\n`));
 
           // STAP 2: Roep de zware Gemini API run aan
-          let geminiUrl = `https://googleapis.com{primairModel}:generateContent?key=${env.GEMINI_API_KEY}`;
+          let geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${primairModel}:generateContent?key=${env.GEMINI_API_KEY}`;
           let geminiResponse = await fetch(geminiUrl, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -245,7 +245,7 @@ export default {
             const reserveModel = reserveModellen[Math.floor(Math.random() * reserveModellen.length)];
             gebruiktModel = reserveModel;
             
-            geminiUrl = `https://googleapis.com{reserveModel}:generateContent?key=${env.GEMINI_API_KEY}`;
+            geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${reserveModel}:generateContent?key=${env.GEMINI_API_KEY}`;
             geminiResponse = await fetch(geminiUrl, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
