@@ -5,7 +5,9 @@ compatibility_date = "2024-03-01"
 [observability.logs]
 enabled = true
 invocation_logs = true
-persist = true
+
+[observability.traces]
+enabled = false
 
 [[rules]]
 type = "Text"
