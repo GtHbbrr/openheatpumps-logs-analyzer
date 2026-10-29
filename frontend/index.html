@@ -361,9 +361,9 @@ function parseMarkdown(tekst) {
             const contextScroller = el('context-scroller');
             const usedModelBadge = el('used-model-badge');
 
-            outputBox.innerHTML = `⚙️ <span class="text-gray-400">Verbinding maken met Cloudflare API-gateway...</span><br>` +
-                                  `🔍 <span class="text-gray-400">RAG-database raadplegen voor OpenQuatt-richtlijnen...</span><br>` +
-                                  `🎲 <span class="text-orange-400 animate-pulse">Model-rotatie activeert... Wachten op Google AI Studio...</span>`;
+            outputBox.innerHTML = `⚙️ <span class="text-gray-400">Verbinding maken met Cloudflare gateway...</span><br>` +
+                                  `🔍 <span class="text-gray-400">Github raadplegen voor OpenQuatt-documentatie...</span><br>` +
+                                  `🎲 <span class="text-orange-400 animate-pulse">Gemini model-selectie activeert... Wachten op Google AI Studio...</span>`;
             
             if (contextScroller) {
                 contextScroller.classList.remove("hidden");
@@ -403,7 +403,7 @@ function parseMarkdown(tekst) {
                 });
 
                 if (!response.ok) {
-                    throw new Error(`Engine weigerde verbinding met status: ${response.status}`);
+                    throw new Error(`ai model weigerde verbinding met status: ${response.status}`);
                 }
 
                 const reader = response.body.getReader();
@@ -446,7 +446,7 @@ function parseMarkdown(tekst) {
                             chatHistory.push({ role: "user", parts: [{ text: "Analyseer dit bestand." }] }, { role: "model", parts: [{ text: d.diagnose }] });
                             
                             if (usedModelBadge) {
-                                usedModelBadge.innerHTML = `ENGINE MOTOR: ${d.model.toUpperCase()} (FREE ROTATION)`;
+                                usedModelBadge.innerHTML = `Ai model: ${d.model.toUpperCase()} (FREE ROTATION)`;
                             }
 
                             el('btn-diagnose').textContent = "Start AI Systeem Analyse";
@@ -498,7 +498,7 @@ function parseMarkdown(tekst) {
             el('btn-send').textContent = "Versturen...";
 
             // Toon de live statusstappen onderaan de chat tijdens het wachten
-            outputBox.innerHTML += `<br><div id="live-chat-status" class="text-xs text-orange-400 animate-pulse mt-2">🎲 Model-rotatie activeert reserve-pijplijn... Wachten op antwoord...</div>`;
+            outputBox.innerHTML += `<br><div id="live-chat-status" class="text-xs text-orange-400 animate-pulse mt-2">🎲 Model-selectie activeert alternatief ai model... Wachten op antwoord...</div>`;
             outputBox.scrollTop = outputBox.scrollHeight;
 
             try {
@@ -516,7 +516,7 @@ function parseMarkdown(tekst) {
                 });
                 
                 if (!response.ok) {
-                    throw new Error(`Engine weigerde verbinding met status: ${response.status}`);
+                    throw new Error(`ai model weigerde verbinding met status: ${response.status}`);
                 }
 
                 const reader = response.body.getReader();
@@ -601,11 +601,11 @@ function parseMarkdown(tekst) {
             scroller.classList.remove("hidden");
 
             if (documenten.length === 0) {
-                scroller.innerHTML = "<div class='text-gray-500 italic text-[11px]'>🔄 Vervolgvraag: lopende RAG-context uit chatgeschiedenis hergebruikt.</div>";
+                scroller.innerHTML = "<div class='text-gray-500 italic text-[11px]'>🔄 Vervolgvraag: alle context uit chatgeschiedenis wordt hergebruikt.</div>";
                 return;
             }
 
-            scroller.innerHTML = "<div class='font-semibold text-orange-400 mb-1.5 text-[11px] uppercase tracking-wider'>🔍 Ingezette OpenQuatt Systeemrichtlijnen (RAG Instruction):</div><div class='space-y-2'></div>";
+            scroller.innerHTML = "<div class='font-semibold text-orange-400 mb-1.5 text-[11px] uppercase tracking-wider'>🔍 OpenQuatt documentatie toegevoegd aan ai-prompt:</div><div class='space-y-2'></div>";
             const wrapper = scroller.querySelector(".space-y-2") || scroller;
 
             documenten.forEach(doc => {
