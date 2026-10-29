@@ -1,4 +1,4 @@
-import openquattDocsSnapshot from "./49d009bd3f70f6ba2f818016e9073a404891fdb3-openquatt_docs_snapshot.txt";
+import openquattDocsSnapshot from "openquatt_docs_snapshot.txt";
 var backend_index_default = {
   // ====================================================================
   // 1. AUTOMATISCHE CRON-TRIGGER (Passieve herinnering)
