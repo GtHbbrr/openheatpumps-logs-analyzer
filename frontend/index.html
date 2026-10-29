@@ -442,8 +442,9 @@ function parseMarkdown(tekst) {
                             const d = JSON.parse(finalJsonString.trim());
                             
                             // SUCCES: Verwerk het resultaat via JOUW eigen parseMarkdown() functie!
-                            outputBox.innerHTML = `${parseMarkdown(d.diagnose)}`;
-                            chatHistory.push({ role: "user", parts: [{ text: "Analyseer dit bestand." }] }, { role: "model", parts: [{ text: d.diagnose }] });
+                            // outputBox.innerHTML = `${parseMarkdown(d.diagnose)}`;
+                            outputBox.innerHTML += `<br><br><div class="text-xs text-gray-500 mb-1">🤖 Beantwoord via model: ${d.model.toUpperCase()}</div><div><span class="inline-block text-sm max-w-[95%]">${parseMarkdown(d.diagnose)}</span></div>`;                            
+                            chatHistory.push({ role: "user", parts: [{ text: "Analyseer dit bestand." }] }, { role: "model", parts: [{ text: d.diagnose }] });                        
                             
                             if (usedModelBadge) {
                                 usedModelBadge.innerHTML = `Ai model: ${d.model.toUpperCase()} (FREE ROTATION)`;
@@ -560,7 +561,7 @@ function parseMarkdown(tekst) {
                             const oudeFouten = outputBox.querySelectorAll('.error-msg');
                             oudeFouten.forEach(fout => fout.remove());
 
-                            // VOEG HET ANTWOORD TOE EN TOON DE PARSER-OUTPUT IN DE TIJDLINJL
+                            // VOEG HET ANTWOORD TOE EN TOON DE PARSER-OUTPUT IN DE TIJDLIJN
                             outputBox.innerHTML += `<br><br><div class="text-xs text-gray-500 mb-1">🤖 Beantwoord via model: ${d.model.toUpperCase()}</div><div><span class="inline-block text-sm max-w-[95%]">${parseMarkdown(d.diagnose)}</span></div>`;
                             chatHistory.push({ role: "model", parts: [{ text: d.diagnose }] });
                             
