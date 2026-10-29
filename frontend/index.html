@@ -549,7 +549,7 @@ function parseMarkdown(tekst) {
                     // ENVELOP 2: Verwerk de finale respons voor de vervolgvraag
                     if (buffer.includes("---FINAL_RESPONSE---")) {
                         const parts = buffer.split("---FINAL_RESPONSE---\n");
-                        const finalJsonString = parts;
+                        const finalJsonString = parts[1];
 
                         if (finalJsonString && finalJsonString.trim().endsWith("}")) {
                             const d = JSON.parse(finalJsonString.trim());
