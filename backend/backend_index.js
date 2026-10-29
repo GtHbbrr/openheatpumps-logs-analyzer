@@ -112,7 +112,7 @@ ${JSON.stringify(geselecteerdeDocs)}
             responseText = await geminiResponse.text();
             geminiJson = responseText.trim().startsWith("{") ? JSON.parse(responseText) : null;
           }
-          let pureAiText = geminiJson?.candidates[0]?.content?.parts[0]?.text;
+          let pureAiText = geminiJson?.candidates?.[0]?.content?.parts?.[0]?.text;
           if (!pureAiText) {
             pureAiText = geminiJson?.error ? `\u{1F6A8} API FOUT: ${geminiJson.error.message}` : "\u{1F6A8} GEEN ANTWOORD GEGENEREERD.";
           }
