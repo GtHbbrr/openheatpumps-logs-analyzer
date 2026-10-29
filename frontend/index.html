@@ -533,8 +533,8 @@ function parseMarkdown(tekst) {
                     // ENVELOP 1: Verwerk de RAG-documenten (bij vervolgvragen stuurt de backend [] mee)
                     if (!contextDocsVerwerkt && buffer.includes("---CONTEXT_DOCS_END---")) {
                         const parts = buffer.split("---CONTEXT_DOCS_END---\n");
-                        const headerPart = parts;
-                        buffer = parts || "";
+                        const headerPart = parts[0];
+                        buffer = parts[1] || "";                        
                         contextDocsVerwerkt = true;
 
                         const jsonString = headerPart.replace("---CONTEXT_DOCS_START---\n", "");
