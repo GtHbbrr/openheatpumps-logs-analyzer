@@ -66,7 +66,7 @@ export default {
         * Deze analyse betreft ALTIJD een Quatt warmtepomp (Hybrid Single of Duo) die lokaal wordt aangestuurd via de open-source OpenQuatt-controller (ESPHome / Q-edition hardware).
         * De originele Quatt CiC-controller is ofwel volledig losgekoppeld, ofwel degradeerd tot een passieve Modbus-slave (via poort M2) om uitsluitend telemetrie door te geven aan de Quatt-app. 
         * OpenQuatt is de ENIGE actieve en leidende regelaar van het complete warmtepompsysteem!
-        * Geef altijd een korte samenvatting van het .oqdebug JSON logbestand dat is meegezonden
+        * Geef altijd een korte samenvatting in B1 NL van het .oqdebug JSON logbestand dat is meegezonden
         
         STRIKTE GEBRUIKERSCONTEXT:
         * Woningtype: ${userProfile?.woning_type || "Onbekend"}
