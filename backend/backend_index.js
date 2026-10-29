@@ -113,7 +113,7 @@ export default {
           // Omdat we de complete snapshot meesturen, geven we aan de front-end door 
           // dat de volledige OpenQuatt bibliotheek succesvol is geladen!
           // const geselecteerdeDocs = [{ source: "Volledige OpenQuatt Repository-Snapshot", text: "Alle handleidingen en tabellen succesvol geladen in het AI-brein." }];
-          const geselecteerdeDocs = [{ source: "toegevoegde OpenQuatt documentatie", text: dynamischeKennisContext }];
+          const geselecteerdeDocs = [{ source: "OpenQuatt documentatie van de Github repository", text: dynamischeKennisContext }];
           await writer.write(encoder.encode(`---CONTEXT_DOCS_START---\n${JSON.stringify(geselecteerdeDocs)}\n---CONTEXT_DOCS_END---\n`));
 
           // STAP 2: Roep de zware Gemini API run aan
