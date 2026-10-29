@@ -28,7 +28,7 @@ var backend_index_default = {
     }
     try {
       const body = await request.json();
-      const { userProfile, messages } = body;
+      const { userProfile, logData, messages } = body;
 
       if (!env.GEMINI_API_KEY) {
         return new Response(JSON.stringify({ status: "error", diagnose: "\u{1F6A8} CONFIGURATIEFOUT: GEMINI_API_KEY ontbreekt." }), { headers: corsHeaders });
