@@ -592,6 +592,12 @@ function parseMarkdown(tekst) {
             el('btn-send').disabled = false;
             outputBox.scrollTop = outputBox.scrollHeight;
         });
+        el('chat-input').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                el('btn-send').click();
+            }
+        });
 
         // 8. RAG DOCUMENT CONTEXT RENDERER (TAILWIND COMPATIBLE)
         function renderGevondenDocumenten(documenten) {
