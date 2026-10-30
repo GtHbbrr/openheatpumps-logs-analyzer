@@ -89,7 +89,8 @@ var backend_index_default = {
         let gebruiktModel = primairModel;
         try {
           const geselecteerdeDocs = [{ source: "OpenQuatt documentatie van de Github repository", text: dynamischeKennisContext }];
-          await writer.write(encoder.encode(`---CONTEXT_DOCS_START---${JSON.stringify(geselecteerdeDocs)}---CONTEXT_DOCS_END---`));
+          await writer.write(encoder.encode(`---CONTEXT_DOCS_START---\n${JSON.stringify(geselecteerdeDocs)}\n---CONTEXT_DOCS_END---\n`));
+
                                         
           let geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${primairModel}:generateContent?key=${env.GEMINI_API_KEY}`;
           let geminiResponse = await fetch(geminiUrl, {
