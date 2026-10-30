@@ -45,7 +45,7 @@ function fetchText(url) {
       txt.split(/\n\s*\n/).forEach(t => {
         const clean = t.replace(/[*_>]/g, ' ').replace(/\s+/g, ' ').trim();
         if (clean.length > 50 && !clean.includes('javascript') && !clean.includes('css')) {
-          out += f.path.slice(5) + ': ' + clean + '\n\n';
+          out += f.path.slice(5) + clean + '\n\n';
         }
       });
     }
