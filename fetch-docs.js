@@ -27,6 +27,14 @@ function fetchText(url) {
 (async () => {
   try {
     console.log('Uitlezen OpenQuatt docs-structuur via API...');
+
+    // Haal de OpenQuatt firmware-versie op uit oq_substitutions_common.yaml
+    const subUrl = 'https://raw.githubusercontent.com/OpenQuatt/OpenQuatt/main/openquatt/oq_substitutions_common.yaml';
+    const subYaml = await fetchText(subUrl);
+    const versionMatch = subYaml.match(/project_version:\s*"?([^"\s]+)"?/);
+    const fwVersion = versionMatch ? versionMatch[1] : 'onbekend';
+    const fetchTimestamp = new Date().toISOString();
+
     const apiUrl = 'https://api.github.com/repos/OpenQuatt/OpenQuatt/git/trees/main?recursive=1';
     const tree = await fetchJson(apiUrl);
     const mdFiles = tree.tree.filter(
@@ -37,7 +45,10 @@ function fetchText(url) {
            !f.path.endsWith('AGENTS.md')
     );
     console.log(mdFiles.length + ' .md bestanden gevonden (development/ en AGENTS.md uitgesloten)');
-    let out = '';
+
+    // Eerste regel met firmware-versie en timestamp
+    let out = '[OpenQuatt docs snapshot | fw: ' + fwVersion + ' | fetched: ' + fetchTimestamp + ']\n\n';
+
     for (const f of mdFiles) {
       console.log('Ophalen en opschonen: ' + f.path);
       const rawUrl = 'https://raw.githubusercontent.com/OpenQuatt/OpenQuatt/main/' + f.path;
@@ -50,8 +61,9 @@ function fetchText(url) {
       });
     }
     fs.writeFileSync('backend/openquatt_docs_snapshot.txt', out, 'utf8');
-    const chunkCount = out.split('\n\n').filter(Boolean).length;
+    const chunkCount = out.split('\n\n').filter(Boolean).length - 1;
     console.log('\n✅ VOLTOOID: backend/openquatt_docs_snapshot.txt bijgewerkt');
+    console.log('   OpenQuatt fw: ' + fwVersion + ' | fetched: ' + fetchTimestamp);
     console.log('   ' + out.length + ' bytes, ' + chunkCount + ' chunks');
   } catch (e) {
     console.error('🚨 Fout:', e.message);
