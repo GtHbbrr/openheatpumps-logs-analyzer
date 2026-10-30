@@ -34,12 +34,13 @@ var backend_index_default = {
       let isEersteRun = !messages || messages.length === 0;
       if (!isEersteRun) {
         const laatsteBericht = messages[messages.length - 1];
-        if (laatsteBericht && laatsteBericht.parts && laatsteBericht.parts && laatsteBericht.parts.text) {
+        if (laatsteBericht?.parts?.text) {
           actueleVraag = laatsteBericht.parts.text;
-        } else if (laatsteBericht && laatsteBericht.parts && laatsteBericht.parts.text) {
-          actueleVraag = laatsteBericht.parts.text;
+        } else if (laatsteBericht?.parts?.[0]?.text) {
+          actueleVraag = laatsteBericht.parts[0].text;
         }
       }
+
       const dynamischeKennisContext = openquattDocsSnapshot;
       const systemInstruction = `
                               Je bent de 'OpenHeatPumps AI Assistent'. 
@@ -62,34 +63,35 @@ var backend_index_default = {
                               
                               DYNAMISCH GEPROMPTE KENNIS UIT DATABASE:
                               ${dynamischeKennisContext}
+                              
+                              LOGDATA:
+                              ${JSON.stringify(logData)}
                             `;
+      
       let contents = [];
       if (isEersteRun) {
-        const initieelBericht = `GEBRUIKERSVRAAG/KLACHT:${actueleVraag}
-
-                              LOGDATA:
-                              ${JSON.stringify(logData)}`;
-                                      contents.push({ role: "user", parts: [{ text: initieelBericht }] });
-                                    } else {
-                                      contents = JSON.parse(JSON.stringify(messages));
-                                    }
-                                    const beschikbareModellen = ["gemini-3.8-flash", "gemini-3.6-flash", "gemini-3.1-flash-lite", "gemini-3.5-flash-lite", "gemini-3-flash-preview"];
-                                    let primairModel = beschikbareModellen[Math.floor(Math.random() * beschikbareModellen.length)];
-                                    const geminiPayload = {
-                                      systemInstruction: { parts: [{ text: systemInstruction }] },
-                                      contents
-                                    };
-                                    const { readable, writable } = new TransformStream();
-                                    const writer = writable.getWriter();
-                                    const encoder = new TextEncoder();
-                                    ctx.waitUntil((async () => {
-                                      let gebruiktModel = primairModel;
-                                      try {
-                                        const geselecteerdeDocs = [{ source: "OpenQuatt documentatie van de Github repository", text: dynamischeKennisContext }];
-                                        await writer.write(encoder.encode(`---CONTEXT_DOCS_START---
-                              ${JSON.stringify(geselecteerdeDocs)}
-                              ---CONTEXT_DOCS_END---
-                              `));
+        const initieelBericht = `GEBRUIKERSVRAAG/KLACHT:${actueleVraag}`;
+        contents.push({ role: "user", parts: [{ text: initieelBericht }] });
+      } else {
+        contents = JSON.parse(JSON.stringify(messages));
+      }
+      
+      const beschikbareModellen = ["gemini-3.8-flash", "gemini-3.6-flash", "gemini-3.1-flash-lite", "gemini-3.5-flash-lite", "gemini-3-flash-preview"];
+      let primairModel = beschikbareModellen[Math.floor(Math.random() * beschikbareModellen.length)];
+      const geminiPayload = {
+        systemInstruction: { parts: [{ text: systemInstruction }] },
+        contents
+      };
+      
+      const { readable, writable } = new TransformStream();
+      const writer = writable.getWriter();
+      const encoder = new TextEncoder();
+      
+      ctx.waitUntil((async () => {
+        let gebruiktModel = primairModel;
+        try {
+          const geselecteerdeDocs = [{ source: "OpenQuatt documentatie van de Github repository", text: dynamischeKennisContext }];
+          await writer.write(encoder.encode(`---CONTEXT_DOCS_START---${JSON.stringify(geselecteerdeDocs)}---CONTEXT_DOCS_END---`));
                                         
           let geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${primairModel}:generateContent?key=${env.GEMINI_API_KEY}`;
           let geminiResponse = await fetch(geminiUrl, {
