@@ -1,7 +1,7 @@
 import openquattDocsSnapshot from "./openquatt_docs_snapshot.txt";
 var backend_index_default = {
   // ====================================================================
-  // 1. AUTOMATISCHE CRON-TRIGGER (Passieve herinnering)
+  // 1. AUTOMATISCHE CRON-TRIGGER (Passieve herinnering )
   // ====================================================================
   async scheduled(event, env, ctx) {
     console.log("Dagelijkse cron-prikkel ontvangen. OpenQuatt snapshot draait mee in de actieve build.");
