@@ -1,0 +1,33 @@
+name: Dagelijkse Docs Update
+
+on:
+  schedule:
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+jobs:
+  update-snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Installeer Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Haal OpenQuatt docs op en compileer snapshot
+        run: node fetch-docs.js
+
+      - name: Commit bijgewerkte snapshot
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add openquatt_docs_snapshot.txt
+          if git diff --cached --quiet; then
+            echo "Geen wijzigingen — snapshot is al up-to-date."
+          else
+            git commit -m "docs: dagelijkse OpenQuatt snapshot update"
+            git push
+          fi
