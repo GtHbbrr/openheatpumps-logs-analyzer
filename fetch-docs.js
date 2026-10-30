@@ -49,9 +49,10 @@ function fetchText(url) {
         }
       });
     }
-    fs.writeFileSync('openquatt_docs_snapshot.txt', out, 'utf8');
+    fs.writeFileSync('backend/openquatt_docs_snapshot.txt', out, 'utf8');
     const chunkCount = out.split('\n\n').filter(Boolean).length;
-    console.log('\n✅ VOLTOOID: ' + out.length + ' bytes, ' + chunkCount + ' chunks');
+    console.log('\n✅ VOLTOOID: backend/openquatt_docs_snapshot.txt bijgewerkt');
+    console.log('   ' + out.length + ' bytes, ' + chunkCount + ' chunks');
   } catch (e) {
     console.error('🚨 Fout:', e.message);
     process.exit(1);
