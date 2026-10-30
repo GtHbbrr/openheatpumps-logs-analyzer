@@ -46,36 +46,23 @@ function fetchText(url) {
     );
     console.log(mdFiles.length + ' .md bestanden gevonden (development/ en AGENTS.md uitgesloten)');
 
-    // Eerste regel met firmware-versie en timestamp
-    let out = '[OpenQuatt docs snapshot | fw: ' + fwVersion + ' | fetched: ' + fetchTimestamp + ']\n\n';
-
-    for (const f of mdFiles) {
-      console.log('Ophalen en opschonen: ' + f.path);
-      const rawUrl = 'https://raw.githubusercontent.com/OpenQuatt/OpenQuatt/main/' + f.path;
-      const txt = await fetchText(rawUrl);
-      txt.split(/\n\s*\n/).forEach(t => {
-        const clean = t.replace(/[*_>]/g, ' ').replace(/\s+/g, ' ').trim();
-        if (clean.length > 50 && !clean.includes('javascript') && !clean.includes('css')) {
-          out += f.path.slice(5) + ': ' + clean + '\n\n';
-        }
-      });
-    }
-
     // Haal openstaande issues op (uitgezonderd PR's)
-    console.log('\nOphalen openstaande issues...');
+    console.log('Ophalen openstaande issues...');
     const issuesUrl = 'https://api.github.com/repos/OpenQuatt/OpenQuatt/issues?state=open&per_page=100';
     const issues = await fetchJson(issuesUrl);
     const openIssues = issues.filter(i => !i.pull_request);
-
     console.log(openIssues.length + ' openstaande issues gevonden (PR\'s uitgesloten)');
 
+    // Eerste regel met firmware-versie en timestamp
+    let out = '[OpenQuatt docs snapshot | fw: ' + fwVersion + ' | fetched: ' + fetchTimestamp + ']\n\n';
+
+    // --- OPEN ISSUES (bovenaan) ---
     if (openIssues.length > 0) {
-      out += '\n---OPEN ISSUES---\n\n';
+      out += '---OPEN ISSUES---\n\n';
       for (const issue of openIssues) {
         const labels = issue.labels.map(l => l.name).join(', ');
         const labelStr = labels ? ' (' + labels + ')' : '';
         const header = 'issue #' + issue.number + labelStr + ': ' + issue.title;
-
         if (issue.body) {
           issue.body.split(/\n\s*\n/).forEach(t => {
             const clean = t.replace(/[*_>`]/g, ' ').replace(/\s+/g, ' ').trim();
@@ -87,6 +74,19 @@ function fetchText(url) {
           out += header + '\n\n';
         }
       }
+    }
+
+    // --- DOCS (onder de issues) ---
+    for (const f of mdFiles) {
+      console.log('Ophalen en opschonen: ' + f.path);
+      const rawUrl = 'https://raw.githubusercontent.com/OpenQuatt/OpenQuatt/main/' + f.path;
+      const txt = await fetchText(rawUrl);
+      txt.split(/\n\s*\n/).forEach(t => {
+        const clean = t.replace(/[*_>]/g, ' ').replace(/\s+/g, ' ').trim();
+        if (clean.length > 50 && !clean.includes('javascript') && !clean.includes('css')) {
+          out += f.path.slice(5) + ': ' + clean + '\n\n';
+        }
+      });
     }
 
     fs.writeFileSync('backend/openquatt_docs_snapshot.txt', out, 'utf8');
