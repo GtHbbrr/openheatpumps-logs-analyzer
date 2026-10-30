@@ -1,3 +1,5 @@
+[OpenQuatt docs snapshot | fw: v0.55.0 | fetched: 2026-10-30T13:31:48.396Z]
+
 api-input.md: OpenQuatt kan externe bronwaarden ontvangen via de lokale ESPHome webserver. Dit is bedoeld voor dezelfde soort dynamische invoer als de MQTT inputbronnen, maar zonder MQTT-broker.
 
 api-input.md: Gebruik deze API alleen vanaf je eigen lokale netwerk en alleen voor waarden die je zelf actueel houdt. Een API-input telt pas mee nadat er een waarde is gezet en blijft daarna beperkt geldig. Na een herstart beginnen alle API-inputbronnen ongeldig totdat je opnieuw een waarde stuurt.
