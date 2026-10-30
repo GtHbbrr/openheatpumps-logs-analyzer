@@ -107,6 +107,9 @@
                 <div id="drop-zone" class="border-2 border-dashed border-gray-800 bg-gray-950 p-6 rounded-lg text-center hover:border-orange-500 transition cursor-pointer">
                     <p class="text-sm text-gray-400">Gekoppeld logboek: <span id="file-name" class="text-orange-400 font-medium">Geen bestand geladen</span></p>
                     <p class="text-xs text-gray-600 mt-1">Of sleep je .oqdebug.json handmatig hiernaartoe</p>
+                    <div id="log-viewer" class="hidden mt-3 text-left bg-gray-900 border border-gray-800 rounded p-3 max-h-48 overflow-auto">
+                        <pre id="log-content" class="text-xs text-gray-400 font-mono whitespace-pre-wrap break-all"></pre>
+                    </div>
                 </div>
 
                 <!-- Start Button -->
@@ -218,6 +221,14 @@ function parseMarkdown(tekst) {
             try {
                 el('file-name').textContent = file.name;
                 activeLogData = JSON.parse(await file.text());
+                
+                // Toon logdata in het scroll-venster
+                const logViewer = el('log-viewer');
+                const logContent = el('log-content');
+                if (logViewer && logContent) {
+                    logContent.textContent = JSON.stringify(activeLogData, null, 2);
+                    logViewer.classList.remove('hidden');
+                }
                 
                 // Activeer de grote groene analyse-knop
                 el('btn-diagnose').disabled = false;
