@@ -1,0 +1,59 @@
+const fs = require('fs');
+const https = require('https');
+
+function fetchJson(url) {
+  return new Promise((res, rej) => {
+    https.get(url, { headers: { 'User-Agent': 'Node-Analyzer' } }, (r) => {
+      let d = '';
+      r.on('data', chunk => d += chunk);
+      r.on('end', () => {
+        try { res(JSON.parse(d)); }
+        catch (e) { rej(new Error('Geen JSON van ' + url)); }
+      });
+    }).on('error', rej);
+  });
+}
+
+function fetchText(url) {
+  return new Promise((res, rej) => {
+    https.get(url, { headers: { 'User-Agent': 'Node-Analyzer' } }, (r) => {
+      let d = '';
+      r.on('data', chunk => d += chunk);
+      r.on('end', () => res(d));
+    }).on('error', rej);
+  });
+}
+
+(async () => {
+  try {
+    console.log('Uitlezen OpenQuatt docs-structuur via API...');
+    const apiUrl = 'https://api.github.com/repos/OpenQuatt/OpenQuatt/git/trees/main?recursive=1';
+    const tree = await fetchJson(apiUrl);
+    const mdFiles = tree.tree.filter(
+      f => f.path.startsWith('docs/') &&
+           f.path.endsWith('.md') &&
+           f.type === 'blob' &&
+           !f.path.startsWith('docs/development/') &&
+           !f.path.endsWith('AGENTS.md')
+    );
+    console.log(mdFiles.length + ' .md bestanden gevonden (development/ en AGENTS.md uitgesloten)');
+    let out = '';
+    for (const f of mdFiles) {
+      console.log('Ophalen en opschonen: ' + f.path);
+      const rawUrl = 'https://raw.githubusercontent.com/OpenQuatt/OpenQuatt/main/' + f.path;
+      const txt = await fetchText(rawUrl);
+      txt.split(/\n\s*\n/).forEach(t => {
+        const clean = t.replace(/[*_>]/g, ' ').replace(/\s+/g, ' ').trim();
+        if (clean.length > 50 && !clean.includes('javascript') && !clean.includes('css')) {
+          out += '[' + f.path + ']: ' + clean + '\n\n';
+        }
+      });
+    }
+    fs.writeFileSync('openquatt_docs_snapshot.txt', out, 'utf8');
+    const chunkCount = out.split('\n\n').filter(Boolean).length;
+    console.log('\n✅ VOLTOOID: ' + out.length + ' bytes, ' + chunkCount + ' chunks');
+  } catch (e) {
+    console.error('🚨 Fout:', e.message);
+    process.exit(1);
+  }
+})();
