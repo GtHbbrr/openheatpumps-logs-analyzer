@@ -60,11 +60,41 @@ function fetchText(url) {
         }
       });
     }
+
+    // Haal openstaande issues op (uitgezonderd PR's)
+    console.log('\nOphalen openstaande issues...');
+    const issuesUrl = 'https://api.github.com/repos/OpenQuatt/OpenQuatt/issues?state=open&per_page=100';
+    const issues = await fetchJson(issuesUrl);
+    const openIssues = issues.filter(i => !i.pull_request);
+
+    console.log(openIssues.length + ' openstaande issues gevonden (PR\'s uitgesloten)');
+
+    if (openIssues.length > 0) {
+      out += '\n---OPEN ISSUES---\n\n';
+      for (const issue of openIssues) {
+        const labels = issue.labels.map(l => l.name).join(', ');
+        const labelStr = labels ? ' (' + labels + ')' : '';
+        const header = 'issue #' + issue.number + labelStr + ': ' + issue.title;
+
+        if (issue.body) {
+          issue.body.split(/\n\s*\n/).forEach(t => {
+            const clean = t.replace(/[*_>`]/g, ' ').replace(/\s+/g, ' ').trim();
+            if (clean.length > 50 && !clean.includes('javascript') && !clean.includes('css')) {
+              out += header + ' - ' + clean + '\n\n';
+            }
+          });
+        } else {
+          out += header + '\n\n';
+        }
+      }
+    }
+
     fs.writeFileSync('backend/openquatt_docs_snapshot.txt', out, 'utf8');
     const chunkCount = out.split('\n\n').filter(Boolean).length - 1;
     console.log('\n✅ VOLTOOID: backend/openquatt_docs_snapshot.txt bijgewerkt');
     console.log('   OpenQuatt fw: ' + fwVersion + ' | fetched: ' + fetchTimestamp);
     console.log('   ' + out.length + ' bytes, ' + chunkCount + ' chunks');
+    console.log('   ' + openIssues.length + ' open issues toegevoegd');
   } catch (e) {
     console.error('🚨 Fout:', e.message);
     process.exit(1);
