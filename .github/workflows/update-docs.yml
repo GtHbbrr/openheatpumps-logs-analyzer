@@ -15,7 +15,7 @@ jobs:
       - name: Installeer Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
 
       - name: Haal OpenQuatt docs op en compileer snapshot
         run: node fetch-docs.js
