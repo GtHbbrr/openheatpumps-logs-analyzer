@@ -63,17 +63,15 @@ var backend_index_default = {
                               
                               DYNAMISCH GEPROMPTE KENNIS UIT DATABASE:
                               ${dynamischeKennisContext}
-                              
-                              LOGDATA:
-                              ${JSON.stringify(logData)}
                             `;
       
       let contents = [];
       if (isEersteRun) {
-        const initieelBericht = `GEBRUIKERSVRAAG/KLACHT:${actueleVraag}`;
+        const initieelBericht = `GEBRUIKERSVRAAG/KLACHT:${actueleVraag}\n\nLOGDATA:\n${JSON.stringify(logData)}`;
         contents.push({ role: "user", parts: [{ text: initieelBericht }] });
       } else {
         contents = JSON.parse(JSON.stringify(messages));
+        contents.unshift({ role: "user", parts: [{ text: `LOGDATA:\n${JSON.stringify(logData)}` }] });
       }
       
       const beschikbareModellen = ["gemini-3.8-flash", "gemini-3.6-flash", "gemini-3.1-flash-lite", "gemini-3.5-flash-lite", "gemini-3-flash-preview"];
