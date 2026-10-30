@@ -121,12 +121,13 @@ var backend_index_default = {
           }
                                         
           const finaleRespons = JSON.stringify({ model: gebruiktModel, diagnose: pureAiText });
-          await writer.write(encoder.encode(`---FINAL_RESPONSE---${finaleRespons}`));
+          await writer.write(encoder.encode(`---FINAL_RESPONSE---\n${finaleRespons}`));
                                         
         } catch (streamErr) {
           console.error("Streaming Fatal Error:", streamErr.message);
           const crashPayload = JSON.stringify({ model: "Crash-pijp", diagnose: `\u{1F6A8} STREAM CRASH: ${streamErr.message}` });
-          await writer.write(encoder.encode(`---FINAL_RESPONSE---${crashPayload}`));
+          await writer.write(encoder.encode(`---FINAL_RESPONSE---\n${crashPayload}`));
+
         } finally {
           await writer.close();
         }
