@@ -24,7 +24,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add openquatt_docs_snapshot.txt
+          git add backend/openquatt_docs_snapshot.txt
           if git diff --cached --quiet; then
             echo "Geen wijzigingen — snapshot is al up-to-date."
           else
