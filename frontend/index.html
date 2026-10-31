@@ -656,7 +656,10 @@
             // --- Initieel renderen ---
             renderChangesRows();
             renderChips();
-            renderGrid();
+            // renderGrid();            
+            
+            // UX-Verbetering: Open de pagina direct op de Tijdreeks-tab in plaats van Wijzigingen
+            setTab('grid'); 
         }
 
         // 1. DE SLIMME EN UNIVERSELE MARKDOWN & LATEX PARSER
