@@ -54,10 +54,9 @@
                         <div>
                             <label class="block text-xs text-gray-400 font-medium mb-1">Afgiftesysteem</label>
                             <select id="afgiftesysteem" class="w-full bg-gray-900 border border-gray-700 rounded p-2 text-sm text-gray-300 focus:outline-none focus:border-orange-500">
-                                <option value="radiatoren">Radiatoren</option>
-                                <option value="vloerverwarming">Vloerverwarming & radiatoren</option>    
-                                <option value="radiatoren">Radiatoren</option>
-                                <option value="vloerverwarming">Vloerverwarming</option>
+                                <option value="alleen radiatoren">Radiatoren</option>
+                                <option value="vloerverwarming en radiatoren">Vloerverwarming & radiatoren</option>    
+                                <option value="alleen vloerverwarming">Vloerverwarming</option>
                                 <option value="fancoils">Fancoils / Jaga</option>
                             </select>
                         </div>
@@ -285,25 +284,29 @@
                 meta.ended_at_ms = new Date(meta.ended_at).getTime();
             }
 
-            // Als er samples zijn, herleiden we het interval en de opnameduur
+            // Dynamische berekening van de starttijd, eindtijd en duur op basis van de DAADWERKELIJK aanwezige samples
             if (samplesArray.length > 0) {
-                meta.interval_s = meta.interval_s || 10; // OpenQuatt default is vaak 10s
-                
-                // Pak de sampleIndex van de allereerste en allerlaatste meting
+                meta.interval_s = meta.interval_s || 10; // OpenQuatt default is 10s
+            
+                // Pak de sampleIndex van de allereerste en allerlaatste meting in dit exportbestand
                 const firstSampleIdx = samplesArray[0][0];
                 const lastSampleIdx = samplesArray[samplesArray.length - 1][0];
                 
-                // Bereken de totale duur in seconden
-                const totalDurationS = (lastSampleIdx - firstSampleIdx) * (meta.interval_s || 10);
-                meta.duration_s = meta.duration_s ?? totalDurationS;
-
-                // Als start_at_ms onbekend is, pakken we de huidige tijd minus de duur als fallback
-                if (!meta.started_at_ms) {
-                    meta.started_at_ms = Date.now() - (totalDurationS * 1000);
-                }
-                if (!meta.ended_at_ms) {
-                    meta.ended_at_ms = meta.started_at_ms + (totalDurationS * 1000);
-                }
+                // Bereken de werkelijke duur van deze specifieke export
+                const totalDurationS = (lastSampleIdx - firstSampleIdx) * meta.interval_s;
+                meta.duration_s = totalDurationS;
+                
+                // Bepaal de werkelijke start- en eindtijd op basis van het gekozen exportvenster
+                // Als de root-level timestamps aanwezig zijn, gebruiken we die als basis icm de sample indices
+                const baseTime = data.started_at ? new Date(data.started_at).getTime() : Date.now() - (totalDurationS * 1000);
+                
+                meta.started_at_ms = baseTime + (firstSampleIdx * meta.interval_s * 1000);
+                meta.ended_at_ms = baseTime + (lastSampleIdx * meta.interval_s * 1000);
+            } else {
+                // Fallback als het bestand onverhoopt helemaal leeg is
+                meta.duration_s = 0;
+                meta.started_at_ms = data.started_at ? new Date(data.started_at).getTime() : 0;
+                meta.ended_at_ms = data.ended_at ? new Date(data.ended_at).getTime() : 0;
             }
 
             // Tekstuele fallbacks voor interface-kaarten om streepjes '–' te voorkomen
