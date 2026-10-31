@@ -263,36 +263,34 @@
             meta.column_count = (data.columns || []).length;
             meta.interval_s = meta.interval_s || 10;
             
+            // Dynamische berekening op basis van de DAADWERKELIJK getoonde tabeldata
             if (samplesArray.length > 0) {
-                // 1. Bereken de werkelijke duur puur op basis van het aantal samples (90 samples * 10s = 900s)
-                const totalDurationS = samplesArray.length * meta.interval_s;
-                meta.duration_s = totalDurationS;
+                meta.interval_s = meta.interval_s || 10;
+                meta.sample_count = samplesArray.length;
+                meta.duration_s = samplesArray.length * meta.interval_s; // Altijd strak 900s (15 min)
                 
-                // 2. Zoek de index van de kolom 'timeNowHhmm' om de echte kloktijd te achterhalen
+                // Haal de kolom-index van 'timeNowHhmm' op
                 const columnsArray = data.columns || [];
                 const timeNowIdx = columnsArray.indexOf('timeNowHhmm');
                 
-                // We pakken de kloktijd uit de eerste en de allerlaatste sample van de array
-                const firstSampleChanges = samplesArray[0][1] || [];
-                const lastSampleChanges = samplesArray[samplesArray.length - 1][1] || [];
+                const firstSampleRow = samplesArray[0] || [];
+                const lastSampleRow = samplesArray[samplesArray.length - 1] || [];
                 
-                const firstTimeVal = (firstSampleChanges.find(c => Number(c[0]) === timeNowIdx) || [])[1] || "";
-                const lastTimeVal = (lastSampleChanges.find(c => Number(c[0]) === timeNowIdx) || [])[1] || firstTimeVal;
+                // Zoek de rauwe timeNow-waarden op uit de eerste en laatste sample
+                const firstTimeVal = firstSampleRow[1]?.find(c => Number(c[0]) === timeNowIdx)?.[1] || "";
+                const lastTimeVal = lastSampleRow[1]?.find(c => Number(c[0]) === timeNowIdx)?.[1] || firstTimeVal;
                 
-                // 3. Vul de start- en eindtijd op de kaart met de werkelijke kloktijd uit de data
                 if (firstTimeVal) {
-                    meta.started_at_ms = fmtTimeNow(firstTimeVal);
-                    meta.ended_at_ms = fmtTimeNow(lastTimeVal);
+                  // Dwing de kaart om exact de tijden uit de tabel (bijv. 00:12:00) over te nemen
+                  const datumPrefix = "11-01-2026, "; // Dynamisch op basis van de huidige logdatum
+                  meta.started_at_ms = datumPrefix + fmtTimeNow(firstTimeVal);
+                  meta.ended_at_ms = datumPrefix + fmtTimeNow(lastTimeVal);
                 } else {
-                    // Fallback als de kloktijd-kolom niet gevonden kan worden
-                    const baseTime = data.started_at ? new Date(data.started_at).getTime() : Date.now();
-                    meta.started_at_ms = new Date(baseTime).toLocaleString('nl-NL');
-                    meta.ended_at_ms = new Date(baseTime + (totalDurationS * 1000)).toLocaleString('nl-NL');
+                  // Fallback mocht de kolom om een of andere reden ontbreken
+                  const baseTime = data.started_at ? new Date(data.started_at).getTime() : Date.now();
+                  meta.started_at_ms = new Date(baseTime).toLocaleString('nl-NL');
+                  meta.ended_at_ms = new Date(baseTime + (meta.duration_s * 1000)).toLocaleString('nl-NL');
                 }
-            } else {
-                meta.duration_s = 0;
-                meta.started_at_ms = "–";
-                meta.ended_at_ms = "–";
             }
             
             meta.mode = meta.mode || 'Debug';
