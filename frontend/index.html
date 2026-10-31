@@ -250,12 +250,67 @@
             const nameOf = i => columns[i] ?? `col${i}`;
             const unitOf = i => unitsMap.get(i) || '';
 
-            // metadata (alles behalve de grote arrays)
+            // ============================================================
+            // GEOPTIMALISEERDE METADATA EXTRACTIE (VOORKOM LEGE METAVELDEN)
+            // ============================================================
             const meta = {};
+            
+            // 1. Haal de basissleutels op van root-niveau indien aanwezig
             for (const [k, v] of Object.entries(data)) {
                 if (!['columns', 'units', 'initial', 'samples'].includes(k)) meta[k] = v;
             }
 
+            // 2. Fallbacks & Slimme berekeningen op basis van de arrays
+            const samplesArray = data.samples || [];
+            const columnsArray = data.columns || [];
+
+            // Aantal samples en kolommen dynamisch tellen
+            meta.sample_count = meta.sample_count ?? samplesArray.length;
+            meta.column_count = meta.column_count ?? columnsArray.length;
+
+            // Zoek specifieke opname-id's of runtime-gegevens in de initial snapshot
+            const initialMap = new Map(data.initial || []);
+            
+            // Haal recording_id / storage / mode op uit de snapshot-indices indien daar aanwezig
+            const recordingIdIdx = columnsArray.indexOf('recordingId');
+            if (recordingIdIdx !== -1 && initialMap.has(recordingIdIdx)) {
+                meta.recording_id = meta.recording_id ?? initialMap.get(recordingIdIdx);
+            }
+
+            // Dynamische berekening van de starttijd, eindtijd en duur op basis van de samples
+            if (!meta.started_at_ms && meta.started_at) {
+                meta.started_at_ms = new Date(meta.started_at).getTime();
+            }
+            if (!meta.ended_at_ms && meta.ended_at) {
+                meta.ended_at_ms = new Date(meta.ended_at).getTime();
+            }
+
+            // Als er samples zijn, herleiden we het interval en de opnameduur
+            if (samplesArray.length > 0) {
+                meta.interval_s = meta.interval_s || 10; // OpenQuatt default is vaak 10s
+                
+                // Pak de sampleIndex van de allereerste en allerlaatste meting
+                const firstSampleIdx = samplesArray[0][0];
+                const lastSampleIdx = samplesArray[samplesArray.length - 1][0];
+                
+                // Bereken de totale duur in seconden
+                const totalDurationS = (lastSampleIdx - firstSampleIdx) * (meta.interval_s || 10);
+                meta.duration_s = meta.duration_s ?? totalDurationS;
+
+                // Als start_at_ms onbekend is, pakken we de huidige tijd minus de duur als fallback
+                if (!meta.started_at_ms) {
+                    meta.started_at_ms = Date.now() - (totalDurationS * 1000);
+                }
+                if (!meta.ended_at_ms) {
+                    meta.ended_at_ms = meta.started_at_ms + (totalDurationS * 1000);
+                }
+            }
+
+            // Tekstuele fallbacks voor interface-kaarten om streepjes '–' te voorkomen
+            meta.mode = meta.mode ?? 'Debug';
+            meta.storage = meta.storage ?? 'Local Flash';
+            meta.event_count = meta.event_count ?? 0;
+            
             // initiële snapshot
             const initial = [...(data.initial || [])]
                 .sort((a, b) => a[0] - b[0])
