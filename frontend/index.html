@@ -574,7 +574,7 @@
                 // Data rijen
                 let body = '';
                 for (const s of d.samples) {
-                    const tn = timeNowIdx >= 0 ? s.state.get(timeNowIdx) : 'leeg';
+                    const tn = timeNowIdx >= 0 ? s.state.get(timeNowIdx) : '';
                     let row = `<td class="p-1 text-blue-400 font-mono whitespace-nowrap sticky left-0 bg-gray-900 z-10">${fmtDur(s.offsetS)}</td><td class="p-1 text-blue-400 font-mono whitespace-nowrap">${fmtTimeNow(tn)}</td>`;
                     for (const i of selected) {
                         const v = s.state.get(i);
