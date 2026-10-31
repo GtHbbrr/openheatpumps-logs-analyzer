@@ -250,71 +250,55 @@
             const unitOf = i => unitsMap.get(i) || '';
 
             // ============================================================
-            // GEOPTIMALISEERDE METADATA EXTRACTIE (VOORKOM LEGE METAVELDEN)
+            // GEOPTIMALISEERDE METADATA EXTRACTIE (PUUR OP BASIS VAN EXPORT)
             // ============================================================
             const meta = {};
             
-            // 1. Haal de basissleutels op van root-niveau indien aanwezig
             for (const [k, v] of Object.entries(data)) {
                 if (!['columns', 'units', 'initial', 'samples'].includes(k)) meta[k] = v;
             }
-
-            // 2. Fallbacks & Slimme berekeningen op basis van de arrays
-            const samplesArray = data.samples || [];
-            const columnsArray = data.columns || [];
-
-            // Aantal samples en kolommen dynamisch tellen
-            meta.sample_count = meta.sample_count ?? samplesArray.length;
-            meta.column_count = meta.column_count ?? columnsArray.length;
-
-            // Zoek specifieke opname-id's of runtime-gegevens in de initial snapshot
-            const initialMap = new Map(data.initial || []);
             
-            // Haal recording_id / storage / mode op uit de snapshot-indices indien daar aanwezig
-            const recordingIdIdx = columnsArray.indexOf('recordingId');
-            if (recordingIdIdx !== -1 && initialMap.has(recordingIdIdx)) {
-                meta.recording_id = meta.recording_id ?? initialMap.get(recordingIdIdx);
-            }
-
-            // Dynamische berekening van de starttijd, eindtijd en duur op basis van de samples
-            if (!meta.started_at_ms && meta.started_at) {
-                meta.started_at_ms = new Date(meta.started_at).getTime();
-            }
-            if (!meta.ended_at_ms && meta.ended_at) {
-                meta.ended_at_ms = new Date(meta.ended_at).getTime();
-            }
-
-            // Dynamische berekening op basis van de DAADWERKELIJK aanwezige samples in de export
+            const samplesArray = data.samples || [];
+            meta.sample_count = samplesArray.length;
+            meta.column_count = (data.columns || []).length;
+            meta.interval_s = meta.interval_s || 10;
+            
             if (samplesArray.length > 0) {
-                meta.interval_s = meta.interval_s || 10;
-                meta.sample_count = samplesArray.length;
-                
-                // Pak de allereerste en allerlaatste sample-rij uit dit bestand
-                const firstSampleRow = samplesArray[0];
-                const lastSampleRow = samplesArray[samplesArray.length - 1];
-                
-                // De sampleIndex staat altijd op de 0-de positie van de rij (bijv. 802 en 892)
-                const firstSampleIdx = firstSampleRow[0];
-                const lastSampleIdx = lastSampleRow[0];
-                
-                // De werkelijke duur is het VERSCHIL tussen de uiterste indices in DIT bestand (892 - 802 = 90 samples)
-                const totalDurationS = (lastSampleIdx - firstSampleIdx) * meta.interval_s;
+                // 1. Bereken de werkelijke duur puur op basis van het aantal samples (90 samples * 10s = 900s)
+                const totalDurationS = samplesArray.length * meta.interval_s;
                 meta.duration_s = totalDurationS;
                 
-                // Bereken de exacte start- en eindtijd van dit specifieke exportvenster
-                const globalStartMs = data.started_at ? new Date(data.started_at).getTime() : Date.now() - (lastSampleIdx * meta.interval_s * 1000);
+                // 2. Zoek de index van de kolom 'timeNowHhmm' om de echte kloktijd te achterhalen
+                const columnsArray = data.columns || [];
+                const timeNowIdx = columnsArray.indexOf('timeNowHhmm');
                 
-                // Verschuif de start- en eindtijd op de kaart naar de werkelijke inhoud van het bestand
-                meta.started_at_ms = globalStartMs + (firstSampleIdx * meta.interval_s * 1000);
-                meta.ended_at_ms = globalStartMs + (lastSampleIdx * meta.interval_s * 1000);
+                // We pakken de kloktijd uit de eerste en de allerlaatste sample van de array
+                const firstSampleChanges = samplesArray[0][1] || [];
+                const lastSampleChanges = samplesArray[samplesArray.length - 1][1] || [];
+                
+                const firstTimeVal = (firstSampleChanges.find(c => Number(c[0]) === timeNowIdx) || [])[1] || "";
+                const lastTimeVal = (lastSampleChanges.find(c => Number(c[0]) === timeNowIdx) || [])[1] || firstTimeVal;
+                
+                // 3. Vul de start- en eindtijd op de kaart met de werkelijke kloktijd uit de data
+                if (firstTimeVal) {
+                    meta.started_at_ms = fmtTimeNow(firstTimeVal);
+                    meta.ended_at_ms = fmtTimeNow(lastTimeVal);
+                } else {
+                    // Fallback als de kloktijd-kolom niet gevonden kan worden
+                    const baseTime = data.started_at ? new Date(data.started_at).getTime() : Date.now();
+                    meta.started_at_ms = new Date(baseTime).toLocaleString('nl-NL');
+                    meta.ended_at_ms = new Date(baseTime + (totalDurationS * 1000)).toLocaleString('nl-NL');
+                }
+            } else {
+                meta.duration_s = 0;
+                meta.started_at_ms = "–";
+                meta.ended_at_ms = "–";
             }
-
-
-            // Tekstuele fallbacks voor interface-kaarten om streepjes '–' te voorkomen
-            meta.mode = meta.mode ?? 'Debug';
-            meta.storage = meta.storage ?? 'Local Flash';
-            meta.event_count = meta.event_count ?? 0;
             
+            meta.mode = meta.mode || 'Debug';
+            meta.storage = meta.storage || 'Local Flash';
+            meta.event_count = meta.event_count || 0;
+                   
             // initiële snapshot
             const initial = [...(data.initial || [])]
                 .sort((a, b) => a[0] - b[0])
