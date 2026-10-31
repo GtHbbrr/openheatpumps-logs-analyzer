@@ -201,6 +201,29 @@
             return `${m}:${String(sec).padStart(2, '0')}`;
         }
 
+        // haal de index van de timeNowHhmm kolom uit de decoded data
+        function findTimeNowIdx(d) {
+            for (let i = 0; i < (d.meta.column_count || 0); i++) {
+                if (d.nameOf(i) === 'timeNowHhmm') return i;
+            }
+            return -1;
+        }
+
+        // formatteer timeNowHhmm waarde naar HH:MM:SS (bijv. "12:49" -> "12:49:00", "1249" -> "12:49:00")
+        function fmtTimeNow(v) {
+            if (v === undefined || v === '') return '';
+            let s = String(v).trim();
+            // als het "12:49" is, voeg ":00" toe
+            if (/^\d{1,2}:\d{2}$/.test(s)) return s + ':00';
+            // als het "1249" is (geen dubbelepunt), voeg toe
+            if (/^\d{3,4}$/.test(s)) {
+                const padded = s.padStart(4, '0');
+                return `${padded.slice(0,2)}:${padded.slice(2)}:00`;
+            }
+            // als het al HH:MM:SS is, laat staan
+            return s;
+        }
+
         function decodeLogbook(data) {
             const columns = data.columns || [];
             const unitsMap = new Map((data.units || []).map(u => [u[0], u[1]]));
@@ -331,7 +354,7 @@
                     <div class="overflow-auto max-h-80 border border-gray-800 rounded">
                     <table class="w-full text-xs">
                     <thead class="bg-gray-950 sticky top-0"><tr class="text-gray-500 text-left">
-                        <th class="p-1">t</th><th class="p-1">tijd</th><th class="p-1.5">gewijzigde waarden</th>
+                        <th class="p-1">t</th><th class="p-1">timeNow</th><th class="p-1.5">gewijzigde waarden</th>
                     </tr></thead><tbody id="lb-changes-body"></tbody>
                     </table></div>
                 </div>
@@ -387,13 +410,13 @@
             const filter = el('lb-filter');
 
             // --- View 1: Wijzigingen rijen renderen (met filter) ---
+            const timeNowIdx = findTimeNowIdx(d);
             function renderChangesRows() {
                 const body = el('lb-changes-body');
                 if (!body) return;
                 const q = (filter.value || '').toLowerCase().trim();
                 let html = '';
                 for (const s of d.samples) {
-                    const t = s.time.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
                     let changes = [...s.changed].sort((a, b) => a - b);
                     if (q) {
                         changes = changes.filter(i => d.nameOf(i).toLowerCase().includes(q));
@@ -402,9 +425,10 @@
                     const changesHtml = changes.map(i =>
                         `<span class="text-gray-300">${esc(d.nameOf(i))}</span>=<span class="text-orange-300 font-mono">${fmtNum(s.state.get(i))}</span><span class="text-gray-600">${esc(d.unitOf(i))}</span>`
                     ).join(' &nbsp;·&nbsp; ');
+                    const tn = timeNowIdx >= 0 ? s.state.get(timeNowIdx) : '';
                     html += `<tr class="border-t border-gray-800 hover:bg-gray-950">
                         <td class="p-1 text-blue-400 font-mono whitespace-nowrap">${fmtDur(s.offsetS)}</td>
-                        <td class="p-1 text-blue-400 font-mono whitespace-nowrap">${t}</td>
+                        <td class="p-1 text-blue-400 font-mono whitespace-nowrap">${fmtTimeNow(tn)}</td>
                         <td class="p-1.5 text-gray-400">${changesHtml || '—'}</td>
                     </tr>`;
                 }
@@ -412,7 +436,7 @@
             }
 
             // --- View 2: Tijdreeks grid ---
-            const allChanged = d.changedCols;
+            const allChanged = d.changedCols.filter(i => i !== timeNowIdx); // timeNow is vaste kolom, geen chip
             let selected = allChanged.filter(i => LB_DEFAULTS.has(d.nameOf(i)));
             if (!selected.length) selected = allChanged.slice(0, 12);
 
@@ -463,7 +487,7 @@
                 }
 
                 // Header
-                let head = `<th class="p-1 sticky left-0 bg-gray-950 z-10">t</th><th class="p-1">tijd</th>`;
+                let head = `<th class="p-1 sticky left-0 bg-gray-950 z-10">t</th><th class="p-1">timeNow</th>`;
                 for (const i of selected) {
                     head += `<th class="p-1.5 whitespace-nowrap">${esc(d.nameOf(i))}<span class="text-gray-600 text-[9px] block">${esc(d.unitOf(i))}</span></th>`;
                 }
@@ -471,8 +495,8 @@
                 // Data rijen
                 let body = '';
                 for (const s of d.samples) {
-                    const t = s.time.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-                    let row = `<td class="p-1 text-blue-400 font-mono whitespace-nowrap sticky left-0 bg-gray-900 z-10">${fmtDur(s.offsetS)}</td><td class="p-1 text-blue-400 font-mono whitespace-nowrap">${t}</td>`;
+                    const tn = timeNowIdx >= 0 ? s.state.get(timeNowIdx) : '';
+                    let row = `<td class="p-1 text-blue-400 font-mono whitespace-nowrap sticky left-0 bg-gray-900 z-10">${fmtDur(s.offsetS)}</td><td class="p-1 text-blue-400 font-mono whitespace-nowrap">${fmtTimeNow(tn)}</td>`;
                     for (const i of selected) {
                         const v = s.state.get(i);
                         const ch = s.changed.has(i);
@@ -516,7 +540,7 @@
 
                 // Header rij
                 let rows = [];
-                let header = ['t (s)', 'tijd'];
+                let header = ['t (s)', 'timeNow'];
                 for (const i of selected) {
                     const u = d.unitOf(i);
                     header.push(u ? `${d.nameOf(i)} (${u})` : d.nameOf(i));
@@ -525,8 +549,8 @@
 
                 // Data rijen
                 for (const s of d.samples) {
-                    const t = s.time.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-                    let row = [s.offsetS.toFixed(1), t];
+                    const tn = timeNowIdx >= 0 ? fmtTimeNow(s.state.get(timeNowIdx)) : '';
+                    let row = [s.offsetS.toFixed(1), tn];
                     for (const i of selected) {
                         const v = s.state.get(i);
                         row.push(v === undefined ? '' : v);
