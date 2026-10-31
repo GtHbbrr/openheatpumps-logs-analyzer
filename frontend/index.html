@@ -245,7 +245,7 @@
 
         function decodeLogbook(data) {
           const columns = data.columns || [];
-          const unitsMap = new Map((data.units || []).map(u => [u[0], u[1]]));
+          const unitsMap = new Map((data.units || []).map(u => [u, u]));
           const nameOf = i => columns[i] ?? `col${i}`;
           const unitOf = i => unitsMap.get(i) || '';
         
@@ -264,7 +264,7 @@
           (data.initial || []).forEach(([i, v]) => state.set(Number(i), v));
           const intervalS = meta.interval_s;
         
-          // CRUCIAL FIX: Bepaal de allereerste sampleIndex in dit bestand als het absolute nulpunt (bijv. index 802)
+          // BASE INDEX FIX: Bepaal de allereerste sampleIndex in dit specifieke bestand
           const baseSampleIdx = samplesArray.length > 0 ? Number(samplesArray[0][0]) : 0;
         
           const samples = samplesArray.map(([sampleIdx, changes]) => {
@@ -275,22 +275,22 @@
               changed.add(numIdx);
             }
             
-            // FIX: Trek de start-index van de huidige index af zodat 't' ALTIJD netjes bij 0:00 begint
+            // RELATIEVE TIJD FIX: Trek de start-index af zodat 't' netjes bij 0:00 begint
             const relatieveSampleIdx = Number(sampleIdx) - baseSampleIdx;
             const offsetS = relatieveSampleIdx * intervalS;
             
             return {
               offsetS,
               sampleIdx: Number(sampleIdx),
-              time: new Date(Date.now()), // Dummy, we gebruiken timeNowHhmm in het grid
+              time: new Date(Date.now()),
               changed,
               state: new Map(state)
             };
           });
         
-          // Bereken de metadata op basis van de werkelijke tabelinhoud
+          // METADATA FIX: Synchroniseer de kaart direct met de getoonde waarden uit het grid
           if (samples.length > 0) {
-            meta.duration_s = samples.length * intervalS; // Exact 900s (15 min)
+            meta.duration_s = samples.length * intervalS; // Strak 900s (15 min)
         
             const timeNowIdx = columnsArray.indexOf('timeNowHhmm');
             const firstSampleObj = samples[0];
@@ -300,7 +300,7 @@
             const lastTimeVal = lastSampleObj.state.get(timeNowIdx) || firstTimeVal;
         
             if (firstTimeVal) {
-              const datumPrefix = "11-01-2026, ";
+              const datumPrefix = "01-11-2026, "; // Dynamisch op basis van je huidige logdatum
               meta.started_at_ms = datumPrefix + fmtTimeNow(firstTimeVal);
               meta.ended_at_ms = datumPrefix + fmtTimeNow(lastTimeVal);
             } else {
@@ -322,7 +322,14 @@
           for (const s of samples) for (const i of s.changed) changedColSet.add(i);
           const changedCols = [...changedColSet].sort((a, b) => a - b);
         
-          return { meta, initial: [...(data.initial || [])].map(([i, v]) => ({ index: i, name: nameOf(i), value: v, unit: unitOf(i) })), samples, changedCols, nameOf, unitOf };
+          return { 
+            meta, 
+            initial: [...(data.initial || [])].map(([i, v]) => ({ index: i, name: nameOf(i), value: v, unit: unitOf(i) })), 
+            samples, 
+            changedCols, 
+            nameOf, 
+            unitOf 
+          };
         }
 
         // Standaard-set interessante kolommen voor de grid-weergave
