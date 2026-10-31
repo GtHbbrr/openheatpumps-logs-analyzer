@@ -418,7 +418,7 @@
                 <div id="lb-snapshot-content" class="hidden mt-4 overflow-auto max-h-60 border border-gray-800 rounded transition-all duration-300">
                     <table class="w-full text-xs">
                         <thead class="bg-gray-950 sticky top-0"><tr class="text-gray-500 text-left">
-                            <th class="p-1.5">#</th><th class="p-1.5">Kolom</th><th class="p-1.5 text-right">Waarde</th><th class="p-1.5">Eenheid</th>
+                            <th class="p-1.5">#</th><th class="p-1.5">Kolom</th><th class="p-1.5">Eenheid</th><th class="p-1.5 text-left">Waarde</th>
                         </tr></thead>
                         <tbody>`;
             for (const r of d.initial) {
@@ -426,8 +426,8 @@
                         <tr class="border-t border-gray-800 hover:bg-gray-900 transition-colors">
                             <td class="p-1.5 text-gray-600">${r.index}</td>
                             <td class="p-1.5 text-gray-300">${esc(r.name)}</td>
-                            <td class="p-1.5 text-right text-gray-200 font-mono">${fmtNum(r.value)}</td>
                             <td class="p-1.5 text-gray-500">${esc(r.unit)}</td>
+                            <td class="p-1.5 text-left text-gray-200 font-mono">${fmtNum(r.value)}</td>
                         </tr>`;
             }
             html += `
