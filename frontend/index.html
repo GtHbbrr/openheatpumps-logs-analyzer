@@ -305,40 +305,39 @@
         ]);
 
         function renderLogbook(data) {
-            // Als het geen .oqdebug formaat is, val terug op pretty-printed JSON
             if (!data || !Array.isArray(data.columns)) {
                 return `<pre class="text-xs text-gray-400 font-mono whitespace-pre-wrap break-all">${esc(JSON.stringify(data, null, 2))}</pre>`;
             }
 
             const d = decodeLogbook(data);
-            _lbData = d; // bewaar voor interactieve elementen
+            _lbData = d;
             let html = '';
 
             // ============================================================
-            // KAART 1: SAMPLES & TIJDREEKS (STANDAARD VOLLEDIG OPEN)
+            // KAART 1: SAMPLES & TIJDREEKS (STANDAARD INGEKLAPT)
             // ============================================================
             html += `
             <div class="border border-gray-800 bg-gray-950 p-4 rounded-lg shadow-md mb-6">
                 <!-- Flex-header met live UX inklapknop voor Samples -->
-                <div class="flex justify-between items-center mb-4 border-b border-gray-800 pb-2 cursor-pointer select-none" id="lb-samples-header">
+                <div class="flex justify-between items-center cursor-pointer select-none" id="lb-samples-header">
                     <h4 class="text-orange-400 font-bold text-sm">📈 Samples (${d.samples.length} metingen)</h4>
                     <button id="lb-samples-toggle-btn" class="text-gray-400 hover:text-orange-500 font-bold text-xs bg-gray-900 border border-gray-800 px-2 py-1 rounded transition">
-                        <span>▼</span> <span id="lb-samples-toggle-text">Inklappen</span>
+                        <span>▶</span> <span id="lb-samples-toggle-text">Uitklappen</span>
                     </button>
                 </div>
 
-                <!-- Deze wrapper houdt alle logboek-elementen bij elkaar voor het inklappen -->
-                <div id="lb-samples-content" class="space-y-4 transition-all duration-300">
-                    <!-- Tabs: Tijdreeks (grid) krijgt nu de oranje actieve styling bij opstarten -->
+                <!-- GECORRIGEERD: Staat nu via 'hidden' standaard strak dichtgeklapt bij laden -->
+                <div id="lb-samples-content" class="hidden mt-4 space-y-4 transition-all duration-300">
+                    <!-- Tabs met scherp contrast (Tijdreeks is default) -->
                     <div class="flex gap-2">
-                        <button id="lb-tab-changes" class="px-3 py-1.5 rounded text-xs font-semibold bg-gray-800 text-gray-400 border border-gray-700 hover:text-white transition">Wijzigingen</button>
-                        <button id="lb-tab-grid" class="px-3 py-1.5 rounded text-xs font-semibold bg-orange-600 text-white shadow-sm transition">Tijdreeks (grid)</button>
+                        <button id="lb-tab-changes" class="px-3 py-1.5 rounded text-xs font-semibold bg-gray-900 text-gray-500 border border-gray-800 hover:text-gray-300 transition">Wijzigingen</button>
+                        <button id="lb-tab-grid" class="px-3 py-1.5 rounded text-xs font-bold bg-orange-600 text-white border border-orange-500 shadow-md transition">Tijdreeks (grid)</button>
                     </div>
 
                     <!-- Gedeelde kolom-filter -->
                     <input id="lb-filter" placeholder="Filter kolommen (bijv. temp, power, flow, hp1)…" class="w-full bg-gray-900 border border-gray-800 rounded p-2 text-xs text-gray-300 focus:outline-none focus:border-orange-500">
 
-                    <!-- View 1: Wijzigingen (Standaard hidden gemaakt) -->
+                    <!-- View 1: Wijzigingen -->
                     <div id="lb-view-changes" class="hidden">
                         <div class="overflow-auto max-h-80 border border-gray-800 rounded">
                         <table class="w-full text-xs">
@@ -348,14 +347,15 @@
                         </table></div>
                     </div>
 
-                    <!-- View 2: Tijdreeks grid (Standaard geopend, hidden class weggehaald) -->
+                    <!-- View 2: Tijdreeks grid -->
                     <div id="lb-view-grid">
                         <div class="flex gap-2 mb-2 flex-wrap items-center">
-                            <button id="lb-all" class="bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs px-3 py-1.5 rounded border border-gray-700">Toon alle</button>
-                            <button id="lb-default" class="bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs px-3 py-1.5 rounded border border-gray-700">Standaardset</button>
-                            <button id="lb-clear" class="bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs px-3 py-1.5 rounded border border-gray-700">Wis selectie</button>
-                            <button id="lb-export" class="bg-green-700 hover:bg-green-600 text-white text-xs px-3 py-1.5 rounded border border-green-600 font-semibold">⬇ Export CSV</button>
-                            <span id="lb-grid-count" class="text-gray-500 text-xs"></span>
+                            <button id="lb-all" class="bg-gray-900 hover:bg-gray-800 text-gray-400 text-xs px-3 py-1.5 rounded border border-gray-800 transition">Toon alle</button>
+                            <!-- Hoog contrast focus voor Standaardset knop (aangezien dit de actieve toestand is) -->
+                            <button id="lb-default" class="bg-orange-600 text-white text-xs px-3 py-1.5 rounded border border-orange-500 font-bold shadow-sm transition">Standaardset</button>
+                            <button id="lb-clear" class="bg-gray-900 hover:bg-gray-800 text-gray-400 text-xs px-3 py-1.5 rounded border border-gray-800 transition">Wis selectie</button>
+                            <button id="lb-export" class="bg-green-700 hover:bg-green-600 text-white text-xs px-3 py-1.5 rounded border border-green-600 font-semibold shadow-sm transition">⬇ Export CSV</button>
+                            <span id="lb-grid-count" class="text-gray-500 text-xs ml-2"></span>
                         </div>
                         <div id="lb-chips" class="flex flex-wrap gap-1 mb-2 max-h-28 overflow-auto"></div>
                         <p class="text-gray-600 text-[10px] mb-1">Oranje cellen = gewijzigd in deze stap. Waarden blijven staan tot de volgende wijziging (carry-forward). De onderste drie rijen tonen min / max / gemiddeld per kolom.</p>
@@ -455,15 +455,18 @@
 
             function setTab(which) {
                 if (which === 'changes') {
-                    tabChanges.className = 'px-3 py-1.5 rounded text-xs font-semibold bg-orange-600 text-white';
-                    tabGrid.className = 'px-3 py-1.5 rounded text-xs font-semibold bg-gray-800 text-gray-400 border border-gray-700';
+                    // Wijzigingen actief (Oranje/Wit) - Tijdreeks inactief (Donkergrijs/Grijs)
+                    tabChanges.className = 'px-3 py-1.5 rounded text-xs font-bold bg-orange-600 text-white border border-orange-500 shadow-md transition';
+                    tabGrid.className = 'px-3 py-1.5 rounded text-xs font-semibold bg-gray-900 text-gray-500 border border-gray-800 hover:text-gray-300 transition';
                     viewChanges.classList.remove('hidden');
                     viewGrid.classList.add('hidden');
                 } else {
-                    tabGrid.className = 'px-3 py-1.5 rounded text-xs font-semibold bg-orange-600 text-white';
-                    tabChanges.className = 'px-3 py-1.5 rounded text-xs font-semibold bg-gray-800 text-gray-400 border border-gray-700';
+                    // Tijdreeks actief (Oranje/Wit) - Wijzigingen inactief (Donkergrijs/Grijs)
+                    tabGrid.className = 'px-3 py-1.5 rounded text-xs font-bold bg-orange-600 text-white border border-orange-500 shadow-md transition';
+                    tabChanges.className = 'px-3 py-1.5 rounded text-xs font-semibold bg-gray-900 text-gray-500 border border-gray-800 hover:text-gray-300 transition';
                     viewGrid.classList.remove('hidden');
                     viewChanges.classList.add('hidden');
+                    renderGrid();
                 }
             }
             tabChanges.addEventListener('click', () => setTab('changes'));
@@ -513,10 +516,20 @@
                     if (q && !name.toLowerCase().includes(q)) continue;
                     const on = selected.includes(i);
                     const unit = d.unitOf(i);
-                    html += `<span class="cursor-pointer select-none text-[10px] px-2 py-1 rounded-full ${on ? 'bg-orange-600 text-white' : 'bg-gray-800 text-gray-400 border border-gray-700'}" data-i="${i}">${esc(name)}${unit ? ` <span class="opacity-60">${esc(unit)}</span>` : ''}</span>`;
+                    
+                    // UX HOGER CONTRAST: Actief = Helder oranje gloed/tekst. Inactief = gedimd grijs.
+                    html += `
+                        <span class="cursor-pointer select-none text-[10px] px-2.5 py-1 rounded-full border transition duration-100 ${
+                            on 
+                            ? 'bg-orange-500/20 text-white border-orange-500 font-bold shadow-[0_0_8px_rgba(237,137,54,0.15)]' 
+                            : 'bg-gray-950 text-gray-500 border-gray-800/80 hover:border-gray-700 hover:text-gray-400'
+                        }" data-i="${i}">
+                            ${esc(name)}${unit ? ` <span class="opacity-60 font-normal">${esc(unit)}</span>` : ''}
+                        </span>`;
                 }
                 chipsEl.innerHTML = html;
             }
+
 
             // Bereken min / max / gemiddeld voor een set geselecteerde kolommen
             function computeStats(cols) {
@@ -664,25 +677,40 @@
                 renderGrid();
             });
 
-            // --- Knoppen ---
+            // --- Knoppen UI contrast-management ---
+            function updateButtonFocus(activeId) {
+                ['lb-all', 'lb-default', 'lb-clear'].forEach(id => {
+                    const btn = el(id);
+                    if (!btn) return;
+                    if (id === activeId) {
+                        btn.className = "bg-orange-600 text-white text-xs px-3 py-1.5 rounded border border-orange-500 font-bold shadow-sm transition";
+                    } else {
+                        btn.className = "bg-gray-900 hover:bg-gray-800 text-gray-400 text-xs px-3 py-1.5 rounded border border-gray-800 transition";
+                    }
+                });
+            }
+
             el('lb-all').addEventListener('click', () => {
                 const q = (filter.value || '').toLowerCase().trim();
                 for (const i of allChanged) {
                     if (q && !d.nameOf(i).toLowerCase().includes(q)) continue;
                     if (!selected.includes(i)) selected.push(i);
                 }
+                updateButtonFocus('lb-all');
                 renderChips();
                 renderGrid();
             });
 
             el('lb-default').addEventListener('click', () => {
                 selected = allChanged.filter(i => LB_DEFAULTS.has(d.nameOf(i)));
+                updateButtonFocus('lb-default');
                 renderChips();
                 renderGrid();
             });
 
             el('lb-clear').addEventListener('click', () => {
                 selected = [];
+                updateButtonFocus('lb-clear');
                 renderChips();
                 renderGrid();
             });
@@ -712,15 +740,20 @@
 
                 if (isCollapsed) {
                     lbSamplesContent.classList.remove('hidden');
+                    lbSamplesHeader.classList.add('border-b', 'border-gray-800', 'pb-2', 'mb-2');
                     if (lbSamplesText) lbSamplesText.textContent = "Inklappen";
                     if (lbSamplesArrow) lbSamplesArrow.textContent = "▼";
-                    renderGrid(); // Tabel-breedtes direct scherpstellen na openen
+                    
+                    // UX-FIX: Zorgt dat de grid-tabel bij de allereerste klik direct correct gevuld klaarstaat!
+                    renderGrid(); 
                 } else {
                     lbSamplesContent.classList.add('hidden');
+                    lbSamplesHeader.classList.remove('border-b', 'border-gray-800', 'pb-2', 'mb-2');
                     if (lbSamplesText) lbSamplesText.textContent = "Uitklappen";
                     if (lbSamplesArrow) lbSamplesArrow.textContent = "▶";
                 }
             }
+
             lbSamplesHeader?.addEventListener('click', toggleSamplesVisibility);
             lbSamplesBtn?.addEventListener('click', toggleSamplesVisibility);
 
@@ -778,11 +811,11 @@
             lbSnapshotHeader?.addEventListener('click', toggleSnapshotVisibility);
             lbSnapshotBtn?.addEventListener('click', toggleSnapshotVisibility);
 
-
-            // --- Centralised Opstartscherm: Render Tijdreeks direct open ---
+            // --- Gecorrigeerd: Initieel renderen (alles start stilgeslagen op de achtergrond) ---
+            selected = allChanged.filter(i => LB_DEFAULTS.has(d.nameOf(i))); // Vul direct de standaardset in het geheugen
             renderChangesRows();
             renderChips();
-            setTab('grid'); 
+            setTab('grid'); // Zet de interne tab-status direct goed naar Tijdreeks
         }
 
         // 1. DE SLIMME EN UNIVERSELE MARKDOWN & LATEX PARSER
