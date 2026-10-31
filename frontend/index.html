@@ -12,17 +12,27 @@
     <div>
         <!-- Header -->
         <header class="border-b border-gray-800 bg-gray-950 p-4 shadow-md">
+
             <div class="max-w-6xl mx-auto flex justify-between items-center">
                 <h1 class="text-xl font-bold text-orange-500 tracking-wide">OpenHeatPumps <span class="text-xs text-gray-400 font-normal">AI Analytics</span></h1>
-                <span class="bg-orange-950 text-orange-400 border border-orange-800 text-xs px-2 py-1 rounded">OpenQuatt debug logs analyzer v0.21</span>
+                <div class="flex items-center space-x-3">
+                    <!-- NIEUW: De UX-Inklapknop -->
+                    <button id="toggle-panel-btn" class="bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs px-2.5 py-1 rounded border border-gray-700 transition flex items-center gap-1">
+                        <span>◀</span> <span id="toggle-panel-text">Inklappen</span>
+                    </button>
+                    <span class="bg-orange-950 text-orange-400 border border-orange-800 text-xs px-2 py-1 rounded">OpenQuatt debug logs analyzer v0.21</span>
+                </div>
             </div>
+
         </header>
 
         <!-- Main Container -->
-        <main class="max-w-6xl mx-auto p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
+
+        <!-- Voeg id="main-grid" toe aan de main tag -->
+        <main id="main-grid" class="max-w-6xl mx-auto p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
             
             <!-- Left: Options & Directory Mapping -->
-            <div class="md:col-span-1 bg-gray-950 border border-gray-800 p-6 rounded-lg shadow-xl space-y-6">
+            <div id="left-panel" class="md:col-span-1 bg-gray-950 border border-gray-800 p-6 rounded-lg shadow-xl space-y-6 transition-all duration-300">
                 <div>
                     <h2 class="text-lg font-semibold mb-4 text-gray-200">1. Systeemkenmerken</h2>
                     <div class="space-y-4">
@@ -824,8 +834,45 @@ function parseMarkdown(tekst) {
             }
         }
 
-        // Activeer de check zodra de pagina klaar is
-        document.addEventListener('DOMContentLoaded', checkClipboardOnLoad);
+        // ============================================================
+        // CENTRALE INITIALISATIE (Zodra de pagina klaar is)
+        // ============================================================
+        document.addEventListener('DOMContentLoaded', () => {
+            
+            // --- 1. UX Inklap-functionaliteit voor het linkerpaneel ---
+            const toggleBtn = document.getElementById('toggle-panel-btn');
+            const leftPanel = document.getElementById('left-panel');
+            const mainGrid = document.getElementById('main-grid');
+            const toggleText = document.getElementById('toggle-panel-text');
+            const toggleArrow = toggleBtn?.querySelector('span:first-child');
+
+            if (toggleBtn && leftPanel && mainGrid) {
+                toggleBtn.addEventListener('click', () => {
+                    const isHidden = leftPanel.classList.contains('hidden');
+
+                    if (isHidden) {
+                        leftPanel.classList.remove('hidden');
+                        mainGrid.className = "max-w-6xl mx-auto p-6 grid grid-cols-1 md:grid-cols-3 gap-6";
+                        if (toggleText) toggleText.textContent = "Inklappen";
+                        if (toggleArrow) toggleArrow.textContent = "◀";
+                    } else {
+                        leftPanel.classList.add('hidden');
+                        mainGrid.className = "max-w-6xl mx-auto p-6 grid grid-cols-1 gap-6";
+                        if (toggleText) toggleText.textContent = "Kenmerken tonen";
+                        if (toggleArrow) toggleArrow.textContent = "▶";
+                    }
+
+                    // Herbereken grid-breedte na inklappen indien de tabel al geladen is
+                    if (typeof renderGrid === 'function') {
+                        renderGrid();
+                    }
+                });
+            }
+
+            // --- 2. Automatisch scannen van het klembord bij laden ---
+            checkClipboardOnLoad();
+            
+        });
 
 
         // 6. EERSTE ANALYSE STARTEN (NU MET PRIVACY-FIRST STREAMING EN CORREKTE PAYLOAD-MAPPING)
