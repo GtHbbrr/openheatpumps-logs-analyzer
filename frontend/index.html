@@ -107,8 +107,9 @@
                 <div id="drop-zone" class="border-2 border-dashed border-gray-800 bg-gray-950 p-6 rounded-lg text-center hover:border-orange-500 transition cursor-pointer">
                     <p class="text-sm text-gray-400">Gekoppeld logboek: <span id="file-name" class="text-orange-400 font-medium">Geen bestand geladen</span></p>
                     <p class="text-xs text-gray-600 mt-1">Of sleep je .oqdebug.json handmatig hiernaartoe</p>
-                    <div id="log-viewer" class="hidden mt-3 text-left bg-gray-900 border border-gray-800 rounded p-3 max-h-48 overflow-auto">
-                        <pre id="log-content" class="text-xs text-gray-400 font-mono whitespace-pre-wrap break-all"></pre>
+                    <!-- VERGROOT: max-h-[600px] i.p.v. max-h-48, en een <div> i.p.v. <pre> voor HTML-inhoud -->
+                    <div id="log-viewer" class="hidden mt-3 text-left bg-gray-900 border border-gray-800 rounded p-3 max-h-[600px] overflow-auto">
+                        <div id="log-content" class="text-xs text-gray-400"></div>
                     </div>
                 </div>
 
@@ -174,6 +175,433 @@
         let activeLogData = null, chatHistory = [];
         const el = id => document.getElementById(id);
 
+        // ============================================================
+        // LOGBOOK DECODER — zet .oqdebug index-formaat om naar leesbare HTML
+        // ============================================================
+
+        let _lbData = null; // globale referentie voor interactieve elementen
+
+        function esc(s) {
+            return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+        }
+
+        function fmtNum(v) {
+            if (typeof v === 'number') {
+                if (!isFinite(v)) return String(v);
+                if (Number.isInteger(v)) return v.toLocaleString('nl-NL');
+                return v.toLocaleString('nl-NL', { maximumFractionDigits: 3 });
+            }
+            return v;
+        }
+
+        function decodeLogbook(data) {
+            const columns = data.columns || [];
+            const unitsMap = new Map((data.units || []).map(u => [u[0], u[1]]));
+            const nameOf = i => columns[i] ?? `col${i}`;
+            const unitOf = i => unitsMap.get(i) || '';
+
+            // metadata (alles behalve de grote arrays)
+            const meta = {};
+            for (const [k, v] of Object.entries(data)) {
+                if (!['columns', 'units', 'initial', 'samples'].includes(k)) meta[k] = v;
+            }
+
+            // initiële snapshot
+            const initial = [...(data.initial || [])]
+                .sort((a, b) => a[0] - b[0])
+                .map(([i, v]) => ({ index: i, name: nameOf(i), value: v, unit: unitOf(i) }));
+
+            // samples met carry-forward (ongewijzigde waarden blijven staan)
+            const state = new Map((data.initial || []).map(([i, v]) => [i, v]));
+            const started = meta.started_at_ms || 0;
+            const samples = (data.samples || []).map(([offsetMs, changes]) => {
+                const changed = new Set();
+                for (const [idx, val] of changes) {
+                    state.set(idx, val);
+                    changed.add(idx);
+                }
+                return {
+                    offsetS: offsetMs / 1000,
+                    time: new Date(started + offsetMs),
+                    changed,
+                    state: new Map(state)
+                };
+            });
+
+            // alle kolommen die ooit wijzigen (voor de kolom-kiezer)
+            const changedColSet = new Set();
+            for (const s of samples) for (const i of s.changed) changedColSet.add(i);
+            const changedCols = [...changedColSet].sort((a, b) => a - b);
+
+            return { meta, initial, samples, changedCols, nameOf, unitOf };
+        }
+
+        // Standaard-set interessante kolommen voor de grid-weergave
+        const LB_DEFAULTS = new Set([
+            'outsideTempSelected','roomTemp','roomSetpoint','supplyTemp',
+            'flowSelected','totalPower','heatingPowerInput','hp1Mode','hp1Freq',
+            'hp1Flow','hp1Power','hp1Heat','hp1WaterIn','hp1WaterOut',
+            'hp1EvaporatorCoilTemp','hp1InnerCoilTemp','hp1CondenserPressure',
+            'hp1EvaporatorPressure','hp1Defrost','boilerActive','boilerHeatPower',
+            'strategy','curveSupplyTarget','curveDemandEffective','phouseHouse',
+            'phouseReq','hpCapacity','hpDeficit','flowOutputIpwm','cicFlowrate',
+            'controllerFlow','hp1Compressor'
+        ]);
+
+        function renderLogbook(data) {
+            // Als het geen .oqdebug formaat is, val terug op pretty-printed JSON
+            if (!data || !Array.isArray(data.columns)) {
+                return `<pre class="text-xs text-gray-400 font-mono whitespace-pre-wrap break-all">${esc(JSON.stringify(data, null, 2))}</pre>`;
+            }
+
+            const d = decodeLogbook(data);
+            _lbData = d; // bewaar voor interactieve elementen
+            let html = '';
+
+            // --- 1. Metadata kaart ---
+            const m = d.meta;
+            const started = m.started_at_ms ? new Date(m.started_at_ms).toLocaleString('nl-NL', { dateStyle: 'short', timeStyle: 'medium' }) : '–';
+            const ended = m.ended_at_ms ? new Date(m.ended_at_ms).toLocaleString('nl-NL', { dateStyle: 'short', timeStyle: 'medium' }) : '–';
+            const dur = m.duration_s ? `${m.duration_s}s (${(m.duration_s / 60).toFixed(1)} min)` : '–';
+
+            const metaItems = [
+                ['Start', started], ['Einde', ended], ['Duur', dur],
+                ['Interval', m.interval_s ? `${m.interval_s}s` : '–'],
+                ['Samples', m.sample_count ?? '–'], ['Kolommen', m.column_count ?? '–'],
+                ['Events', m.event_count ?? '–'], ['Mode', m.mode ?? '–'],
+                ['Storage', m.storage ?? '–'], ['Recording ID', m.recording_id ?? '–'],
+            ];
+
+            html += `<div class="mb-4">
+                <h4 class="text-orange-400 font-bold text-sm mb-2 border-b border-gray-800 pb-1">📋 Opname-meta</h4>
+                <div class="grid grid-cols-2 md:grid-cols-5 gap-2 text-xs">`;
+            for (const [k, v] of metaItems) {
+                html += `<div class="bg-gray-950 border border-gray-800 rounded p-2">
+                    <div class="text-gray-500 uppercase text-[10px]">${esc(k)}</div>
+                    <div class="text-gray-200 font-mono mt-0.5">${esc(String(v))}</div>
+                </div>`;
+            }
+            html += `</div></div>`;
+
+            // --- 2. Initiële snapshot tabel ---
+            html += `<div class="mb-4">
+                <h4 class="text-orange-400 font-bold text-sm mb-2 border-b border-gray-800 pb-1">🔢 Initiële snapshot (${d.initial.length} velden)</h4>
+                <div class="overflow-auto max-h-60 border border-gray-800 rounded">
+                <table class="w-full text-xs">
+                <thead class="bg-gray-950 sticky top-0"><tr class="text-gray-500 text-left">
+                    <th class="p-1.5">#</th><th class="p-1.5">Kolom</th><th class="p-1.5 text-right">Waarde</th><th class="p-1.5">Eenheid</th>
+                </tr></thead><tbody>`;
+            for (const r of d.initial) {
+                html += `<tr class="border-t border-gray-800 hover:bg-gray-950">
+                    <td class="p-1.5 text-gray-600">${r.index}</td>
+                    <td class="p-1.5 text-gray-300">${esc(r.name)}</td>
+                    <td class="p-1.5 text-right text-gray-200 font-mono">${fmtNum(r.value)}</td>
+                    <td class="p-1.5 text-gray-500">${esc(r.unit)}</td>
+                </tr>`;
+            }
+            html += `</tbody></table></div></div>`;
+
+            // --- 3. Samples met tabs: Wijzigingen + Tijdreeks grid ---
+            html += `<div>
+                <h4 class="text-orange-400 font-bold text-sm mb-2 border-b border-gray-800 pb-1">📈 Samples (${d.samples.length} metingen)</h4>
+
+                <!-- Tabs -->
+                <div class="flex gap-2 mb-3">
+                    <button id="lb-tab-changes" class="px-3 py-1.5 rounded text-xs font-semibold bg-orange-600 text-white">Wijzigingen</button>
+                    <button id="lb-tab-grid" class="px-3 py-1.5 rounded text-xs font-semibold bg-gray-800 text-gray-400 border border-gray-700">Tijdreeks (grid)</button>
+                </div>
+
+                <!-- Gedeelde kolom-filter -->
+                <input id="lb-filter" placeholder="Filter kolommen (bijv. temp, power, flow, hp1)…" class="w-full bg-gray-950 border border-gray-800 rounded p-2 text-xs text-gray-300 mb-2 focus:outline-none focus:border-orange-500">
+
+                <!-- View 1: Wijzigingen -->
+                <div id="lb-view-changes">
+                    <div class="overflow-auto max-h-80 border border-gray-800 rounded">
+                    <table class="w-full text-xs">
+                    <thead class="bg-gray-950 sticky top-0"><tr class="text-gray-500 text-left">
+                        <th class="p-1.5">t</th><th class="p-1.5">tijd</th><th class="p-1.5">gewijzigde waarden</th>
+                    </tr></thead><tbody id="lb-changes-body"></tbody>
+                    </table></div>
+                </div>
+
+                <!-- View 2: Tijdreeks grid -->
+                <div id="lb-view-grid" class="hidden">
+                    <div class="flex gap-2 mb-2 flex-wrap items-center">
+                        <button id="lb-all" class="bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs px-3 py-1.5 rounded border border-gray-700">Toon alle</button>
+                        <button id="lb-default" class="bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs px-3 py-1.5 rounded border border-gray-700">Standaardset</button>
+                        <button id="lb-clear" class="bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs px-3 py-1.5 rounded border border-gray-700">Wis selectie</button>
+                        <button id="lb-export" class="bg-green-700 hover:bg-green-600 text-white text-xs px-3 py-1.5 rounded border border-green-600 font-semibold">⬇ Export CSV</button>
+                        <span id="lb-grid-count" class="text-gray-500 text-xs"></span>
+                    </div>
+                    <div id="lb-chips" class="flex flex-wrap gap-1 mb-2 max-h-28 overflow-auto"></div>
+                    <p class="text-gray-600 text-[10px] mb-1">Oranje cellen = gewijzigd in deze stap. Waarden blijven staan tot de volgende wijziging (carry-forward). De onderste drie rijen tonen min / max / gemiddeld per kolom.</p>
+                    <div id="lb-grid-wrap" class="overflow-auto max-h-96 border border-gray-800 rounded"></div>
+                </div>
+            </div>`;
+
+            return html;
+        }
+
+        // ============================================================
+        // INTERACTIEVE LOGBOOK ELEMENTEN (tabs, filter, kolom-kiezer, grid, CSV)
+        // ============================================================
+        function wireLogbookInteractions() {
+            const d = _lbData;
+            if (!d) return;
+
+            // --- Tab switching ---
+            const tabChanges = el('lb-tab-changes');
+            const tabGrid = el('lb-tab-grid');
+            const viewChanges = el('lb-view-changes');
+            const viewGrid = el('lb-view-grid');
+
+            function setTab(which) {
+                if (which === 'changes') {
+                    tabChanges.className = 'px-3 py-1.5 rounded text-xs font-semibold bg-orange-600 text-white';
+                    tabGrid.className = 'px-3 py-1.5 rounded text-xs font-semibold bg-gray-800 text-gray-400 border border-gray-700';
+                    viewChanges.classList.remove('hidden');
+                    viewGrid.classList.add('hidden');
+                } else {
+                    tabGrid.className = 'px-3 py-1.5 rounded text-xs font-semibold bg-orange-600 text-white';
+                    tabChanges.className = 'px-3 py-1.5 rounded text-xs font-semibold bg-gray-800 text-gray-400 border border-gray-700';
+                    viewGrid.classList.remove('hidden');
+                    viewChanges.classList.add('hidden');
+                }
+            }
+            tabChanges.addEventListener('click', () => setTab('changes'));
+            tabGrid.addEventListener('click', () => setTab('grid'));
+
+            // --- Gedeelde filter ---
+            const filter = el('lb-filter');
+
+            // --- View 1: Wijzigingen rijen renderen (met filter) ---
+            function renderChangesRows() {
+                const body = el('lb-changes-body');
+                if (!body) return;
+                const q = (filter.value || '').toLowerCase().trim();
+                let html = '';
+                for (const s of d.samples) {
+                    const t = s.time.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                    let changes = [...s.changed].sort((a, b) => a - b);
+                    if (q) {
+                        changes = changes.filter(i => d.nameOf(i).toLowerCase().includes(q));
+                        if (changes.length === 0) continue; // sla rijen over zonder matchende kolommen
+                    }
+                    const changesHtml = changes.map(i =>
+                        `<span class="text-gray-300">${esc(d.nameOf(i))}</span>=<span class="text-orange-300 font-mono">${fmtNum(s.state.get(i))}</span><span class="text-gray-600">${esc(d.unitOf(i))}</span>`
+                    ).join(' &nbsp;·&nbsp; ');
+                    html += `<tr class="border-t border-gray-800 hover:bg-gray-950">
+                        <td class="p-1.5 text-blue-400 font-mono whitespace-nowrap">+${s.offsetS.toFixed(0)}s</td>
+                        <td class="p-1.5 text-blue-400 font-mono whitespace-nowrap">${t}</td>
+                        <td class="p-1.5 text-gray-400">${changesHtml || '—'}</td>
+                    </tr>`;
+                }
+                body.innerHTML = html;
+            }
+
+            // --- View 2: Tijdreeks grid ---
+            const allChanged = d.changedCols;
+            let selected = allChanged.filter(i => LB_DEFAULTS.has(d.nameOf(i)));
+            if (!selected.length) selected = allChanged.slice(0, 12);
+
+            function renderChips() {
+                const chipsEl = el('lb-chips');
+                if (!chipsEl) return;
+                const q = (filter.value || '').toLowerCase().trim();
+                let html = '';
+                for (const i of allChanged) {
+                    const name = d.nameOf(i);
+                    if (q && !name.toLowerCase().includes(q)) continue;
+                    const on = selected.includes(i);
+                    const unit = d.unitOf(i);
+                    html += `<span class="cursor-pointer select-none text-[10px] px-2 py-1 rounded-full ${on ? 'bg-orange-600 text-white' : 'bg-gray-800 text-gray-400 border border-gray-700'}" data-i="${i}">${esc(name)}${unit ? ` <span class="opacity-60">${esc(unit)}</span>` : ''}</span>`;
+                }
+                chipsEl.innerHTML = html;
+            }
+
+            // Bereken min / max / gemiddeld voor een set geselecteerde kolommen
+            function computeStats(cols) {
+                const stats = {}; // idx -> {min,max,sum,count,avg}
+                for (const i of cols) {
+                    let min = Infinity, max = -Infinity, sum = 0, count = 0;
+                    for (const s of d.samples) {
+                        const v = s.state.get(i);
+                        if (typeof v === 'number' && isFinite(v)) {
+                            if (v < min) min = v;
+                            if (v > max) max = v;
+                            sum += v;
+                            count++;
+                        }
+                    }
+                    stats[i] = (count > 0)
+                        ? { min, max, avg: sum / count, count }
+                        : { min: null, max: null, avg: null, count: 0 };
+                }
+                return stats;
+            }
+
+            function renderGrid() {
+                const wrap = el('lb-grid-wrap');
+                const countEl = el('lb-grid-count');
+                if (countEl) countEl.textContent = `${selected.length} kolommen geselecteerd`;
+                if (!wrap) return;
+                if (!selected.length) {
+                    wrap.innerHTML = '<div class="p-4 text-gray-500 text-xs text-center">Selecteer kolommen hierboven…</div>';
+                    return;
+                }
+
+                // Header
+                let head = `<th class="p-1.5 sticky left-0 bg-gray-950 z-10">t</th><th class="p-1.5">tijd</th>`;
+                for (const i of selected) {
+                    head += `<th class="p-1.5 whitespace-nowrap">${esc(d.nameOf(i))}<span class="text-gray-600 text-[9px] block">${esc(d.unitOf(i))}</span></th>`;
+                }
+
+                // Data rijen
+                let body = '';
+                for (const s of d.samples) {
+                    const t = s.time.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                    let row = `<td class="p-1.5 text-blue-400 font-mono whitespace-nowrap sticky left-0 bg-gray-900 z-10">+${s.offsetS.toFixed(0)}s</td><td class="p-1.5 text-blue-400 font-mono whitespace-nowrap">${t}</td>`;
+                    for (const i of selected) {
+                        const v = s.state.get(i);
+                        const ch = s.changed.has(i);
+                        row += `<td class="p-1.5 text-right font-mono whitespace-nowrap ${ch ? 'text-orange-300' : 'text-gray-400'}">${v === undefined ? '' : fmtNum(v)}</td>`;
+                    }
+                    body += `<tr class="border-t border-gray-800">${row}</tr>`;
+                }
+
+                // Samenvattingsrijen: min / max / gemiddeld
+                const stats = computeStats(selected);
+                function statRow(label, pick, color) {
+                    let cells = `<td colspan="2" class="p-1.5 text-right text-[10px] font-bold ${color} uppercase tracking-wide sticky left-0 bg-gray-950 z-10">${label}</td>`;
+                    for (const i of selected) {
+                        const st = stats[i];
+                        const val = pick(st);
+                        cells += `<td class="p-1.5 text-right font-mono whitespace-nowrap ${color}">${val === null ? '–' : fmtNum(val)}</td>`;
+                    }
+                    return `<tr class="border-t border-gray-700 bg-gray-950">${cells}</tr>`;
+                }
+
+                const foot = statRow('min', st => st.min, 'text-green-400')
+                           + statRow('max', st => st.max, 'text-red-400')
+                           + statRow('gem', st => st.avg, 'text-blue-400');
+
+                wrap.innerHTML = `<table class="w-full text-xs">
+                    <thead class="bg-gray-950 sticky top-0"><tr class="text-gray-500 text-left">${head}</tr></thead>
+                    <tbody>${body}</tbody>
+                    <tfoot>${foot}</tfoot>
+                </table>`;
+            }
+
+            // --- CSV export van de huidige grid ---
+            function exportCSV() {
+                if (!selected.length) return;
+                const stats = computeStats(selected);
+                const sep = ';'; // Nederlandse Excel gebruikt puntkomma
+                const escCSV = v => {
+                    const s = String(v ?? '');
+                    return /[;"\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+                };
+
+                // Header rij
+                let rows = [];
+                let header = ['t (s)', 'tijd'];
+                for (const i of selected) {
+                    const u = d.unitOf(i);
+                    header.push(u ? `${d.nameOf(i)} (${u})` : d.nameOf(i));
+                }
+                rows.push(header.map(escCSV).join(sep));
+
+                // Data rijen
+                for (const s of d.samples) {
+                    const t = s.time.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                    let row = [s.offsetS.toFixed(1), t];
+                    for (const i of selected) {
+                        const v = s.state.get(i);
+                        row.push(v === undefined ? '' : v);
+                    }
+                    rows.push(row.map(escCSV).join(sep));
+                }
+
+                // Lege scheidingsrij
+                rows.push('');
+
+                // Samenvattingsrijen
+                const sumHeader = ['Samenvatting', ''];
+                for (const i of selected) sumHeader.push(d.nameOf(i));
+                rows.push(sumHeader.map(escCSV).join(sep));
+
+                const minRow = ['Minimum', '']; for (const i of selected) minRow.push(stats[i].min ?? '');
+                rows.push(minRow.map(escCSV).join(sep));
+
+                const maxRow = ['Maximum', '']; for (const i of selected) maxRow.push(stats[i].max ?? '');
+                rows.push(maxRow.map(escCSV).join(sep));
+
+                const avgRow = ['Gemiddeld', '']; for (const i of selected) avgRow.push(stats[i].avg !== null ? (Math.round(stats[i].avg * 1000) / 1000) : '');
+                rows.push(avgRow.map(escCSV).join(sep));
+
+                // Download
+                const csv = rows.join('\n');
+                const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                const ts = d.meta.started_at_ms ? new Date(d.meta.started_at_ms).toISOString().slice(0, 19).replace(/[:T]/g, '-') : 'logbook';
+                a.download = `openheatpumps-logbook-${ts}.csv`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }
+
+            // --- Chip klik: toggle kolom ---
+            el('lb-chips').addEventListener('click', e => {
+                const chip = e.target.closest('[data-i]');
+                if (!chip) return;
+                const i = +chip.dataset.i;
+                const idx = selected.indexOf(i);
+                if (idx >= 0) selected.splice(idx, 1);
+                else selected.push(i);
+                renderChips();
+                renderGrid();
+            });
+
+            // --- Knoppen ---
+            el('lb-all').addEventListener('click', () => {
+                const q = (filter.value || '').toLowerCase().trim();
+                for (const i of allChanged) {
+                    if (q && !d.nameOf(i).toLowerCase().includes(q)) continue;
+                    if (!selected.includes(i)) selected.push(i);
+                }
+                renderChips();
+                renderGrid();
+            });
+
+            el('lb-default').addEventListener('click', () => {
+                selected = allChanged.filter(i => LB_DEFAULTS.has(d.nameOf(i)));
+                renderChips();
+                renderGrid();
+            });
+
+            el('lb-clear').addEventListener('click', () => {
+                selected = [];
+                renderChips();
+                renderGrid();
+            });
+
+            el('lb-export').addEventListener('click', exportCSV);
+
+            // --- Filter invullen: update beide views ---
+            filter.addEventListener('input', () => {
+                renderChangesRows();
+                renderChips();
+            });
+
+            // --- Initieel renderen ---
+            renderChangesRows();
+            renderChips();
+            renderGrid();
+        }
+
         // 1. DE SLIMME EN UNIVERSELE MARKDOWN & LATEX PARSER
 function parseMarkdown(tekst) {
     if (!tekst) return "";
@@ -222,12 +650,13 @@ function parseMarkdown(tekst) {
                 el('file-name').textContent = file.name;
                 activeLogData = JSON.parse(await file.text());
                 
-                // Toon logdata in het scroll-venster
+                // TOON GEFORMATTEERD LOGBOEK i.p.v. rauwe JSON
                 const logViewer = el('log-viewer');
                 const logContent = el('log-content');
                 if (logViewer && logContent) {
-                    logContent.textContent = JSON.stringify(activeLogData, null, 2);
+                    logContent.innerHTML = renderLogbook(activeLogData);
                     logViewer.classList.remove('hidden');
+                    wireLogbookInteractions(); // koppel tabs, filter, kolom-kiezer, grid en CSV
                 }
                 
                 // Activeer de grote groene analyse-knop
