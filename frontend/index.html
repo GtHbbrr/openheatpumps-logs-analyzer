@@ -224,10 +224,9 @@
 
         // haal de index van de timeNowHhmm kolom uit de decoded data
         function findTimeNowIdx(d) {
-            for (let i = 0; i < (d.meta.column_count || 0); i++) {
-                if (d.nameOf(i) === 'timeNowHhmm') return i;
-            }
-            return -1;
+            // Zoek direct in de gevulde initial array naar de juiste kolomnaam
+            const found = d.initial.find(r => r.name === 'timeNowHhmm');
+            return found ? found.index : -1;
         }
 
         // formatteer timeNowHhmm waarde naar HH:MM:SS (bijv. "12:49" -> "12:49:00", "1249" -> "12:49:00")
