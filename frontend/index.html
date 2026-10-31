@@ -262,17 +262,19 @@
                 .sort((a, b) => a[0] - b[0])
                 .map(([i, v]) => ({ index: i, name: nameOf(i), value: v, unit: unitOf(i) }));
 
-            // samples met carry-forward (ongewijzigde waarden blijven staan)
-            // Eerste element = sample-index (0,1,2,…), NIET offset in ms.
-            // Ware tijd = started_at_ms + sampleIdx * interval_s * 1000
-            const state = new Map((data.initial || []).map(([i, v]) => [i, v]));
+            // GECORRIGEERD: Gebruik een schone Map en dwing Number-sleutels af voor de carry-forward
+            const state = new Map();
+            (data.initial || []).forEach(([i, v]) => state.set(Number(i), v));
+
             const started = meta.started_at_ms || 0;
             const intervalS = meta.interval_s || 1;
+            
             const samples = (data.samples || []).map(([sampleIdx, changes]) => {
                 const changed = new Set();
                 for (const [idx, val] of changes) {
-                    state.set(idx, val);
-                    changed.add(idx);
+                    const numIdx = Number(idx); // 🌟 CRUCIALER FIX: Dwing omzetting naar Number af
+                    state.set(numIdx, val);
+                    changed.add(numIdx);
                 }
                 const offsetS = sampleIdx * intervalS;
                 return {
@@ -280,7 +282,7 @@
                     sampleIdx,
                     time: new Date(started + offsetS * 1000),
                     changed,
-                    state: new Map(state)
+                    state: new Map(state) // Sla een exacte kopie op met correcte getal-sleutels
                 };
             });
 
@@ -291,6 +293,7 @@
 
             return { meta, initial, samples, changedCols, nameOf, unitOf };
         }
+
 
         // Standaard-set interessante kolommen voor de grid-weergave
         const LB_DEFAULTS = new Set([
