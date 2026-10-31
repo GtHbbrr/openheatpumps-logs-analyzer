@@ -116,9 +116,13 @@
                 </div>
 
             </div>
-            
+
+
+            </div> <!-- GECORRIGEERD: Sluit hier de #left-panel-wrapper div netjes af -->
+
             <!-- Right: AI Console & Chat -->
-            <div class="md:col-span-2 flex flex-col space-y-6">
+            <!-- UX-Aanpassing: flex-1 en min-w-0 dwingen het rechterpaneel om de overgebleven ruimte op te eisen -->
+            <div class="md:col-span-2 flex-1 min-w-0 flex flex-col space-y-6">
                 
                 <!-- Drag & Drop Zone Fallback -->
                 <div id="drop-zone" class="border-2 border-dashed border-gray-800 bg-gray-950 p-6 rounded-lg text-center hover:border-orange-500 transition cursor-pointer">
