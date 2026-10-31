@@ -314,7 +314,59 @@
             _lbData = d; // bewaar voor interactieve elementen
             let html = '';
 
-            // --- 1. Metadata kaart ---
+            // ============================================================
+            // KAART 1: SAMPLES & TIJDREEKS (STANDAARD VOLLEDIG OPEN)
+            // ============================================================
+            html += `
+            <div class="border border-gray-800 bg-gray-950 p-4 rounded-lg shadow-md mb-6">
+                <!-- Flex-header met live UX inklapknop voor Samples -->
+                <div class="flex justify-between items-center mb-4 border-b border-gray-800 pb-2 cursor-pointer select-none" id="lb-samples-header">
+                    <h4 class="text-orange-400 font-bold text-sm">📈 Samples (${d.samples.length} metingen)</h4>
+                    <button id="lb-samples-toggle-btn" class="text-gray-400 hover:text-orange-500 font-bold text-xs bg-gray-900 border border-gray-800 px-2 py-1 rounded transition">
+                        <span>▼</span> <span id="lb-samples-toggle-text">Inklappen</span>
+                    </button>
+                </div>
+
+                <!-- Deze wrapper houdt alle logboek-elementen bij elkaar voor het inklappen -->
+                <div id="lb-samples-content" class="space-y-4 transition-all duration-300">
+                    <!-- Tabs: Tijdreeks (grid) krijgt nu de oranje actieve styling bij opstarten -->
+                    <div class="flex gap-2">
+                        <button id="lb-tab-changes" class="px-3 py-1.5 rounded text-xs font-semibold bg-gray-800 text-gray-400 border border-gray-700 hover:text-white transition">Wijzigingen</button>
+                        <button id="lb-tab-grid" class="px-3 py-1.5 rounded text-xs font-semibold bg-orange-600 text-white shadow-sm transition">Tijdreeks (grid)</button>
+                    </div>
+
+                    <!-- Gedeelde kolom-filter -->
+                    <input id="lb-filter" placeholder="Filter kolommen (bijv. temp, power, flow, hp1)…" class="w-full bg-gray-900 border border-gray-800 rounded p-2 text-xs text-gray-300 focus:outline-none focus:border-orange-500">
+
+                    <!-- View 1: Wijzigingen (Standaard hidden gemaakt) -->
+                    <div id="lb-view-changes" class="hidden">
+                        <div class="overflow-auto max-h-80 border border-gray-800 rounded">
+                        <table class="w-full text-xs">
+                        <thead class="bg-gray-950 sticky top-0"><tr class="text-gray-500 text-left">
+                            <th class="p-1">t</th><th class="p-1">timeNow</th><th class="p-1.5">gewijzigde waarden</th>
+                        </tr></thead><tbody id="lb-changes-body"></tbody>
+                        </table></div>
+                    </div>
+
+                    <!-- View 2: Tijdreeks grid (Standaard geopend, hidden class weggehaald) -->
+                    <div id="lb-view-grid">
+                        <div class="flex gap-2 mb-2 flex-wrap items-center">
+                            <button id="lb-all" class="bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs px-3 py-1.5 rounded border border-gray-700">Toon alle</button>
+                            <button id="lb-default" class="bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs px-3 py-1.5 rounded border border-gray-700">Standaardset</button>
+                            <button id="lb-clear" class="bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs px-3 py-1.5 rounded border border-gray-700">Wis selectie</button>
+                            <button id="lb-export" class="bg-green-700 hover:bg-green-600 text-white text-xs px-3 py-1.5 rounded border border-green-600 font-semibold">⬇ Export CSV</button>
+                            <span id="lb-grid-count" class="text-gray-500 text-xs"></span>
+                        </div>
+                        <div id="lb-chips" class="flex flex-wrap gap-1 mb-2 max-h-28 overflow-auto"></div>
+                        <p class="text-gray-600 text-[10px] mb-1">Oranje cellen = gewijzigd in deze stap. Waarden blijven staan tot de volgende wijziging (carry-forward). De onderste drie rijen tonen min / max / gemiddeld per kolom.</p>
+                        <div id="lb-grid-wrap" class="overflow-auto max-h-96 border border-gray-800 rounded"></div>
+                    </div>
+                </div>
+            </div>`;
+
+            // ============================================================
+            // KAART 2: METADATA KAART (STANDAARD COMPACT INGEKLAPT ONDERAAN)
+            // ============================================================
             const m = d.meta;
             const started = m.started_at_ms ? new Date(m.started_at_ms).toLocaleString('nl-NL', { dateStyle: 'short', timeStyle: 'medium' }) : '–';
             const ended = m.ended_at_ms ? new Date(m.ended_at_ms).toLocaleString('nl-NL', { dateStyle: 'short', timeStyle: 'medium' }) : '–';
@@ -328,75 +380,65 @@
                 ['Storage', m.storage ?? '–'], ['Recording ID', m.recording_id ?? '–'],
             ];
 
-            html += `<div class="mb-4">
-                <h4 class="text-orange-400 font-bold text-sm mb-2 border-b border-gray-800 pb-1">📋 Opname-meta</h4>
-                <div class="grid grid-cols-2 md:grid-cols-5 gap-2 text-xs">`;
+            html += `
+            <div class="border border-gray-800 bg-gray-950 p-4 rounded-lg shadow-md mb-6">
+                <!-- Flex-header met live UX inklapknop voor Metadata -->
+                <div class="flex justify-between items-center cursor-pointer select-none" id="lb-meta-header">
+                    <h4 class="text-orange-400 font-bold text-sm">📋 Opname-meta</h4>
+                    <button id="lb-meta-toggle-btn" class="text-gray-400 hover:text-orange-500 font-bold text-xs bg-gray-900 border border-gray-800 px-2 py-1 rounded transition">
+                        <span>▶</span> <span id="lb-meta-toggle-text">Uitklappen</span>
+                    </button>
+                </div>
+
+                <!-- Deze wrapper staat via 'hidden' standaard strak dichtgeklapt -->
+                <div id="lb-meta-content" class="hidden mt-4 grid grid-cols-2 md:grid-cols-5 gap-2 text-xs transition-all duration-300">`;
             for (const [k, v] of metaItems) {
-                html += `<div class="bg-gray-950 border border-gray-800 rounded p-2">
-                    <div class="text-gray-500 uppercase text-[10px]">${esc(k)}</div>
-                    <div class="text-gray-200 font-mono mt-0.5">${esc(String(v))}</div>
-                </div>`;
+                html += `
+                    <div class="bg-gray-900 border border-gray-800 rounded p-2">
+                        <div class="text-gray-500 uppercase text-[10px]">${esc(k)}</div>
+                        <div class="text-gray-200 font-mono mt-0.5">${esc(String(v))}</div>
+                    </div>`;
             }
             html += `</div></div>`;
 
-            // --- 2. Initiële snapshot tabel ---
-            html += `<div class="mb-4">
-                <h4 class="text-orange-400 font-bold text-sm mb-2 border-b border-gray-800 pb-1">🔢 Initiële snapshot (${d.initial.length} velden)</h4>
-                <div class="overflow-auto max-h-60 border border-gray-800 rounded">
-                <table class="w-full text-xs">
-                <thead class="bg-gray-950 sticky top-0"><tr class="text-gray-500 text-left">
-                    <th class="p-1.5">#</th><th class="p-1.5">Kolom</th><th class="p-1.5 text-right">Waarde</th><th class="p-1.5">Eenheid</th>
-                </tr></thead><tbody>`;
-            for (const r of d.initial) {
-                html += `<tr class="border-t border-gray-800 hover:bg-gray-950">
-                    <td class="p-1.5 text-gray-600">${r.index}</td>
-                    <td class="p-1.5 text-gray-300">${esc(r.name)}</td>
-                    <td class="p-1.5 text-right text-gray-200 font-mono">${fmtNum(r.value)}</td>
-                    <td class="p-1.5 text-gray-500">${esc(r.unit)}</td>
-                </tr>`;
-            }
-            html += `</tbody></table></div></div>`;
-
-            // --- 3. Samples met tabs: Wijzigingen + Tijdreeks grid ---
-            html += `<div>
-                <h4 class="text-orange-400 font-bold text-sm mb-2 border-b border-gray-800 pb-1">📈 Samples (${d.samples.length} metingen)</h4>
-
-                <!-- Tabs -->
-                <div class="flex gap-2 mb-3">
-                    <button id="lb-tab-changes" class="px-3 py-1.5 rounded text-xs font-semibold bg-orange-600 text-white">Wijzigingen</button>
-                    <button id="lb-tab-grid" class="px-3 py-1.5 rounded text-xs font-semibold bg-gray-800 text-gray-400 border border-gray-700">Tijdreeks (grid)</button>
+            // ============================================================
+            // KAART 3: INITIËLE SNAPSHOT TABEL (EVENEEENS STANDAARD INGEKLAPT)
+            // ============================================================
+            html += `
+            <div class="border border-gray-800 bg-gray-950 p-4 rounded-lg shadow-md mb-4">
+                <!-- Flex-header met live UX inklapknop voor Snapshot -->
+                <div class="flex justify-between items-center cursor-pointer select-none" id="lb-snapshot-header">
+                    <h4 class="text-orange-400 font-bold text-sm">🔢 Initiële snapshot (${d.initial.length} velden)</h4>
+                    <button id="lb-snapshot-toggle-btn" class="text-gray-400 hover:text-orange-500 font-bold text-xs bg-gray-900 border border-gray-800 px-2 py-1 rounded transition">
+                        <span>▶</span> <span id="lb-snapshot-toggle-text">Uitklappen</span>
+                    </button>
                 </div>
 
-                <!-- Gedeelde kolom-filter -->
-                <input id="lb-filter" placeholder="Filter kolommen (bijv. temp, power, flow, hp1)…" class="w-full bg-gray-950 border border-gray-800 rounded p-2 text-xs text-gray-300 mb-2 focus:outline-none focus:border-orange-500">
-
-                <!-- View 1: Wijzigingen -->
-                <div id="lb-view-changes">
-                    <div class="overflow-auto max-h-80 border border-gray-800 rounded">
+                <!-- Deze wrapper staat via 'hidden' eveneens standaard dichtgeklapt -->
+                <div id="lb-snapshot-content" class="hidden mt-4 overflow-auto max-h-60 border border-gray-800 rounded transition-all duration-300">
                     <table class="w-full text-xs">
-                    <thead class="bg-gray-950 sticky top-0"><tr class="text-gray-500 text-left">
-                        <th class="p-1">t</th><th class="p-1">timeNow</th><th class="p-1.5">gewijzigde waarden</th>
-                    </tr></thead><tbody id="lb-changes-body"></tbody>
-                    </table></div>
-                </div>
-
-                <!-- View 2: Tijdreeks grid -->
-                <div id="lb-view-grid" class="hidden">
-                    <div class="flex gap-2 mb-2 flex-wrap items-center">
-                        <button id="lb-all" class="bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs px-3 py-1.5 rounded border border-gray-700">Toon alle</button>
-                        <button id="lb-default" class="bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs px-3 py-1.5 rounded border border-gray-700">Standaardset</button>
-                        <button id="lb-clear" class="bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs px-3 py-1.5 rounded border border-gray-700">Wis selectie</button>
-                        <button id="lb-export" class="bg-green-700 hover:bg-green-600 text-white text-xs px-3 py-1.5 rounded border border-green-600 font-semibold">⬇ Export CSV</button>
-                        <span id="lb-grid-count" class="text-gray-500 text-xs"></span>
-                    </div>
-                    <div id="lb-chips" class="flex flex-wrap gap-1 mb-2 max-h-28 overflow-auto"></div>
-                    <p class="text-gray-600 text-[10px] mb-1">Oranje cellen = gewijzigd in deze stap. Waarden blijven staan tot de volgende wijziging (carry-forward). De onderste drie rijen tonen min / max / gemiddeld per kolom.</p>
-                    <div id="lb-grid-wrap" class="overflow-auto max-h-96 border border-gray-800 rounded"></div>
+                        <thead class="bg-gray-950 sticky top-0"><tr class="text-gray-500 text-left">
+                            <th class="p-1.5">#</th><th class="p-1.5">Kolom</th><th class="p-1.5 text-right">Waarde</th><th class="p-1.5">Eenheid</th>
+                        </tr></thead>
+                        <tbody>`;
+            for (const r of d.initial) {
+                html += `
+                        <tr class="border-t border-gray-800 hover:bg-gray-900 transition-colors">
+                            <td class="p-1.5 text-gray-600">${r.index}</td>
+                            <td class="p-1.5 text-gray-300">${esc(r.name)}</td>
+                            <td class="p-1.5 text-right text-gray-200 font-mono">${fmtNum(r.value)}</td>
+                            <td class="p-1.5 text-gray-500">${esc(r.unit)}</td>
+                        </tr>`;
+            }
+            html += `
+                        </tbody>
+                    </table>
                 </div>
             </div>`;
 
             return html;
         }
+
 
         // ============================================================
         // INTERACTIEVE LOGBOOK ELEMENTEN (tabs, filter, kolom-kiezer, grid, CSV)
@@ -653,12 +695,93 @@
                 renderChips();
             });
 
-            // --- Initieel renderen ---
+            // ============================================================
+            // UX COLLAPSE ENGINES — Regelt de 3 onafhankelijke klapframes
+            // ============================================================
+
+            // --- 1. Collapse Engine voor de Samples (Standaard Open) ---
+            const lbSamplesHeader = el('lb-samples-header');
+            const lbSamplesBtn = el('lb-samples-toggle-btn');
+            const lbSamplesContent = el('lb-samples-content');
+            const lbSamplesText = el('lb-samples-toggle-text');
+            const lbSamplesArrow = lbSamplesBtn?.querySelector('span:first-child');
+
+            function toggleSamplesVisibility(e) {
+                if (e.target.closest('button') && e.currentTarget === lbSamplesHeader) return;
+                const isCollapsed = lbSamplesContent.classList.contains('hidden');
+
+                if (isCollapsed) {
+                    lbSamplesContent.classList.remove('hidden');
+                    if (lbSamplesText) lbSamplesText.textContent = "Inklappen";
+                    if (lbSamplesArrow) lbSamplesArrow.textContent = "▼";
+                    renderGrid(); // Tabel-breedtes direct scherpstellen na openen
+                } else {
+                    lbSamplesContent.classList.add('hidden');
+                    if (lbSamplesText) lbSamplesText.textContent = "Uitklappen";
+                    if (lbSamplesArrow) lbSamplesArrow.textContent = "▶";
+                }
+            }
+            lbSamplesHeader?.addEventListener('click', toggleSamplesVisibility);
+            lbSamplesBtn?.addEventListener('click', toggleSamplesVisibility);
+
+
+            // --- 2. Collapse Engine voor de Metadata (Standaard Dicht) ---
+            const lbMetaHeader = el('lb-meta-header');
+            const lbMetaBtn = el('lb-meta-toggle-btn');
+            const lbMetaContent = el('lb-meta-content');
+            const lbMetaText = el('lb-meta-toggle-text');
+            const lbMetaArrow = lbMetaBtn?.querySelector('span:first-child');
+
+            function toggleMetaVisibility(e) {
+                if (e.target.closest('button') && e.currentTarget === lbMetaHeader) return;
+                const isCollapsed = lbMetaContent.classList.contains('hidden');
+
+                if (isCollapsed) {
+                    lbMetaContent.classList.remove('hidden');
+                    lbMetaHeader.classList.add('border-b', 'border-gray-800', 'pb-2', 'mb-2');
+                    if (lbMetaText) lbMetaText.textContent = "Inklappen";
+                    if (lbMetaArrow) lbMetaArrow.textContent = "▼";
+                } else {
+                    lbMetaContent.classList.add('hidden');
+                    lbMetaHeader.classList.remove('border-b', 'border-gray-800', 'pb-2', 'mb-2');
+                    if (lbMetaText) lbMetaText.textContent = "Uitklappen";
+                    if (lbMetaArrow) lbMetaArrow.textContent = "▶";
+                }
+            }
+            lbMetaHeader?.addEventListener('click', toggleMetaVisibility);
+            lbMetaBtn?.addEventListener('click', toggleMetaVisibility);
+
+
+            // --- 3. Collapse Engine voor de Initiële Snapshot (Standaard Dicht) ---
+            const lbSnapshotHeader = el('lb-snapshot-header');
+            const lbSnapshotBtn = el('lb-snapshot-toggle-btn');
+            const lbSnapshotContent = el('lb-snapshot-content');
+            const lbSnapshotText = el('lb-snapshot-toggle-text');
+            const lbSnapshotArrow = lbSnapshotBtn?.querySelector('span:first-child');
+
+            function toggleSnapshotVisibility(e) {
+                if (e.target.closest('button') && e.currentTarget === lbSnapshotHeader) return;
+                const isCollapsed = lbSnapshotContent.classList.contains('hidden');
+
+                if (isCollapsed) {
+                    lbSnapshotContent.classList.remove('hidden');
+                    lbSnapshotHeader.classList.add('border-b', 'border-gray-800', 'pb-2', 'mb-2');
+                    if (lbSnapshotText) lbSnapshotText.textContent = "Inklappen";
+                    if (lbSnapshotArrow) lbSnapshotArrow.textContent = "▼";
+                } else {
+                    lbSnapshotContent.classList.add('hidden');
+                    lbSnapshotHeader.classList.remove('border-b', 'border-gray-800', 'pb-2', 'mb-2');
+                    if (lbSnapshotText) lbSnapshotText.textContent = "Uitklappen";
+                    if (lbSnapshotArrow) lbSnapshotArrow.textContent = "▶";
+                }
+            }
+            lbSnapshotHeader?.addEventListener('click', toggleSnapshotVisibility);
+            lbSnapshotBtn?.addEventListener('click', toggleSnapshotVisibility);
+
+
+            // --- Centralised Opstartscherm: Render Tijdreeks direct open ---
             renderChangesRows();
             renderChips();
-            // renderGrid();            
-            
-            // UX-Verbetering: Open de pagina direct op de Tijdreeks-tab in plaats van Wijzigingen
             setTab('grid'); 
         }
 
