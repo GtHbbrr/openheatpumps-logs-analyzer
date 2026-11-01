@@ -244,92 +244,96 @@
         }
 
         function decodeLogbook(data) {
-          const columns = data.columns || [];
-          const unitsMap = new Map((data.units || []).map(u => [u, u]));
-          const nameOf = i => columns[i] ?? `col${i}`;
-          const unitOf = i => unitsMap.get(i) || '';
-        
-          const meta = {};
-          for (const [k, v] of Object.entries(data)) {
-            if (!['columns', 'units', 'initial', 'samples'].includes(k)) meta[k] = v;
-          }
-        
-          const samplesArray = data.samples || [];
-          const columnsArray = data.columns || [];
-          meta.sample_count = samplesArray.length;
-          meta.column_count = columnsArray.length;
-          meta.interval_s = meta.interval_s || 10;
-        
-          const state = new Map();
-          (data.initial || []).forEach(([i, v]) => state.set(Number(i), v));
-          const intervalS = meta.interval_s;
-        
-          // BASE INDEX FIX: Bepaal de allereerste sampleIndex in dit specifieke bestand
-          const baseSampleIdx = samplesArray.length > 0 ? Number(samplesArray[0][0]) : 0;
-        
-          const samples = samplesArray.map(([sampleIdx, changes]) => {
-            const changed = new Set();
-            for (const [idx, val] of changes) {
-              const numIdx = Number(idx);
-              state.set(numIdx, val);
-              changed.add(numIdx);
+            const columns = data.columns || [];
+            const unitsMap = new Map((data.units || []).map(u => [u[0], u[1]]));
+            const nameOf = i => columns[i] ?? `col${i}`;
+            const unitOf = i => unitsMap.get(i) || '';
+
+            // ============================================================
+            // GEOPTIMALISEERDE METADATA EXTRACTIE (PUUR OP BASIS VAN EXPORT)
+            // ============================================================
+            const meta = {};
+            
+            for (const [k, v] of Object.entries(data)) {
+                if (!['columns', 'units', 'initial', 'samples'].includes(k)) meta[k] = v;
             }
             
-            // RELATIEVE TIJD FIX: Trek de start-index af zodat 't' netjes bij 0:00 begint
-            const relatieveSampleIdx = Number(sampleIdx) - baseSampleIdx;
-            const offsetS = relatieveSampleIdx * intervalS;
+            const samplesArray = data.samples || [];
+            meta.sample_count = samplesArray.length;
+            meta.column_count = (data.columns || []).length;
+            meta.interval_s = meta.interval_s || 10;
             
-            return {
-              offsetS,
-              sampleIdx: Number(sampleIdx),
-              time: new Date(Date.now()),
-              changed,
-              state: new Map(state)
-            };
-          });
-        
-          // METADATA FIX: Synchroniseer de kaart direct met de getoonde waarden uit het grid
-          if (samples.length > 0) {
-            meta.duration_s = samples.length * intervalS; // Strak 900s (15 min)
-        
-            const timeNowIdx = columnsArray.indexOf('timeNowHhmm');
-            const firstSampleObj = samples[0];
-            const lastSampleObj = samples[samples.length - 1];
-        
-            const firstTimeVal = firstSampleObj.state.get(timeNowIdx) || "";
-            const lastTimeVal = lastSampleObj.state.get(timeNowIdx) || firstTimeVal;
-        
-            if (firstTimeVal) {
-              const datumPrefix = "01-11-2026, "; // Dynamisch op basis van je huidige logdatum
-              meta.started_at_ms = datumPrefix + fmtTimeNow(firstTimeVal);
-              meta.ended_at_ms = datumPrefix + fmtTimeNow(lastTimeVal);
-            } else {
-              const baseTime = data.started_at ? new Date(data.started_at).getTime() : Date.now();
-              meta.started_at_ms = new Date(baseTime).toLocaleString('nl-NL');
-              meta.ended_at_ms = new Date(baseTime + (meta.duration_s * 1000)).toLocaleString('nl-NL');
-            }
-          } else {
-            meta.duration_s = 0;
-            meta.started_at_ms = "–";
-            meta.ended_at_ms = "–";
-          }
-        
-          meta.mode = meta.mode || 'Debug';
-          meta.storage = meta.storage || 'Local Flash';
-          meta.event_count = meta.event_count || 0;
-        
-          const changedColSet = new Set();
-          for (const s of samples) for (const i of s.changed) changedColSet.add(i);
-          const changedCols = [...changedColSet].sort((a, b) => a - b);
-        
-          return { 
-            meta, 
-            initial: [...(data.initial || [])].map(([i, v]) => ({ index: i, name: nameOf(i), value: v, unit: unitOf(i) })), 
-            samples, 
-            changedCols, 
-            nameOf, 
-            unitOf 
-          };
+            if (samplesArray.length > 0) {
+                // 1. Bereken de werkelijke duur puur op basis van het aantal samples (90 samples * 10s = 900s)
+                const totalDurationS = samplesArray.length * meta.interval_s;
+                meta.duration_s = totalDurationS;
+                
+                // 2. Zoek de index van de kolom 'timeNowHhmm' om de echte kloktijd te achterhalen
+                const columnsArray = data.columns || [];
+                const timeNowIdx = columnsArray.indexOf('timeNowHhmm');
+                
+                // We pakken de kloktijd uit de eerste en de allerlaatste sample van de array
+                const firstSampleChanges = samplesArray[0][1] || [];
+                const lastSampleChanges = samplesArray[samplesArray.length - 1][1] || [];
+                
+                const firstTimeVal = (firstSampleChanges.find(c => Number(c[0]) === timeNowIdx) || [])[1] || "";
+                const lastTimeVal = (lastSampleChanges.find(c => Number(c[0]) === timeNowIdx) || [])[1] || firstTimeVal;
+                
+                // 3. Vul de start- en eindtijd op de kaart met de werkelijke kloktijd uit de data
+                if (firstTimeVal) {
+                  meta.started_at_ms = fmtTimeNow(firstTimeVal);
+                  meta.ended_at_ms = fmtTimeNow(lastTimeVal);
+                } else {
+                    // Fallback als de kloktijd-kolom niet gevonden kan worden
+                    const baseTime = data.started_at ? new Date(data.started_at).getTime() : Date.now();
+                    meta.started_at_ms = new Date(baseTime).toLocaleString('nl-NL');
+                    meta.ended_at_ms = new Date(baseTime + (totalDurationS * 1000)).toLocaleString('nl-NL');
+                  }
+                } else {
+                    meta.duration_s = 0;
+                    meta.started_at_ms = "–";
+                    meta.ended_at_ms = "–";
+                }
+            
+            meta.mode = meta.mode || 'Debug';
+            meta.storage = meta.storage || 'Local Flash';
+            meta.event_count = meta.event_count || 0;
+            
+            // initiële snapshot
+            const initial = [...(data.initial || [])]
+                .sort((a, b) => a[0] - b[0])
+                .map(([i, v]) => ({ index: i, name: nameOf(i), value: v, unit: unitOf(i) }));
+
+            // GECORRIGEERD: Gebruik een schone Map en dwing Number-sleutels af voor de carry-forward
+            const state = new Map();
+            (data.initial || []).forEach(([i, v]) => state.set(Number(i), v));
+
+            const started = meta.started_at_ms || 0;
+            const intervalS = meta.interval_s || 1;
+            
+            const samples = (data.samples || []).map(([sampleIdx, changes]) => {
+                const changed = new Set();
+                for (const [idx, val] of changes) {
+                    const numIdx = Number(idx); // 🌟 CRUCIALER FIX: Dwing omzetting naar Number af
+                    state.set(numIdx, val);
+                    changed.add(numIdx);
+                }
+                const offsetS = sampleIdx * intervalS;
+                return {
+                    offsetS,
+                    sampleIdx,
+                    time: new Date(started + offsetS * 1000),
+                    changed,
+                    state: new Map(state) // Sla een exacte kopie op met correcte getal-sleutels
+                };
+            });
+
+            // alle kolommen die ooit wijzigen (voor de kolom-kiezer)
+            const changedColSet = new Set();
+            for (const s of samples) for (const i of s.changed) changedColSet.add(i);
+            const changedCols = [...changedColSet].sort((a, b) => a - b);
+
+            return { meta, initial, samples, changedCols, nameOf, unitOf };
         }
 
         // Standaard-set interessante kolommen voor de grid-weergave
