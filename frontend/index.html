@@ -228,20 +228,38 @@
             return found ? found.index : -1;
         }
 
-        // formatteer timeNowHhmm waarde naar HH:MM:SS (bijv. "12:49" -> "12:49:00", "1249" -> "12:49:00")
-        function fmtTimeNow(v) {
+        // AANGEPAST: Formatteer timeNowHhmm waarde en neem de berekende seconden mee
+        function fmtTimeNow(v, extraSeconds = 0) {
             if (v === undefined || v === '') return '';
             let s = String(v).trim();
-            // als het "12:49" is, voeg ":00" toe
-            if (/^\d{1,2}:\d{2}$/.test(s)) return s + ':00';
-            // als het "1249" is (geen dubbelepunt), voeg toe
-            if (/^\d{3,4}$/.test(s)) {
+            let hours = 0, minutes = 0;
+
+            // Haal uren en minuten uit "12:49" of "1249"
+            if (/^\d{1,2}:\d{2}$/.test(s)) {
+                const parts = s.split(':');
+                hours = parseInt(parts[0], 10);
+                minutes = parseInt(parts[1], 10);
+            } else if (/^\d{3,4}$/.test(s)) {
                 const padded = s.padStart(4, '0');
-                return `${padded.slice(0,2)}:${padded.slice(2)}:00`;
+                hours = parseInt(padded.slice(0, 2), 10);
+                minutes = parseInt(padded.slice(2), 10);
+            } else {
+                return s; // Fallback als het formaat al HH:MM:SS is
             }
-            // als het al HH:MM:SS is, laat staan
-            return s;
+
+            // Tel de extra seconden van de interval-offset erbij op
+            let totalSeconds = (hours * 3600) + (minutes * 60) + Math.round(extraSeconds);
+            
+            // Corrigeer voor eventuele overloop naar een volgende dag (24-uurs klok)
+            totalSeconds = totalSeconds % (24 * 3600);
+
+            const h = Math.floor(totalSeconds / 3600);
+            const m = Math.floor((totalSeconds % 3600) / 60);
+            const sec = totalSeconds % 60;
+
+            return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
         }
+
 
         function decodeLogbook(data) {
             const columns = data.columns || [];
