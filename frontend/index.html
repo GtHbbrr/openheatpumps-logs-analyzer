@@ -228,42 +228,27 @@
             return found ? found.index : -1;
         }
 
-        // AANGEPAST: Formatteer timeNowHhmm waarde en neem de berekende seconden mee
-        function fmtTimeNow(v, extraSeconds = 0) {
-            if (v === undefined || v === '') return '';
+        // Geoptimaliseerde formatter: accepteert zowel HH:MM, HHMM als kant-en-klare HH:MM:SS strings
+        function fmtTimeNow(v) {
+            if (v === undefined || v === null || v === '') return '';
             let s = String(v).trim();
-            let hours = 0, minutes = 0;
-
-            // Haal uren en minuten uit "12:49" of "1249"
-            if (/^\d{1,2}:\d{2}$/.test(s)) {
-                const parts = s.split(':');
-                hours = parseInt(parts[0], 10);
-                minutes = parseInt(parts[1], 10);
-            } else if (/^\d{3,4}$/.test(s)) {
-                const padded = s.padStart(4, '0');
-                hours = parseInt(padded.slice(0, 2), 10);
-                minutes = parseInt(padded.slice(2), 10);
-            } else {
-                return s; // Fallback als het formaat al HH:MM:SS is
-            }
-
-            // Tel de extra seconden van de interval-offset erbij op
-            let totalSeconds = (hours * 3600) + (minutes * 60) + Math.round(extraSeconds);
             
-            // Corrigeer voor eventuele overloop naar een volgende dag (24-uurs klok)
-            totalSeconds = totalSeconds % (24 * 3600);
-
-            const h = Math.floor(totalSeconds / 3600);
-            const m = Math.floor((totalSeconds % 3600) / 60);
-            const sec = totalSeconds % 60;
-
-            return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+            // Als het al HH:MM:SS is (zoals gegenereerd door onze nieuwe decodeLogbook), direct teruggeven
+            if (/^\d{2}:\d{2}:\d{2}$/.test(s)) return s;
+            
+            // Mocht er ergens nog een oude HH:MM of HHMM string binnenkomen, herstel deze dan veilig naar :00
+            if (/^\d{1,2}:\d{2}$/.test(s)) return s + ':00';
+            if (/^\d{3,4}$/.test(s)) {
+                const padded = s.padStart(4, '0');
+                return `${padded.slice(0,2)}:${padded.slice(2)}:00`;
+            }
+            return s;
         }
 
 
         function decodeLogbook(data) {
             const columns = data.columns || [];
-            const unitsMap = new Map((data.units || []).map(u => [u[0], u[1]]));
+            const unitsMap = new Map((data.units || []).map(u => [u, u]));
             const nameOf = i => columns[i] ?? `col${i}`;
             const unitOf = i => unitsMap.get(i) || '';
 
@@ -286,8 +271,9 @@
 
             let baseUptimeMs = null;
             let lastUptimeMs = null;
+            let firstTimeNowVal = null;
 
-            // Eerste pas: bouw de states op en registreer de hardware uptime-grenzen
+            // Eerste pas: bouw de basestates op en vind het allereerste startpunt
             const samples = samplesArray.map(([sampleIdx, changes]) => {
                 const changed = new Set();
                 for (const [idx, val] of changes) {
@@ -299,7 +285,11 @@
                 const currentUptime = state.get(uptimeIdx);
                 if (currentUptime !== undefined && currentUptime !== null) {
                     const currentUptimeNum = Number(currentUptime);
-                    if (baseUptimeMs === null) baseUptimeMs = currentUptimeNum;
+                    if (baseUptimeMs === null) {
+                        baseUptimeMs = currentUptimeNum;
+                        // Leg direct de allereerste timeNowHhmm vast als ons ankerpunt (bijv. 01:23)
+                        firstTimeNowVal = state.get(timeNowIdx) || "";
+                    }
                     lastUptimeMs = currentUptimeNum;
                 }
 
@@ -311,19 +301,57 @@
                 };
             });
 
-            // Tweede pas: bereken de relatieve offset voor kolom 't' met afronding voor verloop
+            // Helper om HH:MM naar totale seconden vanaf middernacht om te zetten
+            function timeToSeconds(v) {
+                if (!v) return 0;
+                let s = String(v).trim();
+                let h = 0, m = 0;
+                if (/^\d{1,2}:\d{2}$/.test(s)) {
+                    const parts = s.split(':');
+                    h = parseInt(parts[0], 10);
+                    m = parseInt(parts[1], 10);
+                } else if (/^\d{3,4}$/.test(s)) {
+                    const padded = s.padStart(4, '0');
+                    h = parseInt(padded.slice(0, 2), 10);
+                    m = parseInt(padded.slice(2), 10);
+                }
+                return (h * 3600) + (m * 60);
+            }
+
+            // Helper om totale seconden om te zetten naar een strakke HH:MM:SS string
+            function secondsToTimeStr(totalSecs) {
+                totalSecs = totalSecs % (24 * 3600); // 24-uurs reset
+                if (totalSecs < 0) totalSecs += (24 * 3600);
+                const h = Math.floor(totalSecs / 3600);
+                const m = Math.floor((totalSecs % 3600) / 60);
+                const s = totalSecs % 60;
+                return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+            }
+
+            // Bereken de starttijd in seconden vanaf middernacht op basis van de allereerste meting
+            const baseTimeInSeconds = timeToSeconds(firstTimeNowVal);
+
+            // Tweede pas: bereken de strakke 't' offset en construeer de 'timeNow' kloktijd uit uptimeMs
             const intervalS = meta.interval_s;
             if (baseUptimeMs !== null && lastUptimeMs !== null) {
-                // De werkelijke duur is het exacte uptime-verschil tussen de eerste en laatste rij
                 meta.duration_s = (lastUptimeMs - baseUptimeMs) / 1000;
 
                 samples.forEach((s, idx) => {
                     const sampleUptime = s.state.get(uptimeIdx);
                     if (sampleUptime !== undefined && sampleUptime !== null) {
-                        const rawOffset = (Number(sampleUptime) - baseUptimeMs) / 1000;
-                        // STABILISATIE FIX: Rond af op het dichtstbijzijnde interval (bijv. stappen van 10s)
-                        // Dit voorkomt vreemde sprongen in de 't' kolom door ESP32 resource verloop
-                        s.offsetS = Math.round(rawOffset / intervalS) * intervalS;
+                        const preciseOffsetS = (Number(sampleUptime) - baseUptimeMs) / 1000;
+                        
+                        // Kolom 1 ('t') blijft visueel strak lopen op stabiele intervallen (0:00, 0:10, etc.)
+                        s.offsetS = Math.round(preciseOffsetS / intervalS) * intervalS;
+
+                        // CRUCIALE FIX: Construeer de kloktijd met de EXACTE onafgeronde uptimeMs vanaf de starttijd
+                        const currentClockSeconds = baseTimeInSeconds + preciseOffsetS;
+                        const constructedTimeStr = secondsToTimeStr(Math.round(currentClockSeconds));
+
+                        // Overschrijf de waarde in de staat van deze sample zodat de grid-renderer dit direct tekent
+                        if (timeNowIdx !== -1) {
+                            s.state.set(timeNowIdx, constructedTimeStr);
+                        }
                     } else {
                         s.offsetS = idx * intervalS;
                     }
@@ -332,18 +360,21 @@
                 meta.duration_s = samplesArray.length * intervalS;
                 samples.forEach((s, idx) => {
                     s.offsetS = idx * intervalS;
+                    const currentClockSeconds = baseTimeInSeconds + (idx * intervalS);
+                    if (timeNowIdx !== -1) {
+                        s.state.set(timeNowIdx, secondsToTimeStr(currentClockSeconds));
+                    }
                 });
             }
 
-            // METADATA FIX (Voorkomt Invalid Date en synchroniseert met grid)
+            // METADATA KAART SYNCHRONISEREN
             if (samples.length > 0) {
-                const firstSampleObj = samples[0];
+                const firstSampleObj = samples;
                 const lastSampleObj = samples[samples.length - 1];
 
-                const firstTimeVal = firstSampleObj.state.get(timeNowIdx) || "";
-                const lastTimeVal = lastSampleObj.state.get(timeNowIdx) || firstTimeVal;
+                const finalStartTime = firstSampleObj.state.get(timeNowIdx) || "";
+                const finalEndTime = lastSampleObj.state.get(timeNowIdx) || finalStartTime;
 
-                // Haal de datum dynamisch op, of gebruik de datum van vandaag als fallback
                 let dateStr = "";
                 if (data.started_at && !isNaN(new Date(data.started_at).getTime())) {
                     dateStr = new Date(data.started_at).toLocaleDateString('nl-NL') + ', ';
@@ -351,8 +382,8 @@
                     dateStr = new Date().toLocaleDateString('nl-NL') + ', ';
                 }
 
-                meta.started_at_ms = dateStr + fmtTimeNow(firstTimeVal);
-                meta.ended_at_ms = dateStr + fmtTimeNow(lastTimeVal);
+                meta.started_at_ms = dateStr + finalStartTime;
+                meta.ended_at_ms = dateStr + finalEndTime;
             } else {
                 meta.duration_s = 0;
                 meta.started_at_ms = "–";
@@ -364,7 +395,7 @@
             meta.event_count = meta.event_count || 0;
 
             const initial = [...(data.initial || [])]
-                .sort((a, b) => a[0] - b[0])
+                .sort((a, b) => a - b)
                 .map(([i, v]) => ({ index: i, name: nameOf(i), value: v, unit: unitOf(i) }));
 
             const changedColSet = new Set();
