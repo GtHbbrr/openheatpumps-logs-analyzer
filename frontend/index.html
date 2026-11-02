@@ -675,17 +675,18 @@
                     return;
                 }
 
-                // Header
-                let head = `<th class="p-1 sticky left-0 bg-gray-950 z-10">t</th><th class="p-1">timeNow</th>`;
+                // FIX: bg-gray-950 toegevoegd aan alle th's en z-20 aan de hoek-cel (t) om overlap te voorkomen
+                let head = `<th class="p-1 sticky left-0 top-0 bg-gray-950 z-20">t</th><th class="p-1 sticky top-0 bg-gray-950 z-10">timeNow</th>`;
                 for (const i of selected) {
-                    head += `<th class="p-1.5 whitespace-nowrap">${esc(d.nameOf(i))}<span class="text-gray-600 text-[9px] block">${esc(d.unitOf(i))}</span></th>`;
+                    head += `<th class="p-1.5 whitespace-nowrap sticky top-0 bg-gray-950 z-10">${esc(d.nameOf(i))}<span class="text-gray-600 text-[9px] block">${esc(d.unitOf(i))}</span></th>`;
                 }
 
                 // Data rijen
                 let body = '';
                 for (const s of d.samples) {
                     const tn = timeNowIdx >= 0 ? s.state.get(timeNowIdx) : '';
-                    let row = `<td class="p-1 text-blue-400 font-mono whitespace-nowrap sticky left-0 bg-gray-900 z-10">${fmtDur(s.offsetS)}</td><td class="p-1 text-blue-400 font-mono whitespace-nowrap">${fmtTimeNow(tn)}</td>`;
+                    // FIX: z-index op de linker vaste kolom gezet zodat kolommen er netjes achter verdwijnen bij horizontaal scrollen
+                    let row = `<td class="p-1 text-blue-400 font-mono whitespace-nowrap sticky left-0 bg-gray-950 z-10">${fmtDur(s.offsetS)}</td><td class="p-1 text-blue-400 font-mono whitespace-nowrap">${fmtTimeNow(tn)}</td>`;
                     for (const i of selected) {
                         const v = s.state.get(i);
                         const ch = s.changed.has(i);
@@ -697,6 +698,7 @@
                 // Samenvattingsrijen: min / max / gemiddeld
                 const stats = computeStats(selected);
                 function statRow(label, pick, color) {
+                    // FIX: bg-gray-950 gehandhaafd en z-10 toegevoegd voor de samenvatting
                     let cells = `<td colspan="2" class="p-1 text-right text-[10px] font-bold ${color} uppercase tracking-wide sticky left-0 bg-gray-950 z-10">${label}</td>`;
                     for (const i of selected) {
                         const st = stats[i];
@@ -710,8 +712,9 @@
                            + statRow('max', st => st.max, 'text-red-400')
                            + statRow('gem', st => st.avg, 'text-blue-400');
 
-                wrap.innerHTML = `<table class="w-full text-xs">
-                    <thead class="bg-gray-950 sticky top-0"><tr class="text-gray-500 text-left">${head}</tr></thead>
+                // FIX: border-collapse toegevoegd zodat de sticky borders netjes aansluiten
+                wrap.innerHTML = `<table class="w-full text-xs border-collapse">
+                    <thead class="bg-gray-950"><tr class="text-gray-500 text-left">${head}</tr></thead>
                     <tbody>${body}</tbody>
                     <tfoot>${foot}</tfoot>
                 </table>`;
