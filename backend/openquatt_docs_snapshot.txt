@@ -1,6 +1,128 @@
-[OpenQuatt docs snapshot | fw: v0.56.0 | fetched: 2026-11-01T10:08:37.263Z]
+[OpenQuatt docs snapshot | fw: v0.56.0 | fetched: 2026-11-02T10:37:59.193Z]
 
 ---OPEN ISSUES---
+
+issue #909 (bug): [Bug] Stille modus wordt overruled - Sliders aanpassen die betrekking hebben op de Stille modus, hebben invloed op de aansturing van Quatt ondanks dat Stille modus uit staat.
+
+issue #909 (bug): [Bug] Stille modus wordt overruled - Voorbeeld. Quatt heeft urenlang in CM2 gestaan, maar werd geblokkeerd voor verwarmbedrijf omdat de sliders voor max frequentie overdag door slider aangepast naar 23Hz wat buiten het bereik valt. Dit heeft OQ overgenomen, ondanks dat Stille Modus uitgeschakeld was.
+
+issue #902: Controller herstart tijdens downloaden van de Systeemrecorder (watchdog) - Bij het downloaden van de Systeemrecorder is de controller vastgelopen en automatisch herstart. Daardoor werd de download onderbroken en ging de recorderhistorie van vóór de crash verloren. Volgens de melding hervatte de verwarming daarna weer na de normale minimumwachttijd.
+
+issue #902: Controller herstart tijdens downloaden van de Systeemrecorder (watchdog) - Dit gebeurde op 31 oktober 2026 met v0.55.0, een Heatpump Controller Q, Single en Ethernet , na ruim 13 dagen uptime.
+
+issue #902: Controller herstart tijdens downloaden van de Systeemrecorder (watchdog) - Verwacht: een opname kunnen downloaden terwijl de regeling, OpenTherm en Modbus normaal blijven doorlopen, zonder herstart.
+
+issue #902: Controller herstart tijdens downloaden van de Systeemrecorder (watchdog) - De crash-backtrace is vertaald met het symbolenbestand van precies dezelfde firmwarebuild . De controller voerde op het crashmoment deze code uit:
+
+issue #902: Controller herstart tijdens downloaden van de Systeemrecorder (watchdog) - text Download van een gekozen tijdvenster → recorderopname naar JSON omzetten → een meetwaarde naar tekst omzetten → snprintf("%.7g") / dtoa r → task-watchdog grijpt in
+
+issue #902: Controller herstart tijdens downloaden van de Systeemrecorder (watchdog) - Het gaat om de route /openquatt/debug-recording/download-range . De gekozen downloadperiode is niet bekend.
+
+issue #902: Controller herstart tijdens downloaden van de Systeemrecorder (watchdog) - Op het moment van de crash was het laatste levenssignaal van de hoofdregel-loop 4294 ms oud, dus ongeveer 4,3 seconden .
+
+issue #902: Controller herstart tijdens downloaden van de Systeemrecorder (watchdog) - Voor een download moet de controller veel opgeslagen meetwaarden omzetten naar JSON. Dat gebeurt in de HTTP-task: de taak die webverzoeken afhandelt.
+
+issue #902: Controller herstart tijdens downloaden van de Systeemrecorder (watchdog) - Die taak heeft een hogere prioriteit dan de hoofdregel-loop. De exportcode verwerkt alle samples en velden achter elkaar, zonder zelf periodiek kort te pauzeren. Als de HTTP-task daarbij te lang uitvoerbaar blijft, krijgen de hoofdregel-loop en de idle-task onvoldoende processortijd. De task-watchdog kan dan ingrijpen en de controller herstarten.
+
+issue #902: Controller herstart tijdens downloaden van de Systeemrecorder (watchdog) - De export verstuurt wel blokjes van 512 bytes, maar dat garandeert niet dat andere taken tussendoor voldoende aan bod komen.
+
+issue #902: Controller herstart tijdens downloaden van de Systeemrecorder (watchdog) - Dit is de waarschijnlijke verklaring, nog geen op hardware bewezen oorzaak. De backtrace toont waar de controller bezig was toen de watchdog ingreep; hij bewijst niet dat één getalconversie op zichzelf vastliep. Zie ook de [ESP-IDF-uitleg over de task-watchdog](https://docs.espressif.com/projects/esp-idf/en/v5.5/esp32s3/api-reference/system/wdts.html#task-watchdog-timer-twdt).
+
+issue #902: Controller herstart tijdens downloaden van de Systeemrecorder (watchdog) - Laat de export regelmatig heel kort wachten, zodat de regeling tussendoor kan draaien. De opname blijft hetzelfde; alleen het werk voor de download wordt over korte stukken verdeeld.
+
+issue #902: Controller herstart tijdens downloaden van de Systeemrecorder (watchdog) - Gerichte wijziging in components/openquatt debug recorder/OpenQuattDebugRecorder.cpp :
+
+issue #902: Controller herstart tijdens downloaden van de Systeemrecorder (watchdog) - 1. Houd tijdens het verwerken van samples en velden bij hoeveel tijd is verstreken sinds de vorige pauze. 2. Pauzeer na bijvoorbeeld 5–10 ms kort met vTaskDelay(1) : één FreeRTOS-tick. Meet op hardware welk tijdsbudget passend is. 3. Controleer dit ook wanneer veel velden ongewijzigd zijn, zodat zo'n export evenmin langdurig achter elkaar blijft rekenen. 4. Pauzeer alleen buiten de recorder-mutex, de vergrendeling die recorderdata beschermt. Gebruik voor de export de bestaande onveranderlijke kopie in PSRAM, zodat sampling en herstarten van een opname veilig blijven. 5. Behoud de afhandeling van verbindingsfouten en zorg dat een afgebroken download geen volgende export blokkeert.
+
+issue #902: Controller herstart tijdens downloaden van de Systeemrecorder (watchdog) - Alleen taskYIELD() biedt hier onvoldoende zekerheid: een uitvoerbare taak met hogere prioriteit kan meteen opnieuw gekozen worden. Alleen de watchdog langer zetten of voeden verhelpt het tekort aan processortijd voor de regeling niet.
+
+issue #902: Controller herstart tijdens downloaden van de Systeemrecorder (watchdog) - Het onderzochte bestand openquatt-debug-recording-2026-10-31 10-35-21-000Z.oqdebug.json bevat 37 samples over zes minuten ná de herstart . De opname van vóór de crash is verloren gegaan. De oorspronkelijke hoeveelheid geëxporteerde data en de geheugentoestand vlak vóór de crash zijn daardoor onbekend.
+
+issue #902: Controller herstart tijdens downloaden van de Systeemrecorder (watchdog) - Kort vóór de download waren instellingen voor doorverwarmen aangepast. Er is geen aangetoond verband tussen die wijziging en de crash.
+
+issue #902: Controller herstart tijdens downloaden van de Systeemrecorder (watchdog) - De onderstaande test is een voorstel; de crash is nog niet op hardware gereproduceerd.
+
+issue #902: Controller herstart tijdens downloaden van de Systeemrecorder (watchdog) - - [ ] Vergelijk de bestaande firmware met de fix op Q Single via Ethernet, met een gevulde recorder. Download 2 uur, 6 uur en de volledige beschikbare historie. - [ ] Meet tijdens actieve regeling de maximale vertraging van de hoofdregel-loop; OpenTherm en Modbus blijven functioneren en er treedt geen watchdog/reset op. - [ ] Test snelle en trage downloads en verbreek een download halverwege. Daarna blijft een nieuwe export mogelijk. - [ ] Controleer dat de bestanden volledig en geldig zijn en correct door de analyser worden ingelezen, inclusief tijdvenster en meetwaarden. - [ ] Laat tijdens een export nieuwe samples vastleggen en start ook een nieuwe opname. De export mag geen gegevens van verschillende opnames mengen. - [ ] Controleer bij herhaalde exports het interne vrije heapgeheugen, het minimum sinds boot en het grootste vrije blok op lekkage of regressies. - [ ] Voer npm run check:cpp-format en passende gerichte checks uit. Laat de timing-/concurrencywijziging onafhankelijk reviewen vóór publicatie.
+
+issue #902: Controller herstart tijdens downloaden van de Systeemrecorder (watchdog) - <details <summary Buildgegevens, gedecodeerde backtrace en broncode</summary
+
+issue #902: Controller herstart tijdens downloaden van de Systeemrecorder (watchdog) - - Hardware: Heatpump Controller Q, ESP32-S3 rev0.2. - Topology: Single; verbinding: Ethernet. - Build target: configs/heatpump controller q/single.yaml . - Firmware: v0.55.0 , release channel main ; ESPHome: 2026.9.0 . - Source commit: dbe66c23311e8c6713d8f51fc8f7f45309fdccb8 . - Reporting build ID: 8dee4c8e531a027718d8757048f4987ea33861ab4ddc17d030663ad0516a28e0 . Deze matcht exact met de Single-entry in het release-symbolenarchief. - Uptime bij crashmelding: 1177440 s .
+
+issue #902: Controller herstart tijdens downloaden van de Systeemrecorder (watchdog) - text Reason: Task wdt Crashed core: 1 PC: 0x421569A0 Crash telemetry loop heartbeat age: 4294 ms
+
+issue #902: Controller herstart tijdens downloaden van de Systeemrecorder (watchdog) - 0x421569A0 dtoa r dtoa.c:522 0x4215699D dtoa r dtoa.c:520 0x42154149 cvt / svfprintf r vfprintf.c:1870 / 1307 0x4214BEFF snprintf snprintf.c:85 0x420724B3 write float / write field value OpenQuattDebugRecorder.cpp:240 / 1834 0x42074DDE write recording export OpenQuattDebugRecorder.cpp:1938 0x42074E78 write recording OpenQuattDebugRecorder.cpp:1786 0x42075110 handleRequest OpenQuattDebugRecorder.cpp:377
+
+issue #902: Controller herstart tijdens downloaden van de Systeemrecorder (watchdog) - De overige gedecodeerde frames lopen via ESPHome-middleware en de ESP-IDF HTTP-server naar httpd thread .
+
+issue #902: Controller herstart tijdens downloaden van de Systeemrecorder (watchdog) - ESPHome 2026.9.0 gebruikt de standaard HTTP-taskprioriteit van ESP-IDF ( tskIDLE PRIORITY + 5 ). De ESPHome-loop heeft prioriteit 1 en draait op core 1.
+
+issue #902: Controller herstart tijdens downloaden van de Systeemrecorder (watchdog) - - [Floatconversie met snprintf("%.7g")](https://github.com/OpenQuatt/OpenQuatt/blob/dbe66c23311e8c6713d8f51fc8f7f45309fdccb8/components/openquatt debug recorder/OpenQuattDebugRecorder.cpp#L235-L242). - [Exportlus over samples en velden](https://github.com/OpenQuatt/OpenQuatt/blob/dbe66c23311e8c6713d8f51fc8f7f45309fdccb8/components/openquatt debug recorder/OpenQuattDebugRecorder.cpp#L1923-L1945).
+
+issue #902: Controller herstart tijdens downloaden van de Systeemrecorder (watchdog) - Uitgevoerd: exacte ELF/build-ID-match, volledige backtrace-decodering en inspectie van releasecode en de opname na de herstart. Nog geen firmwarewijziging, build of HIL-reproductie.
+
+issue #901: [Feature] Compacte HA-debugsensoren voor langdurige diagnosehistorie - Voeg een kleine set compacte tekstsensoren toe aan de bestaande native ESPHome-integratie met Home Assistant, vergelijkbaar met de vroegere Strategy debug state en Heating Debug State .
+
+issue #901: [Feature] Compacte HA-debugsensoren voor langdurige diagnosehistorie - Deze sensoren geven de belangrijkste systeemrecorder- en regelinformatie als korte key=value -regels weer. Home Assistant kan de wijzigingen vervolgens via zijn eigen Recorder langdurig bewaren.
+
+issue #901: [Feature] Compacte HA-debugsensoren voor langdurige diagnosehistorie - Alle nieuwe sensoren zijn standaard uitgeschakeld in Home Assistant ( disabled by default: true ) en krijgen entity category: diagnostic . Gebruikers schakelen alleen de gewenste diagnosesensoren in.
+
+issue #901: [Feature] Compacte HA-debugsensoren voor langdurige diagnosehistorie - De lokale Systeemrecorder heeft een beperkt venster van enkele uren — voor deze gebruikswens circa 6–7 uur; de exacte retentie hangt af van firmware en veldenset. De opname staat bovendien in PSRAM en verdwijnt bij een herstart, stroomuitval of OTA.
+
+issue #901: [Feature] Compacte HA-debugsensoren voor langdurige diagnosehistorie - Daardoor ontbreekt regelmatig de aanloop naar een probleem dat pas later wordt opgemerkt. Denk aan gedrag gedurende een nacht, meerdere verwarmingscycli of een storing na een herstart.
+
+issue #901: [Feature] Compacte HA-debugsensoren voor langdurige diagnosehistorie - Door compacte diagnosegegevens in HA op te slaan, kunnen gebruikers langere perioden vergelijken en blijft eerder door HA ontvangen en opgeslagen historie beschikbaar na een OpenQuatt-herstart. De bewaartermijn volgt de HA Recorder-instellingen.
+
+issue #901: [Feature] Compacte HA-debugsensoren voor langdurige diagnosehistorie - | Tekstsensor | Diagnose-inhoud | | --- | --- | | Strategy debug state | Strategie, Control Mode, fase, vraag, vermogensvraag, waterbegrenzing en beslisreden. Strategieafhankelijke velden voor Power House of stooklijn. | | Heating Debug State | Ruwe/gefilterde/begrensde vraag, gevraagde en toegepaste HP-levels, low-load latch, drempels en herstartblokkeringen. | | Cooling Debug State | Enable, permissie, koelvraag, target, dauwpunt, veilige ondergrens, begrenzing en start-/stop-/blokkeerreden. | | Sensor Debug State | Geselecteerde buiten-, kamer-, setpoint- en watertemperatuur, warmtetoestemming, geldigheid en hold-status. Effectieve temperatuurbronlabels hoeven niet opgenomen te worden. | | Flow Debug State | Modus, flowbron/route, gemeten/gewenste flow, iPWM, pompfeedback, mismatch en low-flow. | | HP1 Debug State | Werkmodus, control-levels, fysiek F-level, tabel-/vraag-/gemeten Hz, vermogen en kwaliteit daarvan, water in/uit, defrost en status. | | HP2 Debug State | Dezelfde informatie voor HP2; alleen bij Duo. | | Boiler Debug State | Warmtevraag, commandogeldigheid, bron, target, relais, OpenTherm-verbinding, vlam en blokkeerreden, voor zover beschikbaar. | | System Debug State | Vrij intern heap, minimum sinds boot, grootste vrije interne blok, vrij PSRAM en eventueel fragmentatie/looptijd. |
+
+issue #901: [Feature] Compacte HA-debugsensoren voor langdurige diagnosehistorie - Dit is een compacte diagnosesamenvatting. Volledige tabellen, instellingen en overige detailvelden blijven beschikbaar via de Systeemrecorder.
+
+issue #901: [Feature] Compacte HA-debugsensoren voor langdurige diagnosehistorie - - Richtwaarde maximaal 220 ASCII-tekens per state , met een harde bovengrens onder HA's limiet van 255 tekens. Ook lange redenen, ongeldige waarden en maximale getallen moeten passen; niet stil afkappen. - Normaal elke 10 seconden beoordelen; systeeminformatie hooguit elke 60 seconden . Alleen publiceren als de uiteindelijke tekst verandert. - Vaste veldnamen, volgorde, eenheden en zinvolle afronding. Behoud voldoende precisie voor regelgedrag, bijvoorbeeld 0,01 °C voor kamer/setpoint. - Geen continu veranderend meettijdstip of seconde-teller in iedere regel. Wacht-/blokkeertijden alleen waar nuttig en begrensd in updatefrequentie. - Ontbrekende waarden herkenbaar als ? ; inactieve strategieën en ontbrekende hardware expliciet weergeven. Geen oude actieve toestand of verzonnen nulwaarden. - Onderscheid control-level 0–10, fysiek F-level 0–20 en gemeten Hz. Een opgeslagen frequentievraagregister is geen bewijs dat een compressor draait. Behoud indicatoren zoals legacy estimated .
+
+issue #901: [Feature] Compacte HA-debugsensoren voor langdurige diagnosehistorie - Onderstaande negen states zijn uitgewerkt op basis van een echte Systeemrecorder-export van OpenQuatt v0.55.0 (Q, WiFi, Duo), laatste meetpunt 1 november 2026 om 13:59:04 CET . Het is een voorstel voor de formattering, geen uitvoer van al geïmplementeerde HA-debugsensoren.
+
+issue #901: [Feature] Compacte HA-debugsensoren voor langdurige diagnosehistorie - 1/0 betekent waar/onwaar; ? betekent onbekend of niet opgenomen in deze export. Temperaturen zijn in °C, flow in L/h, vermogens in W en geheugen in B. Kamer/setpoint behouden twee decimalen; overige temperaturen één decimaal; W en L/h zijn afgerond op hele getallen.
+
+issue #901: [Feature] Compacte HA-debugsensoren voor langdurige diagnosehistorie - text mode=PH cm=2 phase=1 enabled=1 req=1 demand=model houseW=1728 reqW=2308 waterlim=1.00 trip=0 hard=0 silent=0 fast=0 reason=keep current
+
+issue #901: [Feature] Compacte HA-debugsensoren voor langdurige diagnosehistorie - text req=1/0 app=1/0 lowload=1 pminW=2308 offW=1600 onW=2200 curve=OFF curveRestart=0 roomBlock=0 raw=? filt=? cap=?
+
+issue #901: [Feature] Compacte HA-debugsensoren voor langdurige diagnosehistorie - text enable=0 permit=1 req=0 block="Cooling disabled" guard="Dew point (HA)" target=14.0 dew=12.0 safe=12.0 raw=0 limited=0 owner=0 start=Ready waitS=0 limitCode=0 stopCode=0
+
+issue #901: [Feature] Compacte HA-debugsensoren voor langdurige diagnosehistorie - text out=9.6 room=20.05 set=20.00 water=28.3 heat=1 heatValid=1 hold=None
+
+issue #901: [Feature] Compacte HA-debugsensoren voor langdurige diagnosehistorie - text ctl="Flow Setpoint" mode=AUTO src="Outdoor unit" route=Aggregate flow=802 target=800 L/h local=802 ctrl=800 ipwm=418 cmd=419/419 fb=300/300 mismatch=0 lowflow=0
+
+issue #901: [Feature] Compacte HA-debugsensoren voor langdurige diagnosehistorie - text mode=Heating req=1 app=1 F=1 tableHz=30 demandHz=30 Hz=36 in=25.0 out=27.6 flow=794 L/h pinW=342 heatW=2369 quality=legacy estimated defrost=0 status="Compressor oil return"
+
+issue #901: [Feature] Compacte HA-debugsensoren voor langdurige diagnosehistorie - text mode=Standby req=0 app=0 F=0 tableHz=0 demandHz=30 Hz=0 in=27.5 out=27.5 flow=811 L/h pinW=35 heatW=0 quality=legacy estimated defrost=0 status=None
+
+issue #901: [Feature] Compacte HA-debugsensoren voor langdurige diagnosehistorie - text active=0 valid=1 cmd=0 heatReq=0 src=None target=? block="no boiler heat request" relay="not applicable" ot=r1 ready otLink=0 ch=0 flame=? err=0 guard=idle
+
+issue #901: [Feature] Compacte HA-debugsensoren voor langdurige diagnosehistorie - text intFreeB=87215 intMinB=39828 intMaxB=31744 psramFreeB=6647264 uptimeMin=1225 frag=? loopMs=?
+
+issue #901: [Feature] Compacte HA-debugsensoren voor langdurige diagnosehistorie - De negen states bevatten samen 1211 bytes tekst ; de langste regel is 173 tekens . Dit telt alleen de state-inhoud, zonder entiteitsnamen, API-overhead of geheugenkopieën.
+
+issue #901: [Feature] Compacte HA-debugsensoren voor langdurige diagnosehistorie - Bij het lezen van deze voorbeelden: - req/app zijn control-levels (0–10); F is het fysieke compressorlevel (0–20); Hz is de gemeten frequentie. Bij HP2 blijft demandHz=30 als registerwaarde zichtbaar, terwijl Standby, level 0 en gemeten 0 Hz laten zien dat de compressor niet draait. - quality=legacy estimated blijft zichtbaar bij de vermogenswaarden. HP1 meldt in dit meetpunt de status Compressor oil return . - enable=0 , permit=1 en req=0 voor koeling zijn afzonderlijke signalen. De permissie is geen actieve koelvraag. - curve=OFF , curveRestart en roomBlock beschrijven de stooklijnstatus; in dit voorbeeld is Power House actief. - phase en fast blijven hier de opgenomen numerieke diagnosecodes. - raw/filt/cap , fragmentatie en looptijd zijn niet uit deze export te reconstrueren. De firmware kan de beschikbare bronwaarden rechtstreeks gebruiken; ontbrekende meetwaarden blijven herkenbaar onbekend. - Effectieve temperatuurbronlabels zijn bewust weggelaten; de geselecteerde waarden en geldigheid/hold-status volstaan voor deze compacte sensor.
+
+issue #901: [Feature] Compacte HA-debugsensoren voor langdurige diagnosehistorie - - De ingeschakelde sensoren moeten juist wel in HA Recorder opgeslagen kunnen worden . - Documenteer inschakelen, eventuele Recorder-filters, bewaartermijn en terugkijken/kopiëren van historische states voor support. - Dit betreft teksthistorie, geen numerieke long-term statistics. De standaard purge keep days is 10 dagen; voor langere bewaring configureert de gebruiker HA bewust. - Bij een OpenQuatt-herstart blijft reeds opgeslagen HA-historie behouden; na reconnect volgen nieuwe actuele states. Een verbindingsonderbreking blijft een zichtbaar gat: geen volledige backfill of reconstructie van de recorderopname vereist. - De diagnose-entiteiten zijn onafhankelijk van het aan-/uitzetten van de lokale Systeemrecorder bruikbaar.
+
+issue #901: [Feature] Compacte HA-debugsensoren voor langdurige diagnosehistorie - Gebruik bestaande diagnosewaarden via de gewone ESPHome-loop en de bestaande API-verbinding. Houd het uitlezen vrij van neveneffecten op de regeling. Er komen geen extra Modbus-/OpenTherm-aanvragen, historybuffers of periodieke recorderdownloads bij.
+
+issue #901: [Feature] Compacte HA-debugsensoren voor langdurige diagnosehistorie - Begrens formatterbuffers en vermijd onnodige stringkopieën. disabled by default is een HA-standaardinstelling en garandeert op zichzelf niet dat firmwarewerk of API-verkeer stopt; controleer de daadwerkelijke extra belasting bij uitgeschakelde én ingeschakelde entiteiten.
+
+issue #901: [Feature] Compacte HA-debugsensoren voor langdurige diagnosehistorie - - [ ] Diagnose-entiteiten verschijnen via de bestaande ESPHome-integratie en zijn standaard disabled. - [ ] De logisch gegroepeerde states zijn compact, gedocumenteerd en blijven ook bij grensgevallen onder de lengtelimiet. - [ ] Gelijke tekst geeft geen herhaalde publicatie; afronding en update-intervallen beperken databasegroei. - [ ] Geactiveerde sensoren leveren bruikbare HA-historie over meerdere dagen, die een OpenQuatt-herstart overleeft. - [ ] Boot, reconnect, ontbrekende/ongeldige waarden en strategiewissels tonen een juiste actuele toestand. - [ ] Single/Duo en aanwezige/afwezige ketelondersteuning werken zonder misleidende waarden. - [ ] Er komen geen extra busaanvragen of wijzigingen in warmtepomp-, boiler- of veiligheidsregeling bij. - [ ] Lengte-/formattercontroles, gerichte configvalidatie en een praktijkproef met HA Recorder zijn uitgevoerd. - [ ] Baseline/candidate worden onder gelijke belasting vergeleken op looplatency, actuele/minimale interne heap, grootste vrije blok, fragmentatie en relevante taskstackmarges. Een compile-RAM-rapport alleen volstaat niet.
+
+issue #901: [Feature] Compacte HA-debugsensoren voor langdurige diagnosehistorie - Niet hardware-specifiek. Representatieve praktijkvalidatie op Heatpump Controller Q, WiFi, Duo.
+
+issue #901: [Feature] Compacte HA-debugsensoren voor langdurige diagnosehistorie - - [x] User-facing entities/configuratie veranderen - [ ] Runtime/control gedrag verandert mogelijk - [ ] Hardware, Modbus IO, actuator, safety, thermal, boiler, of flow gedrag wordt geraakt - [ ] Ik weet het niet zeker
+
+issue #901: [Feature] Compacte HA-debugsensoren voor langdurige diagnosehistorie - De beoogde wijziging is aanvullende diagnostiek. Er is wel extra formatteer-/API-belasting; functionele controlwijzigingen vallen buiten deze wens.
+
+issue #901: [Feature] Compacte HA-debugsensoren voor langdurige diagnosehistorie - - Handmatig diagnosebestanden downloaden: bruikbaar voor recente incidenten, maar vereist tijdig handelen. - De volledige recorder periodiek ophalen of als grote JSON-attributensensor ontsluiten: meer gegevensverwerking en minder eenvoudig voor compacte HA-historie. - Lokale persistente opslag uitbreiden: aparte opslag-/flashvraag; voor deze wens kan HA de langdurige opslag verzorgen.
+
+issue #901: [Feature] Compacte HA-debugsensoren voor langdurige diagnosehistorie - De vroegere tekstsensoren zijn verwijderd in [7caa8bda](https://github.com/OpenQuatt/OpenQuatt/commit/7caa8bda). De nieuwe indeling kan dezelfde gebruiksvorm terugbrengen met kortere regels en aanvullende diagnosevelden.
+
+issue #901: [Feature] Compacte HA-debugsensoren voor langdurige diagnosehistorie - Relevante documentatie: - [ESPHome template text sensors](https://esphome.io/components/text sensor/template/) - [Home Assistant: limiet van 255 tekens per state](https://www.home-assistant.io/docs/templating/states/) - [Home Assistant Recorder: opslag, filters en bewaartermijn](https://www.home-assistant.io/integrations/recorder/)
 
 issue #881 (bug): [Bug] MAX31865/PT1000-uitval op Q-controller: D2/D3/D4 ondanks timingaanpassing - Op de Heatpump Controller Q worden terugkerende MAX31865/PT1000-fouten gemeld. Meestal herstelt de meting na één of enkele cycli van 5 seconden. Ook de timingaanpassing uit #877 verhelpt de fouten op de onderzochte installatie niet.
 
