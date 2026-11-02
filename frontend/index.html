@@ -453,11 +453,14 @@
                     <!-- View 1: Wijzigingen -->
                     <div id="lb-view-changes" class="hidden">
                         <div class="overflow-auto max-h-80 border border-gray-800 rounded">
-                        <table class="w-full text-xs">
-                        <thead class="bg-gray-950 sticky top-0"><tr class="text-gray-500 text-left">
-                            <th class="p-1">t</th><th class="p-1">timeNow</th><th class="p-1.5">gewijzigde waarden</th>
+                        <table class="w-full text-xs border-separate border-spacing-0">
+                        <thead class="bg-gray-950"><tr class="text-gray-500 text-left">
+                            <th class="p-1 sticky top-0 z-20" style="background-color: #030712;">t</th>
+                            <th class="p-1 sticky top-0 z-20" style="background-color: #030712;">timeNow</th>
+                            <th class="p-1.5 sticky top-0 z-20" style="background-color: #030712;">gewijzigde waarden</th>
                         </tr></thead><tbody id="lb-changes-body"></tbody>
-                        </table></div>
+                        </table>
+                        </div>
                     </div>
 
                     <!-- View 2: Tijdreeks grid -->
@@ -529,11 +532,14 @@
 
                 <!-- Deze wrapper staat via 'hidden' eveneens standaard dichtgeklapt -->
                 <div id="lb-snapshot-content" class="hidden mt-4 overflow-auto max-h-60 border border-gray-800 rounded transition-all duration-300">
-                    <table class="w-full text-xs">
-                        <thead class="bg-gray-950 sticky top-0"><tr class="text-gray-500 text-left">
-                            <th class="p-1.5">#</th><th class="p-1.5">Kolom</th><th class="p-1.5">Eenheid</th><th class="p-1.5 text-left">Waarde</th>
-                        </tr></thead>
-                        <tbody>`;
+                <table class="w-full text-xs border-separate border-spacing-0">
+                    <thead class="bg-gray-950"><tr class="text-gray-500 text-left">
+                        <th class="p-1.5 sticky top-0 z-20" style="background-color: #030712;">#</th>
+                        <th class="p-1.5 sticky top-0 z-20" style="background-color: #030712;">Kolom</th>
+                        <th class="p-1.5 sticky top-0 z-20" style="background-color: #030712;">Eenheid</th>
+                        <th class="p-1.5 text-left sticky top-0 z-20" style="background-color: #030712;">Waarde</th>
+                    </tr></thead>
+                    <tbody>;
             for (const r of d.initial) {
                 html += `
                         <tr class="border-t border-gray-800 hover:bg-gray-900 transition-colors">
@@ -676,10 +682,11 @@
                 }
 
                 // Oplossing: Harde achtergrondkleur (#030712) inline meegeven omdat bg-gray-950 niet bestaat in Tailwind v2
-                let head = `<th class="p-1 sticky left-0 bg-gray-950 z-30" style="background-color: #030712;">t</th>`
-                         + `<th class="p-1 bg-gray-950" style="background-color: #030712;">timeNow</th>`;
+                // Door 'sticky top-0' direct op de th-cellen te zetten, is er 0px speling bij het scrollen
+                let head = `<th class="p-1 sticky left-0 top-0 z-30" style="background-color: #030712;">t</th>`
+                         + `<th class="p-1 sticky top-0 z-20" style="background-color: #030712;">timeNow</th>`;
                 for (const i of selected) {
-                    head += `<th class="p-1.5 whitespace-nowrap bg-gray-950" style="background-color: #030712;">${esc(d.nameOf(i))}<span class="text-gray-600 text-[9px] block">${esc(d.unitOf(i))}</span></th>`;
+                    head += `<th class="p-1.5 whitespace-nowrap sticky top-0 z-20" style="background-color: #030712;">${esc(d.nameOf(i))}<span class="text-gray-600 text-[9px] block">${esc(d.unitOf(i))}</span></th>`;
                 }
 
                 // Data rijen
@@ -715,7 +722,7 @@
 
                 // FIX: border-collapse toegevoegd zodat de sticky borders netjes aansluiten
                 wrap.innerHTML = `<table class="w-full text-xs border-separate border-spacing-0">
-                    <thead class="bg-gray-950 sticky top-0 z-20" style="background-color: #030712;"><tr class="text-gray-500 text-left">${head}</tr></thead>
+                    <thead class="bg-gray-950"><tr class="text-gray-500 text-left">${head}</tr></thead>
                     <tbody>${body}</tbody>
                     <tfoot>${foot}</tfoot>
                 </table>`;
