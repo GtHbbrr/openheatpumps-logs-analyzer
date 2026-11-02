@@ -472,7 +472,7 @@
                         </div>
                         <div id="lb-chips" class="flex flex-wrap gap-1 mb-2 max-h-28 overflow-auto"></div>
                         <p class="text-gray-600 text-[10px] mb-1">Oranje cellen = gewijzigd in deze stap. Waarden blijven staan tot de volgende wijziging (carry-forward). De onderste drie rijen tonen min / max / gemiddeld per kolom.</p>
-                        <div id="lb-grid-wrap" class="overflow-auto max-h-96 border border-gray-800 rounded"></div>
+                        <div id="lb-grid-wrap" class="relative overflow-auto max-h-96 border border-gray-800 rounded"></div>
                     </div>
                 </div>
             </div>`;
@@ -675,10 +675,10 @@
                     return;
                 }
 
-                // FIX: bg-gray-950 toegevoegd aan alle th's en z-20 aan de hoek-cel (t) om overlap te voorkomen
-                let head = `<th class="p-1 sticky left-0 top-0 bg-gray-950 z-20">t</th><th class="p-1 sticky top-0 bg-gray-950 z-10">timeNow</th>`;
+                // Pas de opbouw van de 'head' variabele aan naar dit:
+                let head = `<th class="p-1 sticky left-0 bg-gray-950 z-30">t</th><th class="p-1 bg-gray-950">timeNow</th>`;
                 for (const i of selected) {
-                    head += `<th class="p-1.5 whitespace-nowrap sticky top-0 bg-gray-950 z-10">${esc(d.nameOf(i))}<span class="text-gray-600 text-[9px] block">${esc(d.unitOf(i))}</span></th>`;
+                    head += `<th class="p-1.5 whitespace-nowrap bg-gray-950">${esc(d.nameOf(i))}<span class="text-gray-600 text-[9px] block">${esc(d.unitOf(i))}</span></th>`;
                 }
 
                 // Data rijen
@@ -713,8 +713,8 @@
                            + statRow('gem', st => st.avg, 'text-blue-400');
 
                 // FIX: border-collapse toegevoegd zodat de sticky borders netjes aansluiten
-                wrap.innerHTML = `<table class="w-full text-xs border-collapse">
-                    <thead class="bg-gray-950"><tr class="text-gray-500 text-left">${head}</tr></thead>
+                wrap.innerHTML = `<table class="w-full text-xs border-separate border-spacing-0">
+                    <thead class="bg-gray-950 sticky top-0 z-20"><tr class="text-gray-500 text-left">${head}</tr></thead>
                     <tbody>${body}</tbody>
                     <tfoot>${foot}</tfoot>
                 </table>`;
