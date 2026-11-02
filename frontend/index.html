@@ -593,7 +593,7 @@
                     tabChanges.className = 'px-3 py-1.5 rounded text-xs font-semibold bg-gray-900 text-gray-500 border border-gray-800 hover:text-gray-300 transition';
                     viewGrid.classList.remove('hidden');
                     viewChanges.classList.add('hidden');
-                    renderGrid();
+                    ();
                 }
             }
             tabChanges.addEventListener('click', () => setTab('changes'));
@@ -689,20 +689,29 @@
                     return;
                 }
 
-                // Oplossing: Harde achtergrondkleur (#030712) inline meegeven omdat bg-gray-950 niet bestaat in Tailwind v2
-                // Door 'sticky top-0' direct op de th-cellen te zetten, is er 0px speling bij het scrollen
-                let head = `<th class="p-1 sticky left-0 top-0 z-30" style="background-color: #030712;">t</th>`
-                         + `<th class="p-1 sticky top-0 z-20" style="background-color: #030712;">timeNow</th>`;
+                // ============================================================
+                // 1. STABIELE STICKY HEADERS (ZOWEL HORIZONTAAL ALS VERTICAAL)
+                // ============================================================
+                // 't' krijgt left: 0. 'timeNow' krijgt left: 32px (de exacte breedte van kolom t).
+                let head = `<th class="p-1 sticky left-0 top-0 z-30" style="position: sticky; left: 0; top: 0; background-color: #030712; min-width: 32px; width: 32px;">t</th>`
+                         + `<th class="p-1 sticky top-0 z-30" style="position: sticky; left: 32px; top: 0; background-color: #030712; min-width: 75px; width: 75px;">timeNow</th>`;
+                
                 for (const i of selected) {
-                    head += `<th class="p-1.5 whitespace-nowrap sticky top-0 z-20" style="background-color: #030712;">${esc(d.nameOf(i))}<span class="text-gray-600 text-[9px] block">${esc(d.unitOf(i))}</span></th>`;
+                    // De overige kolommen plakken alleen verticaal (top-0) en krijgen een lagere z-index zodat ze áchter t en timeNow schuiven
+                    head += `<th class="p-1.5 whitespace-nowrap sticky top-0 z-20" style="position: sticky; top: 0; background-color: #030712;">${esc(d.nameOf(i))}<span class="text-gray-600 text-[9px] block">${esc(d.unitOf(i))}</span></th>`;
                 }
 
-                // Data rijen
+                // ============================================================
+                // 2. STABIELE STICKY DATA CELLS (ALLEEN HORIZONTAAL)
+                // ============================================================
                 let body = '';
                 for (const s of d.samples) {
                     const tn = timeNowIdx >= 0 ? s.state.get(timeNowIdx) : '';
-                    // FIX: z-index op de linker vaste kolom gezet zodat kolommen er netjes achter verdwijnen bij horizontaal scrollen
-                    let row = `<td class="p-1 text-blue-400 font-mono whitespace-nowrap sticky left-0 bg-gray-950 z-10">${fmtDur(s.offsetS)}</td><td class="p-1 text-blue-400 font-mono whitespace-nowrap">${fmtTimeNow(tn)}</td>`;
+                    
+                    // Zowel de 't'-cel als 'timeNow'-cel krijgen een harde achtergrondkleur en hun respectievelijke left-positie
+                    let row = `<td class="p-1 text-blue-400 font-mono whitespace-nowrap sticky left-0 z-10" style="position: sticky; left: 0; background-color: #030712;">${fmtDur(s.offsetS)}</td>`
+                            + `<td class="p-1 text-blue-400 font-mono whitespace-nowrap sticky z-10" style="position: sticky; left: 32px; background-color: #030712;">${fmtTimeNow(tn)}</td>`;
+                    
                     for (const i of selected) {
                         const v = s.state.get(i);
                         const ch = s.changed.has(i);
@@ -711,11 +720,13 @@
                     body += `<tr class="border-t border-gray-800">${row}</tr>`;
                 }
 
-                // Samenvattingsrijen: min / max / gemiddeld
+                // ============================================================
+                // 3. STABIELE STICKY FOOTER (SAMENVATTING)
+                // ============================================================
                 const stats = computeStats(selected);
                 function statRow(label, pick, color) {
-                    // FIX: bg-gray-950 gehandhaafd en z-10 toegevoegd voor de samenvatting
-                    let cells = `<td colspan="2" class="p-1 text-right text-[10px] font-bold ${color} uppercase tracking-wide sticky left-0 bg-gray-950 z-10">${label}</td>`;
+                    // De label-cel spant nu over 2 kolommen en blijft ook links op left-0 plakken
+                    let cells = `<td colspan="2" class="p-1 text-right text-[10px] font-bold ${color} uppercase tracking-wide sticky left-0 z-10" style="position: sticky; left: 0; background-color: #030712;">${label}</td>`;
                     for (const i of selected) {
                         const st = stats[i];
                         const val = pick(st);
@@ -723,7 +734,7 @@
                     }
                     return `<tr class="border-t border-gray-700 bg-gray-950">${cells}</tr>`;
                 }
-
+                
                 const foot = statRow('min', st => st.min, 'text-green-400')
                            + statRow('max', st => st.max, 'text-red-400')
                            + statRow('gem', st => st.avg, 'text-blue-400');
