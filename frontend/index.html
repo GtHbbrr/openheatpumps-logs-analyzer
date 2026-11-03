@@ -1329,12 +1329,18 @@ function parseMarkdown(tekst) {
             const loader = el('loader');
             const usedModelBadge = el('used-model-badge');
             
-            const isFoutGeweest = outputBox.innerHTML.includes("🚨 GOOGLE API FOUT") || outputBox.innerHTML.includes("🚨 SYSTEMISCHE CRASH") || outputBox.innerHTML.includes("🚨 NETWERKFOUT") || outputBox.innerHTML.includes("🚨 VERBINDINGSFOUT");
+            // Controleer of de knop in de fout-staat staat of dat er een foutmelding in de box staat
+            const isFoutGeweest = el('btn-send').textContent.includes("Opnieuw Proberen") ||
+                                 outputBox.innerHTML.includes("🚨 GOOGLE API FOUT") || 
+                                 outputBox.innerHTML.includes("🚨 SYSTEMISCHE CRASH") || 
+                                 outputBox.innerHTML.includes("🚨 NETWERKFOUT") || 
+                                 outputBox.innerHTML.includes("🚨 VERBINDINGSFOUT");
             let vraagTekst = "";
             
             if (isFoutGeweest) {
                 const laatsteUserBericht = chatHistory.filter(m => m.role === "user").pop();
-                vraagTekst = laatsteUserBericht ? laatsteUserBericht.parts[0].text : inputField.value;
+                vraagTekst = laatsteUserBericht ? laatsteUserBericht.parts[0].text : inputField.value.trim();
+                if (!vraagTekst) return;
             } else {
                 vraagTekst = inputField.value.trim();
                 if (!vraagTekst) return;
@@ -1343,15 +1349,18 @@ function parseMarkdown(tekst) {
                 chatHistory.push({ role: "user", parts: [{ text: vraagTekst }] });
                 inputField.value = "";
             }
-
+        
             if (loader) loader.classList.remove('hidden');
             el('btn-send').disabled = true;
             el('btn-send').textContent = "Versturen...";
-
+        
             // Toon de live statusstappen onderaan de chat tijdens het wachten
             outputBox.innerHTML += `<br><div id="live-chat-status" class="text-xs text-orange-400 animate-pulse mt-2">🎲 Model-selectie activeert alternatief ai model... Wachten op antwoord...</div>`;
             outputBox.scrollTop = outputBox.scrollHeight;
-
+        
+            // Vlag om bij te houden of de AI succesvol een geldige diagnose heeft teruggestuurd
+            let succesvolAfgerond = false;
+        
             try {
                 const profile = { 
                     woning_type: el('woning_type').value, 
@@ -1359,7 +1368,7 @@ function parseMarkdown(tekst) {
                     cv_ketel: el('cv_ketel').value, 
                     thermostaat: el('thermostaat').value 
                 };
-
+        
                 const response = await fetch(WORKER_URL, { 
                     method: 'POST', 
                     headers: { 'Content-Type': 'application/json' }, 
@@ -1369,25 +1378,25 @@ function parseMarkdown(tekst) {
                 if (!response.ok) {
                     throw new Error(`ai model weigerde verbinding met status: ${response.status}`);
                 }
-
+        
                 const reader = response.body.getReader();
                 const textDecoder = new TextDecoder("utf-8");
                 let buffer = "";
                 let contextDocsVerwerkt = false;
-
+        
                 while (true) {
                     const { value, done } = await reader.read();
                     if (done) break;
-
+        
                     buffer += textDecoder.decode(value, { stream: true });
-
-                    // ENVELOP 1: Verwerk de RAG-documenten (bij vervolgvragen stuurt de backend [] mee)
+        
+                    // ENVELOP 1: Verwerk de RAG-documenten
                     if (!contextDocsVerwerkt && buffer.includes("---CONTEXT_DOCS_END---")) {
                         const parts = buffer.split("---CONTEXT_DOCS_END---\n");
                         const headerPart = parts[0];
                         buffer = parts[1] || "";                        
                         contextDocsVerwerkt = true;
-
+        
                         const jsonString = headerPart.replace("---CONTEXT_DOCS_START---\n", "");
                         try {
                             const geselecteerdeDocumenten = JSON.parse(jsonString);
@@ -1396,12 +1405,12 @@ function parseMarkdown(tekst) {
                             console.warn("RAG JSON parsing mislukt:", e.message);
                         }
                     }
-
+        
                     // ENVELOP 2: Verwerk de finale respons voor de vervolgvraag
                     if (buffer.includes("---FINAL_RESPONSE---")) {
                         const parts = buffer.split("---FINAL_RESPONSE---\n");
                         const finalJsonString = parts[1];
-
+        
                         if (finalJsonString && finalJsonString.trim().endsWith("}")) {
                             const d = JSON.parse(finalJsonString.trim());
                             
@@ -1410,7 +1419,7 @@ function parseMarkdown(tekst) {
                             if (statusRegel) statusRegel.remove();
                             const oudeFouten = outputBox.querySelectorAll('.error-msg');
                             oudeFouten.forEach(fout => fout.remove());
-
+        
                             // VOEG HET ANTWOORD TOE EN TOON DE PARSER-OUTPUT IN DE TIJDLIJN
                             outputBox.innerHTML += `<br><br><div class="text-xs text-gray-500 mb-1">🤖 Beantwoord via model: ${d.model.toUpperCase()}</div><div><span class="inline-block text-sm max-w-[95%]">${parseMarkdown(d.diagnose)}</span></div>`;
                             chatHistory.push({ role: "model", parts: [{ text: d.diagnose }] });
@@ -1418,18 +1427,22 @@ function parseMarkdown(tekst) {
                             if (usedModelBadge) {
                                 usedModelBadge.innerHTML = `ENGINE MOTOR: ${d.model.toUpperCase()} (FREE ROTATION)`;
                             }
-
+        
                             el('btn-send').textContent = "Verstuur";
                             el('btn-send').classList.remove('bg-red-600', 'hover:bg-red-700');
                             el('btn-send').classList.add('bg-orange-600', 'hover:bg-orange-700');
                             
-                            if (loader) loader.classList.add('hidden');
-                            el('btn-send').disabled = false;
-                            outputBox.scrollTop = outputBox.scrollHeight;
-                            return;
+                            succesvolAfgerond = true; // Registreer succes!
+                            break;
                         }
                     }
                 }
+        
+                // Als de stream eindigde zonder de FINAL_RESPONSE envelop te parsen, werp handmatig een fout op
+                if (!succesvolAfgerond) {
+                    throw new Error("De backend-stream sloot onverwacht zonder resultaat.");
+                }
+        
             } catch (err) { 
                 const statusRegel = el('live-chat-status');
                 if (statusRegel) statusRegel.remove();
@@ -1439,6 +1452,7 @@ function parseMarkdown(tekst) {
                 el('btn-send').classList.remove('bg-orange-600', 'hover:bg-orange-700');
                 el('btn-send').classList.add('bg-red-600', 'hover:bg-red-700');
             }
+        
             if (loader) loader.classList.add('hidden');
             el('btn-send').disabled = false;
             outputBox.scrollTop = outputBox.scrollHeight;
