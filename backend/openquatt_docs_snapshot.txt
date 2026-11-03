@@ -1,64 +1,10 @@
-[OpenQuatt docs snapshot | fw: v0.57.0 | fetched: 2026-11-02T14:04:09.481Z]
+[OpenQuatt docs snapshot | fw: v0.57.0 | fetched: 2026-11-03T10:29:50.781Z]
 
 ---OPEN ISSUES---
 
 issue #909 (bug): [Bug] Stille modus wordt overruled - Sliders aanpassen die betrekking hebben op de Stille modus, hebben invloed op de aansturing van Quatt ondanks dat Stille modus uit staat.
 
 issue #909 (bug): [Bug] Stille modus wordt overruled - Voorbeeld. Quatt heeft urenlang in CM2 gestaan, maar werd geblokkeerd voor verwarmbedrijf omdat de sliders voor max frequentie overdag door slider aangepast naar 23Hz wat buiten het bereik valt. Dit heeft OQ overgenomen, ondanks dat Stille Modus uitgeschakeld was.
-
-issue #902: Controller herstart tijdens downloaden van de Systeemrecorder (watchdog) - Bij het downloaden van de Systeemrecorder is de controller vastgelopen en automatisch herstart. Daardoor werd de download onderbroken en ging de recorderhistorie van vóór de crash verloren. Volgens de melding hervatte de verwarming daarna weer na de normale minimumwachttijd.
-
-issue #902: Controller herstart tijdens downloaden van de Systeemrecorder (watchdog) - Dit gebeurde op 31 oktober 2026 met v0.55.0, een Heatpump Controller Q, Single en Ethernet , na ruim 13 dagen uptime.
-
-issue #902: Controller herstart tijdens downloaden van de Systeemrecorder (watchdog) - Verwacht: een opname kunnen downloaden terwijl de regeling, OpenTherm en Modbus normaal blijven doorlopen, zonder herstart.
-
-issue #902: Controller herstart tijdens downloaden van de Systeemrecorder (watchdog) - De crash-backtrace is vertaald met het symbolenbestand van precies dezelfde firmwarebuild . De controller voerde op het crashmoment deze code uit:
-
-issue #902: Controller herstart tijdens downloaden van de Systeemrecorder (watchdog) - text Download van een gekozen tijdvenster → recorderopname naar JSON omzetten → een meetwaarde naar tekst omzetten → snprintf("%.7g") / dtoa r → task-watchdog grijpt in
-
-issue #902: Controller herstart tijdens downloaden van de Systeemrecorder (watchdog) - Het gaat om de route /openquatt/debug-recording/download-range . De gekozen downloadperiode is niet bekend.
-
-issue #902: Controller herstart tijdens downloaden van de Systeemrecorder (watchdog) - Op het moment van de crash was het laatste levenssignaal van de hoofdregel-loop 4294 ms oud, dus ongeveer 4,3 seconden .
-
-issue #902: Controller herstart tijdens downloaden van de Systeemrecorder (watchdog) - Voor een download moet de controller veel opgeslagen meetwaarden omzetten naar JSON. Dat gebeurt in de HTTP-task: de taak die webverzoeken afhandelt.
-
-issue #902: Controller herstart tijdens downloaden van de Systeemrecorder (watchdog) - Die taak heeft een hogere prioriteit dan de hoofdregel-loop. De exportcode verwerkt alle samples en velden achter elkaar, zonder zelf periodiek kort te pauzeren. Als de HTTP-task daarbij te lang uitvoerbaar blijft, krijgen de hoofdregel-loop en de idle-task onvoldoende processortijd. De task-watchdog kan dan ingrijpen en de controller herstarten.
-
-issue #902: Controller herstart tijdens downloaden van de Systeemrecorder (watchdog) - De export verstuurt wel blokjes van 512 bytes, maar dat garandeert niet dat andere taken tussendoor voldoende aan bod komen.
-
-issue #902: Controller herstart tijdens downloaden van de Systeemrecorder (watchdog) - Dit is de waarschijnlijke verklaring, nog geen op hardware bewezen oorzaak. De backtrace toont waar de controller bezig was toen de watchdog ingreep; hij bewijst niet dat één getalconversie op zichzelf vastliep. Zie ook de [ESP-IDF-uitleg over de task-watchdog](https://docs.espressif.com/projects/esp-idf/en/v5.5/esp32s3/api-reference/system/wdts.html#task-watchdog-timer-twdt).
-
-issue #902: Controller herstart tijdens downloaden van de Systeemrecorder (watchdog) - Laat de export regelmatig heel kort wachten, zodat de regeling tussendoor kan draaien. De opname blijft hetzelfde; alleen het werk voor de download wordt over korte stukken verdeeld.
-
-issue #902: Controller herstart tijdens downloaden van de Systeemrecorder (watchdog) - Gerichte wijziging in components/openquatt debug recorder/OpenQuattDebugRecorder.cpp :
-
-issue #902: Controller herstart tijdens downloaden van de Systeemrecorder (watchdog) - 1. Houd tijdens het verwerken van samples en velden bij hoeveel tijd is verstreken sinds de vorige pauze. 2. Pauzeer na bijvoorbeeld 5–10 ms kort met vTaskDelay(1) : één FreeRTOS-tick. Meet op hardware welk tijdsbudget passend is. 3. Controleer dit ook wanneer veel velden ongewijzigd zijn, zodat zo'n export evenmin langdurig achter elkaar blijft rekenen. 4. Pauzeer alleen buiten de recorder-mutex, de vergrendeling die recorderdata beschermt. Gebruik voor de export de bestaande onveranderlijke kopie in PSRAM, zodat sampling en herstarten van een opname veilig blijven. 5. Behoud de afhandeling van verbindingsfouten en zorg dat een afgebroken download geen volgende export blokkeert.
-
-issue #902: Controller herstart tijdens downloaden van de Systeemrecorder (watchdog) - Alleen taskYIELD() biedt hier onvoldoende zekerheid: een uitvoerbare taak met hogere prioriteit kan meteen opnieuw gekozen worden. Alleen de watchdog langer zetten of voeden verhelpt het tekort aan processortijd voor de regeling niet.
-
-issue #902: Controller herstart tijdens downloaden van de Systeemrecorder (watchdog) - Het onderzochte bestand openquatt-debug-recording-2026-10-31 10-35-21-000Z.oqdebug.json bevat 37 samples over zes minuten ná de herstart . De opname van vóór de crash is verloren gegaan. De oorspronkelijke hoeveelheid geëxporteerde data en de geheugentoestand vlak vóór de crash zijn daardoor onbekend.
-
-issue #902: Controller herstart tijdens downloaden van de Systeemrecorder (watchdog) - Kort vóór de download waren instellingen voor doorverwarmen aangepast. Er is geen aangetoond verband tussen die wijziging en de crash.
-
-issue #902: Controller herstart tijdens downloaden van de Systeemrecorder (watchdog) - De onderstaande test is een voorstel; de crash is nog niet op hardware gereproduceerd.
-
-issue #902: Controller herstart tijdens downloaden van de Systeemrecorder (watchdog) - - [ ] Vergelijk de bestaande firmware met de fix op Q Single via Ethernet, met een gevulde recorder. Download 2 uur, 6 uur en de volledige beschikbare historie. - [ ] Meet tijdens actieve regeling de maximale vertraging van de hoofdregel-loop; OpenTherm en Modbus blijven functioneren en er treedt geen watchdog/reset op. - [ ] Test snelle en trage downloads en verbreek een download halverwege. Daarna blijft een nieuwe export mogelijk. - [ ] Controleer dat de bestanden volledig en geldig zijn en correct door de analyser worden ingelezen, inclusief tijdvenster en meetwaarden. - [ ] Laat tijdens een export nieuwe samples vastleggen en start ook een nieuwe opname. De export mag geen gegevens van verschillende opnames mengen. - [ ] Controleer bij herhaalde exports het interne vrije heapgeheugen, het minimum sinds boot en het grootste vrije blok op lekkage of regressies. - [ ] Voer npm run check:cpp-format en passende gerichte checks uit. Laat de timing-/concurrencywijziging onafhankelijk reviewen vóór publicatie.
-
-issue #902: Controller herstart tijdens downloaden van de Systeemrecorder (watchdog) - <details <summary Buildgegevens, gedecodeerde backtrace en broncode</summary
-
-issue #902: Controller herstart tijdens downloaden van de Systeemrecorder (watchdog) - - Hardware: Heatpump Controller Q, ESP32-S3 rev0.2. - Topology: Single; verbinding: Ethernet. - Build target: configs/heatpump controller q/single.yaml . - Firmware: v0.55.0 , release channel main ; ESPHome: 2026.9.0 . - Source commit: dbe66c23311e8c6713d8f51fc8f7f45309fdccb8 . - Reporting build ID: 8dee4c8e531a027718d8757048f4987ea33861ab4ddc17d030663ad0516a28e0 . Deze matcht exact met de Single-entry in het release-symbolenarchief. - Uptime bij crashmelding: 1177440 s .
-
-issue #902: Controller herstart tijdens downloaden van de Systeemrecorder (watchdog) - text Reason: Task wdt Crashed core: 1 PC: 0x421569A0 Crash telemetry loop heartbeat age: 4294 ms
-
-issue #902: Controller herstart tijdens downloaden van de Systeemrecorder (watchdog) - 0x421569A0 dtoa r dtoa.c:522 0x4215699D dtoa r dtoa.c:520 0x42154149 cvt / svfprintf r vfprintf.c:1870 / 1307 0x4214BEFF snprintf snprintf.c:85 0x420724B3 write float / write field value OpenQuattDebugRecorder.cpp:240 / 1834 0x42074DDE write recording export OpenQuattDebugRecorder.cpp:1938 0x42074E78 write recording OpenQuattDebugRecorder.cpp:1786 0x42075110 handleRequest OpenQuattDebugRecorder.cpp:377
-
-issue #902: Controller herstart tijdens downloaden van de Systeemrecorder (watchdog) - De overige gedecodeerde frames lopen via ESPHome-middleware en de ESP-IDF HTTP-server naar httpd thread .
-
-issue #902: Controller herstart tijdens downloaden van de Systeemrecorder (watchdog) - ESPHome 2026.9.0 gebruikt de standaard HTTP-taskprioriteit van ESP-IDF ( tskIDLE PRIORITY + 5 ). De ESPHome-loop heeft prioriteit 1 en draait op core 1.
-
-issue #902: Controller herstart tijdens downloaden van de Systeemrecorder (watchdog) - - [Floatconversie met snprintf("%.7g")](https://github.com/OpenQuatt/OpenQuatt/blob/dbe66c23311e8c6713d8f51fc8f7f45309fdccb8/components/openquatt debug recorder/OpenQuattDebugRecorder.cpp#L235-L242). - [Exportlus over samples en velden](https://github.com/OpenQuatt/OpenQuatt/blob/dbe66c23311e8c6713d8f51fc8f7f45309fdccb8/components/openquatt debug recorder/OpenQuattDebugRecorder.cpp#L1923-L1945).
-
-issue #902: Controller herstart tijdens downloaden van de Systeemrecorder (watchdog) - Uitgevoerd: exacte ELF/build-ID-match, volledige backtrace-decodering en inspectie van releasecode en de opname na de herstart. Nog geen firmwarewijziging, build of HIL-reproductie.
 
 issue #901: [Feature] Compacte HA-debugsensoren voor langdurige diagnosehistorie - Voeg een kleine set compacte tekstsensoren toe aan de bestaande native ESPHome-integratie met Home Assistant, vergelijkbaar met de vroegere Strategy debug state en Heating Debug State .
 
