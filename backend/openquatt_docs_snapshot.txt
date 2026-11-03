@@ -1,6 +1,8 @@
-[OpenQuatt docs snapshot | fw: v0.57.0 | fetched: 2026-11-03T10:29:50.781Z]
+[OpenQuatt docs snapshot | fw: v0.57.0 | fetched: 2026-11-03T17:19:14.256Z]
 
 ---OPEN ISSUES---
+
+issue #916: Add and show ODU firmware and EEPROM version numbers for each ODU - Met de verwachte feature om de firmware en of Eeprom te kunnen update kan OpenQuatt ook per ODU ergens in de gui of in de logs laten zien wat de huidige versienummers zijn
 
 issue #909 (bug): [Bug] Stille modus wordt overruled - Sliders aanpassen die betrekking hebben op de Stille modus, hebben invloed op de aansturing van Quatt ondanks dat Stille modus uit staat.
 
