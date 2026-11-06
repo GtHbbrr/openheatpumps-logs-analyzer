@@ -1,6 +1,22 @@
-[OpenQuatt docs snapshot | fw: v0.57.0 | fetched: 2026-11-05T10:25:19.400Z]
+[OpenQuatt docs snapshot | fw: v0.57.0 | fetched: 2026-11-06T10:27:21.218Z]
 
 ---OPEN ISSUES---
+
+issue #927 (enhancement): [Feature] Neem pompvermogen stilstaande unit mee in afweging single/duo (Powerhouse) - Bij een Duo met maar één draaiende compressor pompt de stilstaande unit mee: zijn circulatiepomp draait door zolang de andere unit verwarmt. Power House rekent dat verbruik niet mee wanneer hij single-bedrijf (één unit) vergelijkt met Duo (twee units).
+
+issue #927 (enhancement): [Feature] Neem pompvermogen stilstaande unit mee in afweging single/duo (Powerhouse) - Gemeten opgenomen vermogen van de stilstaande unit ( power input van die unit, Duo V1.5):
+
+issue #927 (enhancement): [Feature] Neem pompvermogen stilstaande unit mee in afweging single/duo (Powerhouse) - | Situatie | Verbruik stilstaande unit | |---|---| | Beide compressoren uit (geen warmtevraag) | ~5 W | | Andere unit verwarmt, flow ~600 L/h | ~31 W | | Andere unit verwarmt, flow ~800 L/h | ~35 W | | Andere unit verwarmt, flow ~1000 L/h | ~41 W |
+
+issue #927 (enhancement): [Feature] Neem pompvermogen stilstaande unit mee in afweging single/duo (Powerhouse) - Het verschil tussen ~5 W en 31–41 W is de pomp. Die kosten horen bij single-bedrijf. Bij Duo draaien beide units en zit de pomp al in het gemodelleerde vermogen.
+
+issue #927 (enhancement): [Feature] Neem pompvermogen stilstaande unit mee in afweging single/duo (Powerhouse) - Single-kandidaten lijken ~30–50 W goedkoper dan ze in werkelijkheid zijn. Rond 3–4 kW is dat genoeg om de keuze naar single te laten kantelen, terwijl Duo zuiniger is.
+
+issue #927 (enhancement): [Feature] Neem pompvermogen stilstaande unit mee in afweging single/duo (Powerhouse) - Bij een Duo telt Power House voor single-kandidaten het pompverbruik van de stilstaande unit mee in de efficiëntievergelijking. Single en Duo worden dan op het werkelijke totaalverbruik vergeleken.
+
+issue #927 (enhancement): [Feature] Neem pompvermogen stilstaande unit mee in afweging single/duo (Powerhouse) - 1. Duo, één compressor draait (single-bedrijf), de andere staat op 0 Hz. 2. Kijk naar het opgenomen vermogen van de stilstaande unit: ~31–41 W, afhankelijk van de flow. 3. Dat verbruik zit niet in de elektrische schatting van de single-kandidaat waarmee Power House Duo vergelijkt.
+
+issue #927 (enhancement): [Feature] Neem pompvermogen stilstaande unit mee in afweging single/duo (Powerhouse) - - [ ] User-facing entities/configuratie veranderen - [ ] Runtime/control gedrag verandert mogelijk - [ ] Hardware, Modbus IO, actuator, safety, thermal, boiler, of flow gedrag wordt geraakt - [ ] Ik weet het niet zeker
 
 issue #920: [Feature] Waarschuwing bij mogelijke ondervulling van het koudemiddelcircuit - @Cannonb4ll, graag jouw blik op dit voorstel voor een diagnosefunctie die per buitenunit waarschuwt bij een mogelijk koudemiddeltekort.
 
@@ -168,7 +184,7 @@ issue #901: [Feature] Compacte HA-debugsensoren voor langdurige diagnosehistorie
 
 issue #901: [Feature] Compacte HA-debugsensoren voor langdurige diagnosehistorie - De negen states bevatten samen 1211 bytes tekst ; de langste regel is 173 tekens . Dit telt alleen de state-inhoud, zonder entiteitsnamen, API-overhead of geheugenkopieën.
 
-issue #901: [Feature] Compacte HA-debugsensoren voor langdurige diagnosehistorie - Bij het lezen van deze voorbeelden: - req/app zijn control-levels (0–10); F is het fysieke compressorlevel (0���20); Hz is de gemeten frequentie. Bij HP2 blijft demandHz=30 als registerwaarde zichtbaar, terwijl Standby, level 0 en gemeten 0 Hz laten zien dat de compressor niet draait. - quality=legacy estimated blijft zichtbaar bij de vermogenswaarden. HP1 meldt in dit meetpunt de status Compressor oil return . - enable=0 , permit=1 en req=0 voor koeling zijn afzonderlijke signalen. De permissie is geen actieve koelvraag. - curve=OFF , curveRestart en roomBlock beschrijven de stooklijnstatus; in dit voorbeeld is Power House actief. - phase en fast blijven hier de opgenomen numerieke diagnosecodes. - raw/filt/cap , fragmentatie en looptijd zijn niet uit deze export te reconstrueren. De firmware kan de beschikbare bronwaarden rechtstreeks gebruiken; ontbrekende meetwaarden blijven herkenbaar onbekend. - Effectieve temperatuurbronlabels zijn bewust weggelaten; de geselecteerde waarden en geldigheid/hold-status volstaan voor deze compacte sensor.
+issue #901: [Feature] Compacte HA-debugsensoren voor langdurige diagnosehistorie - Bij het lezen van deze voorbeelden: - req/app zijn control-levels (0–10); F is het fysieke compressorlevel (0–20); Hz is de gemeten frequentie. Bij HP2 blijft demandHz=30 als registerwaarde zichtbaar, terwijl Standby, level 0 en gemeten 0 Hz laten zien dat de compressor niet draait. - quality=legacy estimated blijft zichtbaar bij de vermogenswaarden. HP1 meldt in dit meetpunt de status Compressor oil return . - enable=0 , permit=1 en req=0 voor koeling zijn afzonderlijke signalen. De permissie is geen actieve koelvraag. - curve=OFF , curveRestart en roomBlock beschrijven de stooklijnstatus; in dit voorbeeld is Power House actief. - phase en fast blijven hier de opgenomen numerieke diagnosecodes. - raw/filt/cap , fragmentatie en looptijd zijn niet uit deze export te reconstrueren. De firmware kan de beschikbare bronwaarden rechtstreeks gebruiken; ontbrekende meetwaarden blijven herkenbaar onbekend. - Effectieve temperatuurbronlabels zijn bewust weggelaten; de geselecteerde waarden en geldigheid/hold-status volstaan voor deze compacte sensor.
 
 issue #901: [Feature] Compacte HA-debugsensoren voor langdurige diagnosehistorie - - De ingeschakelde sensoren moeten juist wel in HA Recorder opgeslagen kunnen worden . - Documenteer inschakelen, eventuele Recorder-filters, bewaartermijn en terugkijken/kopiëren van historische states voor support. - Dit betreft teksthistorie, geen numerieke long-term statistics. De standaard purge keep days is 10 dagen; voor langere bewaring configureert de gebruiker HA bewust. - Bij een OpenQuatt-herstart blijft reeds opgeslagen HA-historie behouden; na reconnect volgen nieuwe actuele states. Een verbindingsonderbreking blijft een zichtbaar gat: geen volledige backfill of reconstructie van de recorderopname vereist. - De diagnose-entiteiten zijn onafhankelijk van het aan-/uitzetten van de lokale Systeemrecorder bruikbaar.
 
