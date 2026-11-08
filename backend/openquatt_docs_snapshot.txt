@@ -1,4 +1,4 @@
-[OpenQuatt docs snapshot | fw: v0.57.0 | fetched: 2026-11-08T09:55:05.654Z]
+[OpenQuatt docs snapshot | fw: v0.58.1 | fetched: 2026-11-08T18:06:01.448Z]
 
 ---OPEN ISSUES---
 
@@ -836,7 +836,7 @@ diagnose-en-afstelling.md: - [Problemen oplossen](problemen-oplossen.md) voor di
 
 gegevens-delen-technisch.md: Deze naslag beschrijft het uurbericht met gebruiksstatistieken. Zie [Gegevens delen en privacy](web-app/privacy.md) voor de gebruikerskeuzes. Crashrapporten en optionele prestatiemetingen zijn afzonderlijke berichten.
 
-gegevens-delen-technisch.md: Tijdens een nieuwe Quick Start staat delen standaard aan en verschijnt de opt-out vóór het afronden. De keuze wordt pas opgeslagen wanneer die stap werkelijk wordt geopend. Je kunt de keuze later wijzigen via Instellingen → Systeem → Gebruiksstatistieken . Zolang Quick Start niet is afgerond, wordt niets verzonden. Daarna, of wanneer je delen later zelf aanzet, verstuurt OpenQuatt vrijwel direct en vervolgens ongeveer elk uur één klein bericht naar de centrale OpenQuatt-loggingserver.
+gegevens-delen-technisch.md: Tijdens een nieuwe Quick Start staat delen standaard aan en verschijnt de opt-out vóór het afronden. De keuze wordt pas opgeslagen wanneer die stap werkelijk wordt geopend. Je kunt de keuze later wijzigen via Instellingen → Gegevens delen → Gebruiksstatistieken . Zolang Quick Start niet is afgerond, wordt niets verzonden. Daarna, of wanneer je delen later zelf aanzet, verstuurt OpenQuatt vrijwel direct en vervolgens ongeveer elk uur één klein bericht naar de centrale OpenQuatt-loggingserver.
 
 gegevens-delen-technisch.md: Een ontbrekende telemetrykeuze geldt nooit als toestemming. Bestaande installaties starten na de introductie van deze functie daarom met delen uit, ook wanneer hun oude Quick Start-status ontbreekt. Als correctie op de eerste telemetryversie wordt de oude opslagindeling eenmalig naar uit gemigreerd; het willekeurige installatie-ID blijft behouden. Ook wie delen in die korte eerste versie bewust had aangezet, moet het daardoor eenmalig opnieuw inschakelen. Nieuwe installaties krijgen de standaard-aan opt-out alleen wanneer ze de gebruiksstatistiekenstap van Quick Start werkelijk openen.
 
@@ -846,7 +846,7 @@ gegevens-delen-technisch.md: Een niet-ondersteunde functie, tijdelijk nog niet g
 
 gegevens-delen-technisch.md: Het bericht bevat nooit een MAC-adres, lokaal IP-adres, wifi-netwerknaam, wifi-wachtwoord, gebruikersnaam, ander wachtwoord of andere inloggegevens. Ook MQTT-servergegevens, topics, ontvangen MQTT-waarden, ingestelde temperaturen of grenzen, verwarmingsmetingen, regelwaarden, Modbus-frames en gewone logregels gaan niet mee. Alleen de hierboven genoemde communicatiebetrouwbaarheidstellers worden gedeeld. De OpenQuatt-loggingserver ziet bij een netwerkverbinding technisch wel het bron-IP-adres, maar dit staat niet in de payload en OpenQuatt slaat het niet op. In de web-app staat onder Welke gegevens worden gedeeld? (in Quick Start Wat gaat er mee? ) een eenmalige momentopname van de JSON-vorm. De vier Modbus-tellers worden rechtstreeks uit de ODU-bus gelezen bij de echte verzending en zijn bewust geen web-/Home Assistant-entiteiten; daarom staan alleen deze vier velden in de lokale preview op `null`. Het getoonde `message id` en `timestamp s` worden voor een echte verzending opnieuw bepaald; `reset reason` is niet via de lokale web-API beschikbaar en staat in deze preview eveneens op `null`.
 
-gegevens-delen-technisch.md: Wanneer delen voor het eerst actief wordt, maakt de controller met de hardware-randomgenerator een UUIDv4 aan en bewaart die lokaal. Een UUIDv4 heeft 122 willekeurige bits; zelfs bij één miljoen installaties is de kans op minstens één dubbel ID kleiner dan ongeveer `10^-25`. Dit ID blijft gelijk na een OTA-update en wanneer je delen tijdelijk uitzet. Je kunt het bekijken via Instellingen → Systeem → Gebruiksstatistieken . Een fabrieksreset maakt een nieuw ID. De keuze en het ID worden niet via een instellingenbackup naar een andere controller gekopieerd. Uitzetten stopt nieuwe berichten direct; er wordt geen wachtrij voor later opgeslagen. Na een mislukte verzending maakt iedere retry een verse momentopname, maar behoudt binnen dezelfde retryreeks het `message id` zodat een verloren QoS 1-bevestiging kan worden gededupliceerd.
+gegevens-delen-technisch.md: Wanneer delen voor het eerst actief wordt, maakt de controller met de hardware-randomgenerator een UUIDv4 aan en bewaart die lokaal. Een UUIDv4 heeft 122 willekeurige bits; zelfs bij één miljoen installaties is de kans op minstens één dubbel ID kleiner dan ongeveer `10^-25`. Dit ID blijft gelijk na een OTA-update en wanneer je delen tijdelijk uitzet. Je kunt het bekijken via Instellingen → Gegevens delen → Gebruiksstatistieken . Een fabrieksreset maakt een nieuw ID. De keuze en het ID worden niet via een instellingenbackup naar een andere controller gekopieerd. Uitzetten stopt nieuwe berichten direct; er wordt geen wachtrij voor later opgeslagen. Na een mislukte verzending maakt iedere retry een verse momentopname, maar behoudt binnen dezelfde retryreeks het `message id` zodat een verloren QoS 1-bevestiging kan worden gededupliceerd.
 
 gegevens-delen-technisch.md: De statistiekenclient staat los van de configureerbare [MQTT inputbronnen](mqtt.md): hij publiceert alleen dit ene bericht, subscribed nergens op en schakelt ESPHome MQTT-discovery, entiteitspublicaties en logexport niet in. Het JSON-bericht wordt met QoS 1 en zonder retain gepubliceerd op `openquatt/devices/<installation-id /telemetry`. De broker bewaart het daardoor niet als retained state voor later verbindende subscribers; de loggingserver slaat ieder ontvangen bericht zelf op. Een eerder door oude firmware retained opgeslagen payload wordt door een non-retained publicatie niet gewist en moet zo nodig eenmalig op de centrale broker worden verwijderd. Een build zonder geconfigureerde centrale loggingserver maakt ook wanneer delen aanstaat geen externe verbinding.
 
@@ -1064,7 +1064,9 @@ instellingen-en-meetwaarden.md: `Manual Cooling Enable` omzeilt de gekozen toest
 
 instellingen-en-meetwaarden.md: Deze groep speelt vooral mee als je twee warmtepompen gebruikt of onrustig compressorgedrag ziet.
 
-instellingen-en-meetwaarden.md: - `Minimum runtime` - `Dual HP Enable Level` - `Dual HP Enable Hold` - `Dual HP Disable Hold`
+instellingen-en-meetwaarden.md: - `Minimum runtime` - `Dual HP Enable Hold` - `Dual HP Disable Hold`
+
+instellingen-en-meetwaarden.md: In Home Assistant zijn de entiteiten voor de twee Duo-wachttijden standaard uitgeschakeld. De vraagdrempels liggen vast in de stooklijnregeling. Zie [Duo bij Water Temperature Control](water-temperature-control.md#duo).
 
 instellingen-en-meetwaarden.md: Raak deze groep pas aan nadat de strategie zelf logisch voelt.
 
@@ -1288,6 +1290,10 @@ power-house.md: ## Wat doet het systeem bij te koud, goed of te warm?
 
 power-house.md: `Power House` berekent de warmtevraag uit de woningbehoefte en een kamercorrectie. De gewenste kamertemperatuur is geen automatische uitknop. In Power House — comfort staan daarom Op temperatuur houden en het optionele Langer doorverwarmen apart herkenbaar bij elkaar.
 
+power-house.md: De vraag blijft in watt behouden tot de keuze van de compressorfrequenties. De elektrische begrenzing kan de vraag verlagen; de performancetabel bepaalt welke toegestane frequentie of Duo-combinatie past.
+
+power-house.md: Volg de effectieve regelvraag via `Strategy requested power` in W. De stapdiagnostiek `Demand raw` en `Demand filtered` is tijdens Power House niet beschikbaar.
+
 power-house.md: Onder de normale koude grens vraagt OpenQuatt extra warmte boven op de normale huisvraag. Die grens is het setpoint min `Power House comfort below setpoint`, in de web-app Afkoeling onder gewenste temperatuur .
 
 power-house.md: - de warmtevraag loopt op; - de compressorvraag blijft makkelijker actief; - het systeem probeert de ruimte weer rustig terug richting setpoint te brengen.
@@ -1421,6 +1427,8 @@ power-house.md: Voor de meeste gebruikers is vooral dit belangrijk:
 power-house.md: - `Duo` hoeft dus niet altijd "meer vermogen" te betekenen; - twee warmtepompen tegelijk zijn niet per definitie beter; - het systeem probeert een praktische en zuinige keuze te maken.
 
 power-house.md: Bij beschikbare inlaattemperatuur en flow berekent OpenQuatt het vermogen voor ieder kandidaatpaar met de waterketen HP1 → HP2: de voorspelde uitlaat van HP1 wordt de inlaat van HP2. Dit geldt ook voor Water Temperature Control. Bij ontbrekende watermetingen gebruikt de regeling de eigen verse uitlaattemperatuur van een draaiende ODU, met de bestaande temperatuurreferentie als terugval. Stilstaande ODU's en defrost behouden die bestaande referentie. Alle frequentiegrenzen, stroomlimieten en wachttijden blijven actief; 90 Hz inclusief blijft toegestaan.
+
+power-house.md: De V1/V1.5-kaart van Quatt begint bij 35 °C water. Bij lagere watertemperaturen, zoals bij vloerverwarming, schatte de kaart het stroomverbruik daardoor 10-30 % te hoog. De kaart heeft daarom twee extra punten bij 25 en 30 °C, bepaald op meetdata van 54 V1/V1.5-installaties. Alleen de COP verandert; het thermisch vermogen en alles vanaf 35 °C blijven de waarden van Quatt. De meetdata loopt tot ongeveer 2 °C buiten; bij vorst zijn de nieuwe punten een schatting. Een lagere watertemperatuur geeft nooit een lagere COP dan het punt erboven.
 
 power-house.md: Power House berekent continu hoeveel warmte je woning nodig heeft. Langer doorverwarmen bepaalt alleen hoe een bestaande verwarmingsrun bij heel weinig vraag mag doorgaan en daarna opnieuw mag beginnen. De functie staat standaard uit.
 
@@ -1708,7 +1716,7 @@ q-edition.md: - `openquatt.local` stabiel bereikbaar is; - Quick Start volledig 
 
 q-edition.md: Vanaf dit punt kun je OpenQuatt zelfstandig via de web-app gebruiken. Home Assistant en het dashboard zijn optionele vervolgstappen.
 
-q-edition.md: Op Heatpump Controller Q Single en Duo kan Power House optioneel passief leren . Je vindt dit onder Instellingen → Verwarmen → Power House .
+q-edition.md: Op Heatpump Controller Q Single en Duo kan Power House optioneel passief leren . Je vindt dit in de web-app onder [ Leren ](web-app/leren.md).
 
 q-edition.md: Na inschakelen verzamelt OpenQuatt alleen geschikte verwarmingsperioden en schat het warmteverlies van de woning en een bijbehorende woninglijn. De verzamelde leerdata blijft na een herstart of software-update bewaard, en de gekozen aan/uit-stand blijft behouden. Passief leren staat standaard aan ; bewust uitschakelen blijft ook na een herstart of update behouden.
 
@@ -1932,15 +1940,15 @@ water-temperature-control.md: Als je deze strategie afstelt, begin dan bijna alt
 
 water-temperature-control.md: 1. de zes stooklijnpunten 2. `Curve Fallback Tsupply (No Outside Temp)` 3. `Heating Curve PID Kp` 4. `Heating Curve PID Ki` 5. `Maximum water temperature`
 
-water-temperature-control.md: 6. `Minimum runtime` 7. `Dual HP Enable Level` 8. `Dual HP Enable Hold` 9. `Dual HP Disable Hold`
+water-temperature-control.md: 6. `Minimum runtime` 7. `Dual HP Enable Hold` (standaard 3 min) 8. `Dual HP Disable Hold` (standaard 5 min)
 
 water-temperature-control.md: - stooklijn bepaalt het doel; - PID stuurt de aanvoer; - de compressor volgt die vraag binnen de normale beveiligingen.
 
 water-temperature-control.md: Bij `Duo` werkt deze strategie eenvoudiger dan bij `Power House`.
 
-water-temperature-control.md: - OpenQuatt begint normaal met één warmtepomp; - de tweede unit komt pas bij als de vraag hoog genoeg en lang genoeg aanwezig blijft; - loopt de draaiende warmtepomp nog op, dan komt de tweede unit pas bij zodra die warmtepomp volgens het prestatiemodel minstens zoveel levert als de kleinste Duo-combinatie; zo springt de tweede unit niet bij om kort daarna weer te stoppen. Kan de draaiende warmtepomp niet verder oplopen, bijvoorbeeld door `Silent max frequency`, een actieve storing of ontdooien, dan geldt deze wachttijd niet; - er zit dus bewust wachttijd en hysterese in.
+water-temperature-control.md: - Bij een start vanuit stilstand krijgt de beschikbare warmtepomp met de minste draaiuren voorrang. - In `RECOVERY` kan de tweede pomp bijspringen als de eerste haar toegestane maximum bereikt, de begrensde PID-vraag minstens 95% van de maximale vraag bedraagt, het aanvoertekort aanhoudt en Duo volgens het prestatiemodel extra warmte kan leveren. Hoe groot en hoe lang het tekort moet zijn, hangt af van het stooklijnprofiel. Zodra beide pompen draaien, kan de PID hun volledige beschikbare vermogen vragen. Ontdooien zet de wachttijd voor het bijschakelen van een stilstaande pomp terug op nul. - In `MAINTAIN` kan de PID-vraag beide pompen rond het aanvoerdoel laten draaien. Daalt de vraag voldoende en volstaat één pomp, dan moduleert Duo eerst terug. Daarna volgt de ingestelde wachttijd en blijft de beschikbare pomp met de minste draaiuren draaien.
 
-water-temperature-control.md: Dat voorkomt onrustig schakelen tussen één en twee warmtepompen.
+water-temperature-control.md: De gewone opschakelroute vraagt minstens 80% van de maximale vraag in `MAINTAIN`. In `RECOVERY` geldt die route vanaf 90% als de eerste pomp na een herstart van de controller tijdelijk op een vaste stand wordt gehouden. Voor deze route geldt `Dual HP Enable Hold`.
 
 water-temperature-control.md: Voor de meeste gebruikers zijn dit geen eerste knoppen:
 
@@ -1974,7 +1982,7 @@ web-app.md: De taalkeuze vertaalt de interface, meldingen, statussen en datum-/g
 
 web-app.md: In hetzelfde paneel kies je onder Uiterlijk en overzicht voor `Automatisch`, `Licht` of `Donker`. `Automatisch` volgt de licht- of donkerinstelling van je apparaat en wisselt direct mee wanneer die verandert. De keuze wordt lokaal in de browser bewaard; zonder opgeslagen keuze staat het thema op `Automatisch`.
 
-web-app.md: | Scherm | Gebruik | |---|---| | `Overzicht` | Live zien wat OpenQuatt nu doet en of de belangrijkste waarden logisch zijn. | | `Energie` | Vermogen, energie, COP en EER bekijken. | | `Resultaten` | Opgeslagen energie- en resultaathistorie over een langere periode bekijken. | | `Beslislog` | Terugzien welke regelbeslissingen OpenQuatt nam en waarom. Deze functie is nog beta. | | `Diagnose` | Live waarden en korte trendhistorie naast elkaar bekijken om gedrag te onderzoeken. | | `Instellingen` | OpenQuatt configureren, bijwerken en beheren. |
+web-app.md: | Scherm | Gebruik | |---|---| | `Overzicht` | Live zien wat OpenQuatt nu doet en of de belangrijkste waarden logisch zijn. | | `Energie` | Vermogen, energie, COP en EER bekijken. | | `Grafieken` | Onder Resultaten opgeslagen energie- en resultaathistorie over een langere periode bekijken. Onder Diagnose live waarden en korte trendhistorie naast elkaar bekijken om gedrag te onderzoeken. | | `Leren` | Meetvoortgang, dagmetingen en het woningmodel bekijken. | | `Beslislog` | Terugzien welke regelbeslissingen OpenQuatt nam en waarom. Deze functie is nog beta. | | `Instellingen` | OpenQuatt configureren, bijwerken en beheren. |
 
 web-app.md: Voor dagelijks kijken is `Overzicht` meestal genoeg. Ga pas naar `Instellingen` als je bewust iets wilt veranderen.
 
@@ -1986,7 +1994,7 @@ web-app.md: Geschatte beschikbare warmtecapaciteit toont bij Power House én Sto
 
 web-app.md: Dit is een modelschatting, geen meting van het geleverde vermogen of garantie op het startmoment. Vraagregeling, waterbeveiligingen en startvoorwaarden blijven bepalen wat werkelijk wordt geleverd. Ontbreken benodigde model-, frequentie- of temperatuurgegevens, dan staat er — . 0 W betekent dat de berekening met geldige gegevens geen beschikbare capaciteit vindt. De sensornaam `HP capacity (W)` blijft gelijk; bij koelen is deze verwarmingsschatting niet beschikbaar.
 
-web-app.md: | Onderwerp | Handleiding | | --- | --- | | OpenQuatt voor het eerst configureren | [Eerste keer instellen](web-app/quick-start.md) | | Comfort en installatie-instellingen aanpassen | [Instellingen aanpassen](web-app/instellingen.md) | | Kiezen welke sensoren en externe waarden de regeling gebruikt | [Bronnen en integraties](web-app/bronnen.md) | | Vermogen, rendement en historie bekijken | [Energie en resultaten](web-app/energie.md) | | Onverwacht gedrag onderzoeken en gegevens bewaren | [Diagnose en logboeken](web-app/diagnose.md) | | Firmware bijwerken of instellingen veiligstellen | [Updates en backups](web-app/onderhoud.md) | | Kiezen welke gegevens je deelt | [Gegevens delen en privacy](web-app/privacy.md) | | Wachtwoord, Home Assistant-koppeling of Wi-Fi herstellen | [Herstelpagina gebruiken](web-app/herstel.md) |
+web-app.md: | Onderwerp | Handleiding | | --- | --- | | OpenQuatt voor het eerst configureren | [Eerste keer instellen](web-app/quick-start.md) | | Comfort en installatie-instellingen aanpassen | [Instellingen aanpassen](web-app/instellingen.md) | | Kiezen welke sensoren en externe waarden de regeling gebruikt | [Bronnen en integraties](web-app/bronnen.md) | | Dagmeting, meetkwaliteit en woningmodel volgen | [Leren](web-app/leren.md) | | Vermogen, rendement en historie bekijken | [Energie en resultaten](web-app/energie.md) | | Onverwacht gedrag onderzoeken en gegevens bewaren | [Diagnose en logboeken](web-app/diagnose.md) | | Firmware bijwerken of instellingen veiligstellen | [Updates en backups](web-app/onderhoud.md) | | Kiezen welke gegevens je deelt | [Gegevens delen en privacy](web-app/privacy.md) | | Wachtwoord, Home Assistant-koppeling of Wi-Fi herstellen | [Herstelpagina gebruiken](web-app/herstel.md) |
 
 web-app.md: Voor normaal gebruik begin je bij [Dagelijkse controle](dagelijks/controleren.md). Voor uitleg van comfortkeuzes zie [Verwarmen en comfort](dagelijks/verwarmen.md) en [Koelen](dagelijks/koelen.md).
 
@@ -1997,6 +2005,14 @@ web-app/bronnen.md: Een bron levert een waarde aan OpenQuatt, bijvoorbeeld de ka
 web-app/bronnen.md: 1. Open Instellingen → Bronnen / integraties en stel de benodigde verbinding in. 2. Open Sensorselectie en kies de bron voor het betreffende signaal. 3. Controleer of de getoonde waarde geldig en aannemelijk is. De gekozen waarde is wat de regeling daadwerkelijk gebruikt. 4. Verander één bron tegelijk. Zie je een terugval naar een andere bron, controleer dan de verbinding en de geldigheid van de aangeleverde waarde.
 
 web-app/bronnen.md: `Auto` kiest volgens de regels van het betreffende signaal; het betekent niet dat altijd dezelfde integratie voorrang heeft. Een dauwpuntbron gebruikt bijvoorbeeld de hoogste geldige waarde, terwijl buitentemperatuur de laagste geldige waarde gebruikt. Zie [Instellingen en meetwaarden](../instellingen-en-meetwaarden.md#5-bronselectie) voor de bronregels.
+
+web-app/bronnen.md: De standaardfirmware voor Heatpump Controller Q Single en Duo bevat de Open-Meteo-buitenbron en Vooruitblik. Stel de locatie in en zet weersverwachting aan bij [Vooruitblik](leren.md#vooruitblik). Kies daarna Auto of Open-Meteo onder Sensorselectie → Buitentemperatuur . Gebruik je al Auto en staat weersverwachting aan, dan telt Open-Meteo na een geldige weeropvraag automatisch mee.
+
+web-app/bronnen.md: Gebruik je een eigen configuratie bovenop `single.yaml` of `duo.yaml`, verwijder dan de extra weerinclude; de standaardconfiguratie bevat deze pakketten al.
+
+web-app/bronnen.md: De bron gebruikt de actuele kwartierwaarde van het KNMI-weermodel via Open-Meteo. Auto neemt die mee bij de keuze van de laagste geldige waarde. Bij gelijke waarden houdt de buitenbron die al vóór Open-Meteo in de keuzevolgorde stond voorrang. Zodra het modeltijdstip meer dan 30 minuten oud is, valt de waarde weg. In Auto kan OpenQuatt dan een andere geldige bron gebruiken. Kies je uitsluitend Open-Meteo , dan is de buitentemperatuur onbeschikbaar zolang de modelwaarde ontbreekt.
+
+web-app/bronnen.md: De regeling en het leren kunnen de gekozen modeltemperatuur gebruiken. De antivriesbewaking en de koelbeveiliging zonder dauwpunt blijven hun buitenreferentie uit de bestaande bronnen halen.
 
 web-app/bronnen.md: Hier beheer je de directe gegevensbronnen en integraties:
 
@@ -2028,7 +2044,7 @@ web-app/bronnen.md: - [Overzicht van de web-app](../web-app.md) - [Problemen opl
 
 web-app/diagnose.md: | Vraag | Hulpmiddel | | --- | --- | | Welke waarden veranderen tijdens het probleem? | Diagnose: actuele waarden en grafieken | | Waarom schakelt of begrenst de regeling? | Beslislog: regelkeuzes en redenen | | Welke technische meldingen verschijnen? | Logboek: live meldingen | | Welke gegevens moet ik voor support bewaren? | Systeemrecorder: downloadbaar diagnosebestand |
 
-web-app/diagnose.md: `Diagnose` combineert actuele waarden met korte historie. Dat helpt bij vragen zoals:
+web-app/diagnose.md: `Diagnose`, onder `Grafieken`, combineert actuele waarden met korte historie. Dat helpt bij vragen zoals:
 
 web-app/diagnose.md: - loopt de aanvoertemperatuur rustig op; - blijft de flow stabiel; - schakelt het systeem vaak; - reageert de regeling logisch op setpoint en kamertemperatuur.
 
@@ -2036,7 +2052,7 @@ web-app/diagnose.md: Gebruik bij een probleem dat je opnieuw kunt veroorzaken oo
 
 web-app/diagnose.md: Via `Instellingen → Systeem → Gegevens bewaren` beheer je welke historie OpenQuatt bewaart. OpenQuatt maakt daarbij onderscheid tussen twee soorten geheugen:
 
-web-app/diagnose.md: - PSRAM (tijdelijk, vluchtig) — snelle opslag voor recente diagnosegegevens en RAM-logs. Deze historie is direct beschikbaar zolang de controller online is en verdwijnt na een herstart. - Flash-partitie `openquatt data` (persistent) — blijft normaal bewaard na een herstart of update. Hier staan energie-dagtotalen (standaard aan, 180 dagen uurdetail), beslislog (standaard aan, maximaal 7 dagen, per uur gebundeld naar flash) en diagnosehistorie (standaard aan, maximaal 30 dagen). Bij de overstap van diagnosehistorie-formaat v1 naar v2 wordt alleen de oude diagnosehistorie eenmalig gewist; de andere archieven blijven staan.
+web-app/diagnose.md: - PSRAM (tijdelijk, vluchtig) — snelle opslag voor recente diagnosegegevens en RAM-logs. Deze historie is direct beschikbaar zolang de controller online is en verdwijnt na een herstart. - Flash-partitie `openquatt data` (persistent) — blijft normaal bewaard na een herstart of update. Hier staan energie-dagtotalen (standaard aan, 180 dagen uurdetail), beslislog (standaard aan, maximaal 7 dagen, per uur gebundeld naar flash), diagnosehistorie (standaard aan, maximaal 30 dagen) en het wijzigingslogboek van de instellingen (altijd aan, laatste 100 wijzigingen). Bij de overstap van diagnosehistorie-formaat v1 naar v2 wordt alleen de oude diagnosehistorie eenmalig gewist; de andere archieven blijven staan.
 
 web-app/diagnose.md: Tijdelijke PSRAM-historie is op alle ondersteunde profielen standaard aan en wordt niet als aparte keuze in Quick Start getoond; ontbrekende PSRAM wijst op een hardware- of profielprobleem. Persistente flash-historie kun je per domein (Diagnose / Beslislog / Energie) aan of uit zetten onder Gegevens bewaren. Zet je een flash-optie uit, dan blijft bestaande flashhistorie gewoon staan — OpenQuatt stopt alleen met nieuw wegschrijven. Met `Nu opslaan` kun je vóór een herstart of update alvast een extra opslagmoment forceren. De technische opslagdetails tonen voor diagnosehistorie ook de langste volledige opslagactie, sector-erase, flashwrite en index-update sinds de laatste start.
 
@@ -2076,7 +2092,7 @@ web-app/energie.md: De actuele COP toont `—` in CM1 (voorloop/naloop), tijdens
 
 web-app/energie.md: Vergelijk dezelfde periode en let op verschillen in buitentemperatuur en gebruik. Eén kort moment vertelt weinig over de prestaties van een hele dag.
 
-web-app/energie.md: `Resultaten` bundelt opgeslagen resultaten en historie. Gebruik dit scherm om prestaties over een langere periode te vergelijken. Voor een snelle diagnose van het actuele regelgedrag is `Diagnose` geschikter.
+web-app/energie.md: `Resultaten`, onder `Grafieken`, bundelt opgeslagen resultaten en historie. Gebruik dit scherm om prestaties over een langere periode te vergelijken. Voor een snelle diagnose van het actuele regelgedrag is `Diagnose` geschikter.
 
 web-app/energie.md: COP is geleverde warmte gedeeld door elektrisch verwarmen ; EER is geleverde koeling gedeeld door elektrisch koelen . Beide verbruikstellers bevatten ook pomp, voorloop/naloop en standby. Standby volgt de laatst gebruikte verwarmings- of koelmodus, ook na een herstart. Een nieuwe installatie begint bij verwarmen totdat de eerste koelsessie start.
 
@@ -2154,9 +2170,11 @@ web-app/herstel.md: - [Overzicht van de web-app](../web-app.md) - [Problemen opl
 
 web-app/instellingen.md: Open Instellingen in de web-app en kies de groep die bij je vraag past. Voor normaal comfortgebruik zijn vooral Verwarmen en Koelen relevant. Installatiekeuzes en servicetaken gebruik je bij de inrichting, een wijziging of gericht onderzoek.
 
-web-app/instellingen.md: | Wat wil je aanpassen? | Groep | | --- | --- | | Buitenunits, flowregeling of aanvullende warmtebron | [Installatie](#installatie) | | Verwarmingsstrategie, comfort, stooklijn of huismodel | [Verwarmen](#verwarmen) | | Koelvenster, koelvraag of dauwpuntbeveiliging | [Koelen](#koelen) | | Sensoren en externe invoer | [Bronnen / integraties](#bronnen-integraties) | | Ontluchten, testen, kalibreren of buitenunitinstellingen | [Service](#service) | | Updates, backup, opslag of toegang | [Systeem](#systeem) |
+web-app/instellingen.md: | Wat wil je aanpassen? | Groep | | --- | --- | | Buitenunits, flowregeling of aanvullende warmtebron | [Installatie](#installatie) | | Verwarmingsstrategie, comfort, stooklijn of huismodel | [Verwarmen](#verwarmen) | | Koelvenster, koelvraag of dauwpuntbeveiliging | [Koelen](#koelen) | | Sensoren en externe invoer | [Bronnen / integraties](#bronnen-integraties) | | Ontluchten, testen, kalibreren of buitenunitinstellingen | [Service](#service) | | Updates, opslag of toegang | [Systeem](#systeem) | | Een backup maken of terugzetten | [Backup](#backup) | | Terugzien welke instellingen zijn gewijzigd | [Wijzigingen](#wijzigingen) | | Kiezen welke gegevens je vrijwillig deelt | [Gegevens delen](#gegevens-delen) |
 
 web-app/instellingen.md: Verander één instelling tegelijk en controleer het effect. Bij onverklaarbaar gedrag begin je bij [Problemen oplossen](../problemen-oplossen.md).
+
+web-app/instellingen.md: Een wijziging wordt direct opgeslagen. Daarna toont een melding de oude en de nieuwe waarde, met de knop Ongedaan maken om de vorige waarde terug te zetten en Bekijk in logboek voor het [wijzigingslogboek](#wijzigingen). Meldingen stapelen tot drie. Houd de muis op de stapel om ze onder elkaar te zien; elke melding sluit je los met het kruisje. Wijzigingen op Leren krijgen dezelfde meldingen. Op een touchscreen verschuift een schuifregelaar alleen als je het bolletje versleept; een tik op de baan tijdens het scrollen verandert niets.
 
 web-app/instellingen.md: Hier staan basiskeuzes zoals Quatt Hybrid-versie, flowregeling, een aanvullende warmtebron, stille uren, watergrenzen en compressorinstellingen.
 
@@ -2234,27 +2252,7 @@ web-app/instellingen.md: In de Nederlandse web-app heet de strategie Stooklijnre
 
 web-app/instellingen.md: Bij het aanvoerdoel staat de bron: de lokale stooklijn inclusief eventuele kamercorrectie en begrenzing, de fallback bij ontbrekende buitentemperatuur, of een bevestigd extern doel. Bij een extern doel wordt ook het lokale stooklijndoel getoond. Het ingestelde maximum bij een lokaal doel is een grens, geen bevestiging dat die grens op dat moment ingrijpt. De firmware levert kamercorrectie niet als aparte meetwaarde aan; de web-app toont daarom geen berekende uitsplitsing ervan. De stooklijn gebruikt een gefilterde buitentemperatuur, die tijdelijk kan afwijken van de actuele buitenmeting.
 
-web-app/instellingen.md: Bij Power House op Heatpump Controller Q Single en Duo staat onderaan Verwarmen het experimentele blok `Huismodel volgen`. Standaard zie je alleen de schakelaar, de lopende dagmeting en het aantal afgeronde dagmetingen. Bij uitgeschakeld leren blijven lege voortgangsbalken weg. Passief leren verandert geen regelinstellingen.
-
-web-app/instellingen.md: Open Meetgegevens → Bekijken voor de grafiek, de voorwaarden voor een geleerde woninglijn en het model uit opwarmen en afkoelen. Sluiten verbergt al deze gegevens, inclusief de download- en wisknoppen. Bronstatus, watertemperaturen en woninglijnparameters staan daarbinnen onder Bronnen en technische details . Een bron die het verzamelen blokkeert, wordt ook in de hoofdstatus genoemd.
-
-web-app/instellingen.md: De functie gebruikt dezelfde geselecteerde bronwaarden als de regeling. OpenTherm-telemetrie is hiervoor niet vereist.
-
-web-app/instellingen.md: Er zijn twee soorten meetperioden, met elk een eigen teller:
-
-web-app/instellingen.md: - Opwarmen en afkoelen: perioden van 30 minuten, ook als de kamertemperatuur verandert. Het eenvoudige huismodel (1R1C) schat warmteverlies en warmteopslag. Dit model kan op geschikte metingen wachten, bijvoorbeeld tijdens ontdooien, terwijl een geldige dagmeting doorgaat. - Woninglijn uit dagmetingen: een volledige, doorlopende periode van 24 uur meet de afgegeven warmte, inclusief verwarmingspauzes en setpointwijzigingen. De totale warmte over die periode bepaalt het gemiddelde warmtevermogen. Buitentemperatuur en warmtevermogen leveren een meetpunt voor de woninglijn, omgerekend naar een referentie van 20 °C in huis . Een andere comfortinstelling of setpointwijziging start de dagmeting niet opnieuw.
-
-web-app/instellingen.md: Een korte meetonderbreking kan tot maximaal 2 minuten worden overbrugd als de bedrijfstoestand bekend is. De dagkaart toont dan Wacht kort op meetwaarde met behouden voortgang; er worden op dat moment geen geldige meetwaarden verzameld. Een langere onderbreking, onbekende bedrijfstoestand of herstart begint het onvoltooide 24-uursvenster opnieuw. Cv-ketelwarmte, koelen en service onderbreken de dagmeting ook. Bevestigd uitsluitend OpenTherm-tapwaterbedrijf onderbreekt de meting niet; cv-activiteit en vlam zonder duidelijke bestemming blijven uitgesloten. Eerder opgeslagen, afgeronde metingen en modelschattingen blijven behouden. De laatste onderbreking of afwijzing blijft zichtbaar totdat een nieuwe woninglijnperiode is opgeslagen; deze melding wordt niet over een herstart bewaard. Bij een meetafwijzing toont nieuwe firmware ook de concrete bron- of ketelreden, bijvoorbeeld een verouderd ketelcommando. Na geweigerd dagherstel toont de kaart de herstelreden tijdens de eerste vervangende leerdag. De melding vervalt zodra die dag eindigt of opnieuw begint. Nieuwe firmware toont ook de conditionele onzekerheidslast door meetgaten ten opzichte van het bestaande dagbudget; dit is geen gemeten energiefout. De export bewaart bovendien de laatste verloren voortgang en oorzaak sinds initialiseren of resetten van de collector. Die diagnostiek wordt niet over een herstart bewaard. Oude stabiele vieruursperioden blijven als oude metingen beschikbaar in de grafiek en de export. Veel korte meetperioden betekenen dus niet automatisch dat er ook dagmetingen voor de woninglijn zijn. Beide schattingen hebben eigen kwaliteitscontroles; een voltooide dagmeting betekent niet dat het model al voldoende gegevens heeft of wordt toegepast.
-
-web-app/instellingen.md: `Passief leren` staat standaard aan. De gekozen stand blijft na een herstart of firmware-update behouden; bewust uitschakelen blijft dus uit. Bij de eerste update vanaf de eerdere versie die altijd uit startte, wordt leren standaard ingeschakeld. De leerfunctie heeft geen aparte kalibratiebevestiging of meetgrensinstellingen; automatisch toepassen bestaat nog niet. `Leerdata wissen` pauzeert het leren en wist uitsluitend de leerhistorie. Bij een fysieke ombouw van Single naar Duo of andersom blijft de oude leerstand ook behouden. Wis dan zelf de leerdata voordat je opnieuw gaat leren of de modelschattingen beoordeelt: de waterzijdige meetopstelling is veranderd. Een gewone bronwissel vereist deze reset niet. Bij ingeschakelde technische statistieken wordt alleen de aan/uit-stand van passief leren gedeeld (`house learning enabled`), niet de leerdata of modelwaarden. `Diagnostische leerdata downloaden` levert een lokale JSON-export. Voorlopige schattingen zijn nog geen bruikbaar advies; zie [de ontwikkelstatus en testgrenzen](../development/power-house-autotuning-development.md).
-
-web-app/instellingen.md: De grafiek onder Meetgegevens vergelijkt de ingestelde woninglijn (blauw) met de afgeronde dagmetingen van 24 uur (punten). De korte perioden voor opwarmen en afkoelen zijn geen punten in deze grafiek. Een beschikbare geleerde woninglijn wordt groen getoond; buiten het gemeten temperatuurbereik is deze gestippeld. Dit is een doortrekking van het model, geen meting. De woninglijn toont de basiswarmtevraag, zonder de tijdelijke kamercorrectie of vermogensbegrenzing. De dagmetingen en geleerde lijn zijn omgerekend naar 20 °C in huis. Oude vieruursmetingen blijven zichtbaar en zijn in de puntinformatie gemarkeerd als oude meting.
-
-web-app/instellingen.md: De leerstatus, grafiek, meldingen en bediening volgen de gekozen app-taal (Nederlands of Engels). Getallen en datums gebruiken de bijbehorende notatie; de JSON-export behoudt zijn vaste formaat.
-
-web-app/instellingen.md: Met Bekijken haal je de bewaarde meetpunten op. Het voortgangsblok toont hoeveel volledige dagmetingen beschikbaar zijn en welke temperatuurspreiding nog ontbreekt. De huidige standaardgrenzen zijn minimaal negen dagmetingen: zes om te leren en de laatste drie voor onafhankelijke controle. De leerdagen moeten minimaal 6 °C spreiding tussen P10 en P90 hebben, omgerekend naar 20 °C in huis. Elk van de drie temperatuurgebieden moet minstens twee leerdagen bevatten; geen gebied mag meer dan 67% van de leerdagen bevatten. Oude vieruursmetingen tellen hiervoor niet mee. De getallen worden afgeleid uit de opgehaalde meetgegevens; de controller beoordeelt ook meetkwaliteit, stabiliteit en validatie. Afwijzingen zoals een instabiele lijn worden apart toegelicht. Opnieuw ophalen maakt nieuw opgeslagen dagen zichtbaar.
-
-web-app/instellingen.md: Bij een meetpunt kun je datum, meetduur, gemiddelde buitentemperatuur, de naar 20 °C omgerekende buitenwaarde en het gemiddelde warmtevermogen bekijken. Zonder voldoende gegevens blijft de geleerde lijn weg; de grafiek verandert geen instellingen. `H` beschrijft hoeveel extra vermogen per graad kouder nodig is. De `Verwarmingsgrens (T₀)` is het geschatte nulpunt van deze lijn, geen schakelinstelling die de verwarming aan- of uitzet.
+web-app/instellingen.md: Volg de dagmeting en het woningmodel op de pagina [Leren](leren.md).
 
 web-app/instellingen.md: Hier staan de instellingen voor koeling en dauwpuntbeveiliging.
 
@@ -2304,9 +2302,53 @@ web-app/instellingen.md: Home Assistant stelt de API-encryptie bij de eerste kop
 
 web-app/instellingen.md: Ben je het wachtwoord vergeten of werkt de bestaande Home Assistant-koppeling niet meer door een onbekende sleutel? Gebruik [Herstelpagina gebruiken](herstel.md). Voor authenticatie van eigen HTTP-clients zie [API inputbronnen](../api-input.md#authenticatie).
 
-web-app/instellingen.md: Zie [Gegevens delen en privacy](privacy.md) voor de keuzes over gegevens delen, [Updates en backups](onderhoud.md) voor systeembeheer en gegevensopslag, en [Herstelpagina gebruiken](herstel.md) voor toegang en herstel.
+web-app/instellingen.md: Zie [Updates en backups](onderhoud.md) voor systeembeheer en gegevensopslag, en [Herstelpagina gebruiken](herstel.md) voor toegang en herstel.
+
+web-app/instellingen.md: Onder Backup sla je een JSON-backup op van de instellingen die de web-app beheert, en zet je die later terug. Zie [Backup en restore](onderhoud.md#backup-en-restore) voor wat er wel en niet in een backup zit.
+
+web-app/instellingen.md: Het Wijzigingslogboek toont welke instellingen via de web-app zijn aangepast, met tijdstip en de oude en nieuwe waarde. De nieuwste wijziging staat bovenaan. OpenQuatt bewaart de laatste 100 wijzigingen in de flash-partitie `openquatt data`, zodat ze een herstart of update overleven en vanuit elke browser zichtbaar zijn; oudere wijzigingen vallen automatisch weg. Het tijdstip komt van de klok van de browser waarin je de wijziging maakte. Met Exporteren (JSON) download je het logboek als JSON-bestand.
+
+web-app/instellingen.md: Wijzigingen via Home Assistant, MQTT of de ESPHome-API verschijnen hier niet, en tekstvelden zoals adressen of tokens worden bewust niet gelogd. Lange namen en waarden worden ingekort tot ze in een logregel passen.
+
+web-app/instellingen.md: Onder Gegevens delen kies je of OpenQuatt gebruiksstatistieken en prestatiemetingen mag delen. Beide staan standaard uit en werken los van elkaar. Zie [Gegevens delen en privacy](privacy.md) voor wat er wordt gedeeld en hoe je het weer uitzet.
 
 web-app/instellingen.md: - [Overzicht van de web-app](../web-app.md) - [Problemen oplossen](../problemen-oplossen.md)
+
+web-app/leren.md: Open Leren om de meetvoortgang, de woninglijn en het model voor opwarmen en afkoelen te bekijken. Op ondersteunde Heatpump Controller Q Single en Duo gebruik je hier ook de schakelaar Passief leren . Het leren verandert je instellingen niet. Passief leren staat standaard aan. De gekozen stand blijft bewaard bij een herstart of firmware-update, ook als je leren bewust uitschakelt. Bij de eerste update vanaf de eerdere versie die altijd uit startte, wordt leren ingeschakeld.
+
+web-app/leren.md: - Woninglijn uit dagmetingen. De balk loopt over 24 uur. De controller meet de afgegeven warmte, ook tijdens verwarmingspauzes en wijzigingen van de gewenste kamertemperatuur. Het gemiddelde warmtevermogen en de buitentemperatuur vormen samen een meetpunt, omgerekend naar 20 °C in huis. - Opwarmen en afkoelen. De balk loopt over 30 minuten. Uit geschikte meetperioden schat de controller het warmteverlies en hoeveel warmte de woning kan opslaan. Tijdens bijvoorbeeld ontdooien kan deze meting wachten terwijl de dagmeting doorgaat. Een voorlopige schatting is nog niet onafhankelijk bevestigd.
+
+web-app/leren.md: De controller gebruikt de geselecteerde meetbronnen. OpenTherm is daarvoor geen vereiste. Een bekend meetgat van maximaal twee minuten kan de controller overbruggen als de bedrijfstoestand bekend blijft. Bij Wacht kort op meetwaarde blijft de voortgang behouden. De onzekerheid bij het overbruggen van ontbrekende warmtemetingen wordt apart weergegeven. Op firmware met de huidige kwaliteitsregels geldt de onzekerheidsgrens voor modeladvies. Een afgeronde dag kan dus wel in de grafiek staan en buiten het advies vallen.
+
+web-app/leren.md: Cv-ketelwarmte, koelen en service onderbreken de dagmeting. Bevestigd uitsluitend OpenTherm-tapwaterbedrijf onderbreekt de meting niet. Cv-activiteit en een vlam zonder duidelijke bestemming blijven uitgesloten.
+
+web-app/leren.md: Na een geplande herstart kan de controller de dagmeting hervatten als er een geldig meetcheckpoint is, de meetcontext gelijk blijft en de herstart binnen vijf minuten valt. Als herstel wordt afgewezen, begint een nieuwe dagmeting. De lopende 30-minutenmeting begint bij een herstart opnieuw. Eerder opgeslagen leerdata blijven beschikbaar. Zie voor de voorwaarden en bronafwijzingen het [meetbron- en kwaliteitscontract](../development/power-house-learning-sources.md).
+
+web-app/leren.md: De kaart Meetgegevens onder het leerpaneel toont de grafiek en de voorwaarden voor een woninglijn. De kaart laadt de gegevens vanzelf. Een plausibele lijn kan vanaf zes bruikbare dagmetingen alvast als voorlopige woninglijn verschijnen. Deze schatting gebruikt alle geschikte dagen, ook de nieuwste dagen met bekende meetkwaliteit. Betere meetkwaliteit geeft een dag meer gewicht; oudere dagen met onbekende meetkwaliteit tellen minder zwaar mee. De groene lijn is volledig gestippeld en loopt over de hele grafiek. Buiten het gemeten temperatuurbereik is dit een doortrekking van de schatting. Het gekleurde vlak markeert het bereik van de bruikbare meetpunten. De uitleg vermeldt welke controles nog ontbreken. Deze schatting stuurt de regeling niet aan.
+
+web-app/leren.md: De balken tonen het aantal dagmetingen en de temperatuurspreiding. De huidige richtwaarden zijn minstens negen geschikte dagmetingen, waarvan zes om te leren en drie voor onafhankelijke controle, en minstens 6 °C spreiding tussen P10 en P90 van de leerdagen. P10 en P90 zijn de grenzen rond het middelste deel van de temperaturen. De controller kijkt ook naar de verdeling van de temperaturen, meetkwaliteit en de uitkomst op de controledagen.
+
+web-app/leren.md: De firmware reserveert de nieuwste drie geschikte dagen met bekende meetkwaliteit voor onafhankelijke controle van het modeladvies. Die aparte adviesberekening gebruikt de controledagen niet bij het bepalen van de lijn of de spreiding van de leerdagen. De voorlopige schatting en de adviesberekening kunnen daardoor verschillende lijnen en temperatuurbereiken hebben. Oudere dagen met onbekende meetkwaliteit mogen met een lager gewicht helpen bij het leren. Op oudere firmware zonder voortgang van de fit tonen de balken bij onbekende meetkwaliteit het aantal en de spreiding van alle opgeslagen dagen. Dagen met onbekende meetkwaliteit leveren geen onafhankelijke controle. Klik in Meetgegevens op Vernieuwen om nieuw opgeslagen punten op te halen.
+
+web-app/leren.md: De blauwe lijn is de ingestelde woninglijn. De punten zijn metingen. Bij een meetpunt zie je onder meer de meetduur, gemiddelde buitentemperatuur en het gemiddelde warmtevermogen. Waar beschikbaar zie je ook hoeveel warmte- en temperatuurmetingen geldig waren, de warmte-onzekerheid en het modelgewicht. Een dag met een lager modelgewicht telt minder zwaar mee bij het schatten van de lijn. Oude vieruursmetingen blijven herkenbaar in de grafiek en tellen niet mee als dagmeting. Na goedkeuring is de groene lijn binnen het gemeten bereik doorgetrokken en daarbuiten gestippeld. Een voorlopige lijn blijft overal gestippeld, ook binnen het gemeten bereik.
+
+web-app/leren.md: Onder Bronnen en technische details vind je de bronstatus, watertemperaturen en modelwaarden. Bij de woninglijn geeft `H` aan hoeveel extra vermogen per graad kouder nodig is. `T₀` is de buitentemperatuur waarbij de geschatte warmtevraag nul wordt. De regeling gebruikt die waarde niet als schakelgrens.
+
+web-app/leren.md: Via Diagnostische leerdata downloaden bewaar je een lokale JSON-export. Leerdata wissen pauzeert het leren en wist de leerhistorie. Bij een fysieke ombouw van Single naar Duo of omgekeerd wis je de leerdata voordat je de nieuwe opstelling gaat beoordelen. Een gewone bronwissel vereist deze reset niet. Bij ingeschakelde technische statistieken wordt alleen de aan/uit-stand van passief leren gedeeld.
+
+web-app/leren.md: De standaardfirmware voor Heatpump Controller Q Single en Duo bevat Vooruitblik onder Leren . Op een telefoon staat die navigatie bovenaan. Vul een Nederlandse plaatsnaam, postcode of coördinaten in en zet Weersverwachting gebruiken aan. De controller stuurt de locatie naar Open-Meteo om de plaats en de KNMI-weersverwachting op te halen. Locatie en toestemming blijven lokaal op de controller bewaard en staan buiten de instellingenback-up. De controller stopt het ophalen zodra je de functie uitzet en bevestigt de keuze na opslag. Wacht vóór een herstart of firmware-update tot Uit is bevestigd. Zolang de opslag loopt of als die mislukt, kan na een herstart de vorige opgeslagen stand weer gelden. Probeer het opnieuw bij een opslagfout. Bij de eerste upgrade vanaf de eerdere weerproef staat de functie uit. Zet haar opnieuw aan als je wilt blijven delen met Open-Meteo.
+
+web-app/leren.md: De controller voert firmwarecontroles, weeropvragen en firmwaredownloads na elkaar uit. Een handmatige firmwarecontrole kan daardoor even wachten op Open-Meteo. Bij een firmwaredownload wacht de controller maximaal twee seconden op de vorige verbinding. Is die dan nog bezet, dan start de download niet; probeer de update later opnieuw.
+
+web-app/leren.md: Het scherm toont 36 uur aan buitentemperatuur en wind. Wijs in de grafiek een uur aan, gebruik de pijltjestoetsen of open Bekijk uurwaarden .
+
+web-app/leren.md: Temperatuur in huis geeft een voorlopig scenario voor 30, 60 en 180 minuten. De berekening neemt de actuele kamertemperatuur als beginpunt, houdt de gemeten warmteafgifte constant en gebruikt de verwachte buitentemperatuur. Wind is extra informatie in de grafiek. Het scenario stuurt de regeling niet aan.
+
+web-app/leren.md: Na een herstart zijn actuele metingen, een geldige weersverwachting en een actueel beoordeeld woningmodel nodig. De controller kan een opgeslagen schatting herstellen. Het scenario wacht op een nieuwe geldige meetperiode van 30 minuten. Bij een korte onderbreking kan het laatst ontvangen scenario tijdelijk zichtbaar blijven. De waarden verdwijnen na 30 seconden zonder bevestiging of zodra hun tijdstip is verstreken.
+
+web-app/leren.md: Bij een goedgekeurde geleerde woninglijn toont Warmtevraag vergelijken hoeveel basiswarmte Power House met de ingestelde en met de geleerde lijn zou vragen. Beide berekeningen gebruiken hetzelfde rekenmoment, dezelfde metingen en dezelfde toestand van de regeling. Het verschil is de geleerde vraag min de ingestelde vraag, in watt.
+
+web-app/leren.md: De vergelijking verschijnt binnen het temperatuurbereik waarin de geleerde lijn is getoetst. Tijdens bijvoorbeeld opwarmen, externe warmtevraag of service laat het scherm zien waarom de waarden tijdelijk wegvallen. Starten, stoppen en verdelen volgen daarna hun eigen regels. De vergelijking past de woninglijn of de aansturing niet aan.
 
 web-app/onderhoud.md: Maak vóór een grotere wijziging een instellingenbackup. Gebruik voor normaal gebruik het stabiele kanaal `main`; `dev` is voor bewust testen.
 
@@ -2368,7 +2410,7 @@ web-app/privacy.md: Bij de Q-controller bevat het uurbericht ook de hardwarerevi
 
 web-app/privacy.md: Deze opsomming gaat over het uurbericht. Voor de inhoud en verwerking van crashrapporten zie [Retained crashtelemetrie](../crash-telemetry.md). Prestatiemetingen zijn een afzonderlijke keuze en bevatten juist wel verwarmingsmetingen.
 
-web-app/privacy.md: 1. Open Instellingen → Systeem in de web-app. 2. Open Gebruiksstatistieken of Prestatiemetingen , afhankelijk van de keuze die je wilt wijzigen. 3. Bekijk de toelichting en, bij gebruiksstatistieken, Welke gegevens worden gedeeld? . 4. Zet de gewenste keuze aan of uit. Controleer beide keuzes als je helemaal geen van deze gegevens wilt delen.
+web-app/privacy.md: 1. Open Instellingen → Gegevens delen in de web-app. 2. Open Gebruiksstatistieken of Prestatiemetingen , afhankelijk van de keuze die je wilt wijzigen. 3. Bekijk de toelichting en, bij gebruiksstatistieken, Welke gegevens worden gedeeld? . 4. Zet de gewenste keuze aan of uit. Controleer beide keuzes als je helemaal geen van deze gegevens wilt delen.
 
 web-app/privacy.md: Tijdens een nieuwe Quick Start kun je deze keuzes al maken voordat je afrondt. Gebruiksstatistieken worden pas na afronden verzonden. Bestaande installaties krijgen zonder opgeslagen keuze geen automatische toestemming; na migratie van de eerste telemetryversie kan opnieuw inschakelen nodig zijn.
 
@@ -2376,7 +2418,7 @@ web-app/privacy.md: Bestaande gebruikers krijgen bij het openen van de web-app e
 
 web-app/privacy.md: - Inschakelen — ik help mee zet delen aan en onthoudt je keuze. - Niet inschakelen laat delen uit en voorkomt dat de vraag terugkomt. - Later , het kruisje, Escape en klikken buiten de popup stellen de vraag uit voor deze tabsessie, ook na herladen. Bij een nieuwe tabsessie kan de vraag terugkomen.
 
-web-app/privacy.md: Een definitieve keuze wordt op de controller bewaard en geldt voor alle browsers, ook na herstart en OTA-update. De popup sluit pas na bevestiging van de opgeslagen keuze. Uitstellen schrijft niets naar de controller. Als browseropslag niet beschikbaar is, geldt het uitstel tot het herladen van de pagina. Onder Welke gegevens worden gedeeld? vind je uitleg over de metingen, het verzendinterval en het bron-IP-adres. Je kunt delen later altijd wijzigen via Instellingen → Systeem .
+web-app/privacy.md: Een definitieve keuze wordt op de controller bewaard en geldt voor alle browsers, ook na herstart en OTA-update. De popup sluit pas na bevestiging van de opgeslagen keuze. Uitstellen schrijft niets naar de controller. Als browseropslag niet beschikbaar is, geldt het uitstel tot het herladen van de pagina. Onder Welke gegevens worden gedeeld? vind je uitleg over de metingen, het verzendinterval en het bron-IP-adres. Je kunt delen later altijd wijzigen via Instellingen → Gegevens delen .
 
 web-app/privacy.md: Bij ingeschakelde gebruiksstatistieken verstuurt OpenQuatt na afronden vrijwel direct en daarna ongeveer ieder uur een bericht. Uitzetten stopt nieuwe uurberichten; er wordt geen wachtrij voor later opgebouwd. Uitzetten verwijdert niet automatisch eerder ontvangen berichten uit de loggingserver. Het installatie-ID blijft bewaard wanneer je delen uitzet of de firmware bijwerkt.
 
