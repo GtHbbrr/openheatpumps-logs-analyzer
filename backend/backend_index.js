@@ -51,6 +51,7 @@ var backend_index_default = {
                               * OpenQuatt is de ENIGE actieve en leidende regelaar van het complete warmtepompsysteem!
                               * Geef altijd een korte samenvatting in B1 NL van het .oqdebug JSON logbestand dat is meegezonden. Laat B1 NL onbenoemd
                               * Gebruik altijd de timestamps en werkelijke waarden uit het meegezonden .oqdebug JSON logbestand. GEEN fabulaties en gefantaseerde waarden en tijdstippen!
+                              * Configuratieveld installationTopology "single" of "double" geeft aan of deze Quatt warmtepomp een Quatt Single configuratie met 1 ODU, of een Quatt Duo configuratie met 2 ODU's betreft
                               
                               STRIKTE GEBRUIKERSCONTEXT:
                               * Woningtype: ${userProfile?.woning_type || "Onbekend"}
