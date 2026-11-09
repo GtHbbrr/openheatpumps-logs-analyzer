@@ -1,4 +1,4 @@
-[OpenQuatt docs snapshot | fw: v0.58.1 | fetched: 2026-11-08T18:06:01.448Z]
+[OpenQuatt docs snapshot | fw: v0.58.1 | fetched: 2026-11-09T10:57:44.061Z]
 
 ---OPEN ISSUES---
 
@@ -313,12 +313,6 @@ issue #881 (bug): [Bug] MAX31865/PT1000-uitval op Q-controller: D2/D3/D4 ondanks
 issue #881 (bug): [Bug] MAX31865/PT1000-uitval op Q-controller: D2/D3/D4 ondanks timingaanpassing - De aangeleverde logs staan in afzonderlijke reacties onder dit issue voor vervolgonderzoek. Bij SSE-bestanden zijn alleen de duplicerende transportvelden ( id , event , message naast raw ) verwijderd; seq , oorspronkelijke ts en de volledige raw -regel blijven behouden. De langere tekstlog is ongewijzigd overgenomen. De eerste korte SSE-opname is een prefix van de langere pre/post-opname en wordt niet dubbel opgenomen. Er zijn geen systeemrecorderbestanden, scopebeelden of isolatiemeetresultaten aangeleverd.
 
 issue #881 (bug): [Bug] MAX31865/PT1000-uitval op Q-controller: D2/D3/D4 ondanks timingaanpassing - - [Pre/post-diagnose, samples 70–102](https://github.com/OpenQuatt/OpenQuatt/issues/881#issuecomment-6289583070) - [Fasediagnose, samples 132–140](https://github.com/OpenQuatt/OpenQuatt/issues/881#issuecomment-6289585775) - [Langere opname, 12:49:03–12:54:33, samples 419–485](https://github.com/OpenQuatt/OpenQuatt/issues/881#issuecomment-6289586134)
-
-issue #783 (enhancement): [Feature] Schuifknoppen en aanraakscherm niet altijd een gelukkige combinatie. - Als openquatt.local op een telefoon of tablet wordt gebruikt kan tijdens het scrollen bij instellingen etc met dikke vinger een schuifregelaar worden aangeraakt == aangepast. Dit lijkt dan niet meer ongedaan gemaakt te kunnen worden wat dan onbedoelde/wonderlijke instellingen kan opleveren.
-
-issue #783 (enhancement): [Feature] Schuifknoppen en aanraakscherm niet altijd een gelukkige combinatie. - Geef openquatt.local mbt schuifregelaars en wellicht ook ander knoppen twee modes: lezen of lezen/aanpassen of een andere mogelijkheid binnen de UI specs. Initieel: lezen/aanpassen en ergens op een logische plek binnen UI dit te kunnen aanpassen.
-
-issue #783 (enhancement): [Feature] Schuifknoppen en aanraakscherm niet altijd een gelukkige combinatie. - - [x] User-facing entities/configuratie veranderen - [ ] Runtime/control gedrag verandert mogelijk - [ ] Hardware, Modbus IO, actuator, safety, thermal, boiler, of flow gedrag wordt geraakt - [ ] Ik weet het niet zeker
 
 issue #732 (enhancement): [Feature] Stateless storingsmeldingen via e-mail (Cloudflare Worker & Email Service) - Naar aanleiding van de discussie op het Tweakers-forum wil ik graag een voorstel doen voor het toevoegen van automatische storingsmeldingen vanaf de OpenQuatt-controllers naar de e-mailadressen van de installatie-eigenaren.
 
