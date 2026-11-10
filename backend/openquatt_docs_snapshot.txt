@@ -1,6 +1,16 @@
-[OpenQuatt docs snapshot | fw: v0.58.1 | fetched: 2026-11-09T10:57:44.061Z]
+[OpenQuatt docs snapshot | fw: v0.58.1 | fetched: 2026-11-10T10:49:03.661Z]
 
 ---OPEN ISSUES---
+
+issue #947: Enhancement: Vervang gestreepte "Geleerde woninglijn" door groen gearceerd 95% betrouwbaarheidsinterval om schijnnauwkeurigheid te voorkomen - <img width="1468" height="821" alt="Image" src="https://github.com/user-attachments/assets/0e106bc3-216e-4b7e-a04e-122028e4cc48" /
+
+issue #947: Enhancement: Vervang gestreepte "Geleerde woninglijn" door groen gearceerd 95% betrouwbaarheidsinterval om schijnnauwkeurigheid te voorkomen - Momenteel wordt de geschatte stooklijn ("Geleerde woninglijn - voorlopig") weergegeven als een strakke, groene gestreepte lijn. Hoewel dit de centrale schatting van het model toont, creëert dit een vorm van schijnnauwkeurigheid. De lijn suggereert dat het model exact weet hoe het huis zich gedraagt bij -10°C, terwijl de beschikbare meetpunten op de afbeelding uitsluitend tussen de 5°C en 15°C liggen. De onzekerheid en variantie buiten dit datagebied worden nu volledig gecamoufleerd.
+
+issue #947: Enhancement: Vervang gestreepte "Geleerde woninglijn" door groen gearceerd 95% betrouwbaarheidsinterval om schijnnauwkeurigheid te voorkomen - Gewenste oplossing Ik wil voorstellen om de groene stippellijn te vervangen door een groen gearceerd gebied dat het 95% betrouwbaarheidsinterval van de schatting weergeeft.
+
+issue #947: Enhancement: Vervang gestreepte "Geleerde woninglijn" door groen gearceerd 95% betrouwbaarheidsinterval om schijnnauwkeurigheid te voorkomen - Dit heeft grote voordelen voor de gebruikerservaring: • Eerlijk beeld van data-beschikbaarheid: Het gebied laat direct zien waar het model veel data heeft (smal interval) en waar het nog onzeker is (breed interval, zoals bij lage temperaturen). • Visuele feedback op het leerproces: Dit betrouwbaarheidsgebied kan vanaf het eerste meetpunt direct getoond worden. Naarmate er (hopelijk) meer meetpunten over het hele temperatuurspectrum worden verzameld, ziet de gebruiker het gearceerde gebied live "krimpen" richting een smalle, betrouwbare lijn. Beschrijf alternatieven die je hebt overwogen De huidige stippellijn behouden, maar die schiet tekort in het informeren van de gebruiker over de daadwerkelijke status en betrouwbaarheid van het model.
+
+issue #947: Enhancement: Vervang gestreepte "Geleerde woninglijn" door groen gearceerd 95% betrouwbaarheidsinterval om schijnnauwkeurigheid te voorkomen - Aanvullende context Op de meegestuurde screenshot is perfect te zien waarom dit nodig is. Het model trekt nu een steile lijn naar de -10°C op basis van een handjevol datapunten bij relatief mild weer (5°C tot 15°C). Een 95% betrouwbaarheidsinterval zou hier visueel direct duidelijk maken dat de voorspelling voor streng winterweer op dit moment nog een brede marge heeft.
 
 issue #934 (enhancement): [Feature] koppel sliders voor compressor limieten aan frequentie mappings van de geselecteerde ODUs - De sliders voor compressor limieten kunnen nu op willekeurige waarden worden gezet en ook op waarden lager dan het 1e level van de compressor. Met de bekende frequentiemappings voor de verschillende ODUs kan de bediening voor deze sliders worden uitgebreid met vaste stops die overeenkomen met de frequentie mappings van de geselecteerde ODUs
 
