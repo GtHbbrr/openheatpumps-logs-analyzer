@@ -1,6 +1,32 @@
-[OpenQuatt docs snapshot | fw: v0.58.1 | fetched: 2026-11-11T10:25:04.402Z]
+[OpenQuatt docs snapshot | fw: v0.58.1 | fetched: 2026-11-12T10:42:11.089Z]
 
 ---OPEN ISSUES---
+
+issue #952: [Bug] Passive Power House learning keurt elke dag af door korte PT1000-uitvallers tijdens compressorbedrijf - De Passive Power House learning heeft na ruim anderhalve week nog maar één bruikbaar leerpunt, en dat is een legacy-record uit v0.56. Op v0.58.1 is de eerste volledige dag (9-11 18:01 → 10-11 18:01) wel opgeslagen, maar niet bruikbaar voor de fit:
+
+issue #952: [Bug] Passive Power House learning keurt elke dag af door korte PT1000-uitvallers tijdens compressorbedrijf - heat coverage bp 9806, temperature coverage bp 9806, heat uncertainty mean w 1046, fit eligible false
+
+issue #952: [Bug] Passive Power House learning keurt elke dag af door korte PT1000-uitvallers tijdens compressorbedrijf - De eisen zijn kDailyFitMinimumCoverageBp = 9900 en kDailyFitMaximumUncertaintyW = 100 ( oq ph daily record quality.h ). De lopende batch stond na ruim 3 uur al op batch missing energy uncertainty wh 10132, met een budget van 2400. Ook die dag wordt dus afgekeurd.
+
+issue #952: [Bug] Passive Power House learning keurt elke dag af door korte PT1000-uitvallers tijdens compressorbedrijf - De lokale PT1000 (MAX31865) op mijn HCQ geeft af en toe één meting NaN. In HA wordt sensor.openquatt water supply temp pt1000 dan kort unknown , meestal 5 s (één poll), en binary sensor.openquatt pt1000 read problem blijft off . Elke uitvaller zet de batch op batch gap pending: true met missing measurement / essential source . Na ongeveer 20 s wordt het gat overbrugd ( bridged gaps +1), maar de onzekerheid stijgt dan steeds met ongeveer 450 Wh. Dat klopt met de begrenzing van daily gap uncertainty ws() : (50 kW + |q|) × ~30 s.
+
+issue #952: [Bug] Passive Power House learning keurt elke dag af door korte PT1000-uitvallers tijdens compressorbedrijf - Op 10-11 tussen 21:13 en 21:31 heb ik meegekeken. Alle 6 gaten in de leermeting vielen samen met een PT1000- unknown :
+
+issue #952: [Bug] Passive Power House learning keurt elke dag af door korte PT1000-uitvallers tijdens compressorbedrijf - 21:25:34 gap pending True missing measurement essential source onzekerheid 8778 Wh 21:25:54 gap pending False ok onzekerheid 9230 Wh 21:27:55 gap pending True missing measurement essential source 9230 Wh 21:28:14 gap pending False ok 9682 Wh 21:31:05 gap pending True missing measurement essential source 9682 Wh 21:31:25 gap pending False ok 10132 Wh
+
+issue #952: [Bug] Passive Power House learning keurt elke dag af door korte PT1000-uitvallers tijdens compressorbedrijf - PT1000 unknown volgens HA om 21:25:31, 21:27:51 en 21:31:01 (plus 21:12:51, 21:19:41 en 21:20:21 bij de eerdere gaten).
+
+issue #952: [Bug] Passive Power House learning keurt elke dag af door korte PT1000-uitvallers tijdens compressorbedrijf - Uitvallers per dag volgens de HA-history van sensor.openquatt water supply temp pt1000 :
+
+issue #952: [Bug] Passive Power House learning keurt elke dag af door korte PT1000-uitvallers tijdens compressorbedrijf - | dag | 31-10 | 1-11 | 2-11 | 3-11 | 4-11 | 5-11 | 6-11 | 7-11 | 8-11 | 9-11 | 10-11 | |---|---|---|---|---|---|---|---|---|---|---|---| | aantal | 183 | 108 | 113 | 154 | 107 | 201 | 86 | 42 | 42 | 80 | 80 |
+
+issue #952: [Bug] Passive Power House learning keurt elke dag af door korte PT1000-uitvallers tijdens compressorbedrijf - Van 3 tot 10 november waren het er 793. Daarvan vielen er 788 (99 %) terwijl minstens één compressor draaide, terwijl de compressoren maar 41 % van de tijd draaiden. Dat wijst op storing door compressor of omvormer op de PT1000-meting. Die kant ga ik zelf aanpakken met afscherming, kabelroute en ferriet.
+
+issue #952: [Bug] Passive Power House learning keurt elke dag af door korte PT1000-uitvallers tijdens compressorbedrijf - Met ongeveer 450 Wh per uitvaller is het dagbudget van 2400 Wh na een stuk of 5 uitvallers op. Eén NaN-sample per uur maakt een hele meetdag dus al onbruikbaar.
+
+issue #952: [Bug] Passive Power House learning keurt elke dag af door korte PT1000-uitvallers tijdens compressorbedrijf - - Korte uitval overbruggen: behandel een enkele ontbrekende PT1000-sample (≤ 1–2 polls, met geldige waarden ervoor en erna) niet als een gat met de volle 50 kW-begrenzing. Interpoleer liever, of houd de laatste waarde vast, zoals de control-kant waarschijnlijk ook doet. - Begrenzing beperken: begrens de onzekerheid van zo'n kort gat op de daadwerkelijk waargenomen warmte rond het gat, bijvoorbeeld gap heat observed abs w met een marge, in plaats van batch missing heat bound w = 50000. - Waarschuwen: geef een melding als de PT1000 vaker dan N keer per uur NaN geeft. pt1000 read problem reageert nu niet op deze korte uitvallers. - Rol van de PT1000: is de lokale aanvoertemperatuur bij Duo in serie (calorimetrie op HP1-in/HP2-uit) echt een essentiële bron voor de dagrecords? Zo niet, dan zou een PT1000-uitval de batch niet hoeven te raken.
+
+issue #952: [Bug] Passive Power House learning keurt elke dag af door korte PT1000-uitvallers tijdens compressorbedrijf - - HCQ Duo (serie), WiFi, firmware v0.58.1 (ESPHome 2026.10.0), updatekanaal main - PT1000 via MAX31865, 2-draads (profielstandaard), referentieweerstand 1500 Ω - Power House-regeling; ruimtetemperatuur via HA-input, setpoint via MQTT, flowbron buitenunit - Status: /openquatt/learning/status → status: collecting , batch status: insufficient data , train segments: 1 , daily record count: 2
 
 issue #948: [Feature] OpenQuatt voorbereiden op 20 compressorlevels voor V1 en V1.5 - Zou OpenQuatt voorbereid kunnen worden op de mogelijkheid dat Quatt V1- en V1.5-units in de toekomst twintig compressorlevels ondersteunen?
 
