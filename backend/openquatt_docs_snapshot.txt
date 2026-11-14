@@ -1,6 +1,12 @@
-[OpenQuatt docs snapshot | fw: v0.58.1 | fetched: 2026-11-13T10:37:22.530Z]
+[OpenQuatt docs snapshot | fw: v0.58.1 | fetched: 2026-11-14T09:51:12.136Z]
 
 ---OPEN ISSUES---
+
+issue #956 (enhancement): Evcc - Is there anyone who is using also EVCC and can test the new plugin? https://github.com/evcc-io/evcc/pull/36193
+
+issue #956 (enhancement): Evcc - Evcc kan de Quatt via Openquatt aansturen via dynamische energy prijzen, batterij vermogen en voorspelde zonne-energie opbrengst.
+
+issue #956 (enhancement): Evcc - - [ ] User-facing entities/configuratie veranderen - [ ] Runtime/control gedrag verandert mogelijk - [ ] Hardware, Modbus IO, actuator, safety, thermal, boiler, of flow gedrag wordt geraakt - [x] Ik weet het niet zeker
 
 issue #955 (enhancement): [Feature] Langer doorverwarmen: koude start gedraagt zich als warme start - Onderstaande opzet is gemaakt door AI. Te onderzoeken of dit de beste oplossing is; ik heb de eerste helft gelezen en het lijkt in de goede richting.
 
