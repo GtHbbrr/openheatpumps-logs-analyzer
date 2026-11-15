@@ -151,21 +151,24 @@
                     <!-- AI ONTTVANGSTVENSTER: Hier komt de live opbouwende tekst -->
                     <div id="output-box" class="text-sm leading-relaxed text-gray-300 space-y-4 max-h-[400px] overflow-y-auto pr-2 streaming-text-container">De resultaten verschijnen hier na de scan...</div>
                     
-                    <!-- RECENT GEBRUIKT MODEL BADGE (Debug- & Supportvenster) -->
-                    <div class="mt-2 text-right">
-                        <span id="used-model-badge" class="text-[10px] text-gray-600 tracking-wide font-mono"></span>
+                    <!-- RECENT GEBRUIKT MODEL BADGE + DEELKNOP -->
+                    <div class="mt-2 flex justify-between items-center">
+                        <button id="btn-share" class="hidden bg-gray-800 hover:bg-gray-700 text-orange-400 border border-gray-700 text-xs px-3 py-1.5 rounded transition flex items-center gap-1.5 font-medium">
+                            🔗 Deel analyse (7 dagen geldig)
+                        </button>
+                        <span id="used-model-badge" class="text-[10px] text-gray-600 tracking-wide font-mono ml-auto"></span>
                     </div>
                     
-                    <!-- GECORRIGEERD: Zwevende, altijd zichtbare statusbalk boven het invoerveld -->
+                    <!-- Zwevende statusbalk + meegroeiende textarea -->
                     <div id="chat-container" class="hidden mt-6 pt-4 border-t border-gray-800 flex flex-col gap-2 sticky bottom-0 bg-gray-950 z-10">
                         <div id="loader" class="hidden text-orange-400 animate-pulse text-xs font-medium mb-1 flex items-center gap-1">
-                            ⏳ AI denkt na en raadpleegt de documentatie...
+                            ⏳ AI denkt na en raadpleegt de logs en de documentatie...
                         </div>
-                        <div class="flex gap-2">
-                            <input type="text" id="chat-input" placeholder="Stel een vervolgvraag over je warmtepomp-gedrag..." class="flex-1 bg-gray-900 border border-gray-700 rounded-lg p-3 text-sm focus:outline-none focus:border-orange-500 text-gray-200">
+                        <div class="flex gap-2 items-end">
+                            <textarea id="chat-input" rows="2" placeholder="Stel een vervolgvraag over je warmtepomp-gedrag... (Shift+Enter voor nieuwe regel)" class="flex-1 bg-gray-900 border border-gray-700 rounded-lg p-3 text-sm focus:outline-none focus:border-orange-500 text-gray-200 resize-none overflow-y-auto max-h-40"></textarea>
                             <button id="btn-send" class="bg-orange-600 hover:bg-orange-700 px-5 py-3 rounded-lg text-sm font-semibold transition">Verstuur</button>
                         </div>
-                    </div>
+                    </div>                    
                 </div>
             </div>
 
@@ -1199,6 +1202,9 @@ function parseMarkdown(tekst) {
 
             // --- 2. Automatisch scannen van het klembord bij laden ---
             if (typeof checkClipboardOnLoad === 'function') {
+                if (typeof laadGedeeldeSessie === 'function') {
+                laadGedeeldeSessie();
+            }
                 checkClipboardOnLoad();
             }
         });
@@ -1314,6 +1320,7 @@ function parseMarkdown(tekst) {
                             el('btn-diagnose').disabled = false;
                             
                             el('chat-container').classList.remove('hidden');
+                            el('btn-share')?.classList.remove('hidden');
                             el('loader').classList.add('hidden');
                             return;
                         }
@@ -1355,6 +1362,7 @@ function parseMarkdown(tekst) {
                 outputBox.innerHTML += `<br><br><div class="text-right"><span class="bg-gray-800 text-gray-200 border border-gray-700 px-3 py-2 rounded-lg inline-block text-sm max-w-[85%] text-left"><strong>Jij:</strong><br>${vraagTekst}</span></div>`;
                 chatHistory.push({ role: "user", parts: [{ text: vraagTekst }] });
                 inputField.value = "";
+                inputField.style.height = 'auto';
             }
         
             if (loader) loader.classList.remove('hidden');
@@ -1442,7 +1450,8 @@ function parseMarkdown(tekst) {
                             el('btn-send').textContent = "Verstuur";
                             el('btn-send').classList.remove('bg-red-600', 'hover:bg-red-700');
                             el('btn-send').classList.add('bg-orange-600', 'hover:bg-orange-700');
-                            
+
+                            el('btn-share')?.classList.remove('hidden');                            
                             succesvolAfgerond = true;
                             break;
                         }
@@ -1468,12 +1477,98 @@ function parseMarkdown(tekst) {
             outputBox.scrollTop = outputBox.scrollHeight;
         });
 
-        el('chat-input').addEventListener('keydown', (e) => {
+        // Meegroeiende textarea (Enter = versturen, Shift+Enter = nieuwe regel)
+        const chatInputEl = el('chat-input');
+        chatInputEl.addEventListener('input', () => {
+            chatInputEl.style.height = 'auto';
+            chatInputEl.style.height = Math.min(chatInputEl.scrollHeight, 160) + 'px';
+        });
+
+        chatInputEl.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
                 el('btn-send').click();
+                chatInputEl.style.height = 'auto';
             }
         });
+
+        // Deelbare link genereren en kopiëren naar klembord
+        el('btn-share')?.addEventListener('click', async () => {
+            const btn = el('btn-share');
+            btn.textContent = "⏳ Link maken...";
+            btn.disabled = true;
+            try {
+                const profile = {
+                    woning_type: el('woning_type').value,
+                    afgiftesysteem: el('afgiftesysteem').value,
+                    cv_ketel: el('cv_ketel').value,
+                    thermostaat: el('thermostaat').value
+                };
+                const res = await fetch(`${WORKER_URL}/share`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ userProfile: profile, logData: activeLogData, chatHistory, model: activeSessionModel })
+                });
+                const data = await res.json();
+                if (data.status === "success" && data.id) {
+                    const shareUrl = `${window.location.origin}${window.location.pathname}?id=${data.id}`;
+                    await navigator.clipboard.writeText(shareUrl);
+                    btn.textContent = "✅ Link gekopieerd naar klembord!";
+                    setTimeout(() => { btn.textContent = "🔗 Deel analyse (7 dagen geldig)"; btn.disabled = false; }, 3000);
+                } else {
+                    throw new Error(data.melding || "Kon link niet opslaan");
+                }
+            } catch (err) {
+                alert("Delen mislukt: " + err.message);
+                btn.textContent = "🔗 Deel analyse (7 dagen geldig)";
+                btn.disabled = false;
+            }
+        });
+
+        // Bij openen van de pagina controleren of er een ?id=... in de URL staat
+        async function laadGedeeldeSessie() {
+            const params = new URLSearchParams(window.location.search);
+            const shareId = params.get("id");
+            if (!shareId) return;
+
+            try {
+                const res = await fetch(`${WORKER_URL}/share?id=${encodeURIComponent(shareId)}`);
+                const data = await res.json();
+                if (!res.ok || data.status === "error") {
+                    alert(data.melding || "Gedeelde analyse niet gevonden.");
+                    return;
+                }
+                if (data.userProfile) {
+                    if (data.userProfile.woning_type) el('woning_type').value = data.userProfile.woning_type;
+                    if (data.userProfile.afgiftesysteem) el('afgiftesysteem').value = data.userProfile.afgiftesysteem;
+                    if (data.userProfile.cv_ketel) el('cv_ketel').value = data.userProfile.cv_ketel;
+                    if (data.userProfile.thermostaat) el('thermostaat').value = data.userProfile.thermostaat;
+                }
+                if (data.logData) {
+                    const virtueelBestand = new File([JSON.stringify(data.logData)], `gedeeld-${shareId}.json`, { type: "application/json" });
+                    await laadBestand(virtueelBestand);
+                }
+                if (Array.isArray(data.chatHistory)) {
+                    chatHistory = data.chatHistory;
+                    activeSessionModel = data.model || null;
+                    const outputBox = el('output-box');
+                    outputBox.innerHTML = `<div class="text-xs text-orange-400 mb-2">🔗 Gedeelde analyse geladen (ID: ${shareId})</div>`;
+                    chatHistory.forEach(msg => {
+                        if (msg.role === "user") {
+                            const tekst = msg.parts?.[0]?.text?.replace(/^GEBRUIKERSVRAAG\/KLACHT:/, "") || "";
+                            outputBox.innerHTML += `<br><div class="text-right"><span class="bg-gray-800 text-gray-200 border border-gray-700 px-3 py-2 rounded-lg inline-block text-sm max-w-[85%] text-left"><strong>Vraag:</strong><br>${esc(tekst)}</span></div>`;
+                        } else if (msg.role === "model") {
+                            outputBox.innerHTML += `<br><div class="text-xs text-gray-500 mb-1">🤖 AI Analyse</div><div><span class="inline-block text-sm max-w-[95%]">${parseMarkdown(msg.parts?.[0]?.text || "")}</span></div>`;
+                        }
+                    });
+                    el('chat-container').classList.remove('hidden');
+                    el('btn-share').classList.remove('hidden');
+                }
+            } catch (err) {
+                console.error("Fout bij laden gedeelde sessie:", err);
+            }
+        }
+
 
         // 8. RAG DOCUMENT CONTEXT RENDERER (TAILWIND COMPATIBLE)
         function renderGevondenDocumenten(documenten) {
