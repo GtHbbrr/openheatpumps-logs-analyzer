@@ -186,7 +186,7 @@ STRIKTE GEBRUIKERSCONTEXT:
           const promptTokens = geminiJson?.usageMetadata?.promptTokenCount || 0;
           console.log(`[Cache Status] Model: ${gebruiktModel} | Gecached: ${cachedTokens} / ${promptTokens} tokens`);
 
-          let pureAiText = geminiJson?.candidates?.?.content?.parts?.?.text;
+          let pureAiText = geminiJson?.candidates?.at(0)?.content?.parts?.at(0)?.text;          
           if (!pureAiText) {
             pureAiText = geminiJson?.error
               ? `🚨 API FOUT: ${geminiJson.error.message}`
