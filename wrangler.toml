@@ -21,3 +21,9 @@ crons = [
 #  "*/5 * * * *",   # tijdelijk voor testen iedere 5 minuten synchronisatie
 ]
 
+[[kv_namespaces]]
+binding = "LOGS_KV"
+id = "bd5c604915394db39ab1f77fd8dbbd8b"
+
+[vars]
+ENABLE_TEST_LOGGING = "true"
