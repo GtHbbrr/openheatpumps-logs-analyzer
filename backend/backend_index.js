@@ -9,7 +9,7 @@ var backend_index_default = {
   },
 
   // ====================================================================
-  // 2. HTTP-VERKEER AFHANDELEN (DIAGNOSE & CHAT STREAMING HANDLER)
+  // 2. HTTP-VERKEER AFHANDELEN (SHARE LINKS, DIAGNOSE & CHAT STREAMING)
   // ====================================================================
   async fetch(request, env, ctx) {
     const corsHeaders = {
@@ -20,6 +20,36 @@ var backend_index_default = {
 
     if (request.method === "OPTIONS") {
       return new Response(null, { headers: corsHeaders });
+    }
+
+    const url = new URL(request.url);
+
+    // ROUTE A: Gedeelde analyse ophalen (GET /share?id=...)
+    if (request.method === "GET" && url.pathname === "/share") {
+      const shareId = url.searchParams.get("id");
+      if (!shareId || !env.LOGS_KV) {
+        return new Response(JSON.stringify({ status: "error", melding: "Ongeldig ID of KV niet gekoppeld." }), { status: 400, headers: corsHeaders });
+      }
+      const opgeslagenData = await env.LOGS_KV.get(`share:${shareId}`);
+      if (!opgeslagenData) {
+        return new Response(JSON.stringify({ status: "error", melding: "Deze deellink is verlopen (max. 7 dagen) of bestaat niet." }), { status: 404, headers: corsHeaders });
+      }
+      return new Response(opgeslagenData, { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    // ROUTE B: Analyse opslaan voor een deelbare link (POST /share)
+    if (request.method === "POST" && url.pathname === "/share") {
+      try {
+        if (!env.LOGS_KV) {
+          return new Response(JSON.stringify({ status: "error", melding: "KV storage niet geconfigureerd." }), { status: 500, headers: corsHeaders });
+        }
+        const payload = await request.json();
+        const shareId = crypto.randomUUID().slice(0, 8);
+        await env.LOGS_KV.put(`share:${shareId}`, JSON.stringify(payload), { expirationTtl: 604800 });
+        return new Response(JSON.stringify({ status: "success", id: shareId }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      } catch (err) {
+        return new Response(JSON.stringify({ status: "error", melding: err.message }), { status: 500, headers: corsHeaders });
+      }
     }
 
     if (request.method === "GET") {
@@ -41,8 +71,8 @@ var backend_index_default = {
       }
 
       let actueleVraag = "Analyseer dit bestand.";
-      let isEersteRun = !messages || messages.length === 0;
-      if (!isEersteRun) {
+      let isEersteRun = !messages || messages.length <= 1;
+      if (Array.isArray(messages) && messages.length > 0) {
         const laatsteBericht = messages[messages.length - 1];
         if (laatsteBericht?.parts?.text) {
           actueleVraag = laatsteBericht.parts.text;
@@ -51,12 +81,6 @@ var backend_index_default = {
         }
       }
 
-      // ====================================================================
-      // GELAAGDE OPBOUW VOOR MAXIMALE IMPLICIT CACHING:
-      // Laag 1: Vaste systeemregels + dagelijkse docs snapshot (gedeeld over alle gebruikers)
-      // Laag 2: Logdata (ongewijzigd tijdens de volledige chatsessie)
-      // Laag 3: Gebruikerscontext (mag tijdens het gesprek wijzigen zonder cache te breken)
-      // ====================================================================
       const dynamischeKennisContext = openquattDocsSnapshot;
       const systemInstruction = `Je bent de 'OpenHeatPumps AI Assistent'.
 
@@ -91,9 +115,8 @@ STRIKTE GEBRUIKERSCONTEXT:
 * Afgiftesysteem: ${userProfile?.afgiftesysteem || "Onbekend"}
 * Aanwezige CV-ketel: ${userProfile?.cv_ketel || "GEEN KETEL AANWEZIG"}
 * Thermostaat: ${userProfile?.thermostaat || "Onbekend"}`;
-
       let contents = [];
-      if (isEersteRun) {
+      if (!messages || messages.length === 0) {
         const initieelBericht = `GEBRUIKERSVRAAG/KLACHT:${actueleVraag}`;
         contents.push({ role: "user", parts: [{ text: initieelBericht }] });
       } else {
@@ -110,8 +133,7 @@ STRIKTE GEBRUIKERSCONTEXT:
         return kopie;
       };
 
-      // Groep 1: Volwaardige Flash-modellen (hoogste kwaliteit, eerst proberen)
-      // Groep 2: Lite-modellen (alleen als laatste vangnet bij drukte)
+      // Volwaardige Flash-modellen eerst, Lite-modellen als laatste vangnet
       const primaireModellen = hussel(["gemini-3.8-flash", "gemini-3.6-flash", "gemini-3-flash-preview"]);
       const vangnetModellen = hussel(["gemini-3.1-flash-lite", "gemini-3.5-flash-lite"]);
       const geschuddeModellen = [...primaireModellen, ...vangnetModellen];
@@ -132,7 +154,7 @@ STRIKTE GEBRUIKERSCONTEXT:
       const encoder = new TextEncoder();
 
       ctx.waitUntil((async () => {
-        let gebruiktModel = geschuddeModellen[0];
+        let gebruiktModel = geschuddeModellen;
         let geminiJson = null;
 
         try {
@@ -142,10 +164,9 @@ STRIKTE GEBRUIKERSCONTEXT:
           }];
           await writer.write(encoder.encode(`---CONTEXT_DOCS_START---\n${JSON.stringify(geselecteerdeDocs)}\n---CONTEXT_DOCS_END---\n`));
 
-          // Probeer de geschudde modellen één voor één tot er eentje slaagt
           for (const model of geschuddeModellen) {
             gebruiktModel = model;
-            const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${env.GEMINI_API_KEY}`;
+            const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${env.GEMINI_API_KEY}`;            
             const geminiResponse = await fetch(geminiUrl, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -161,12 +182,11 @@ STRIKTE GEBRUIKERSCONTEXT:
             console.warn(`Model ${model} faalde (${geminiResponse.status}), schakel door naar volgende model...`);
           }
 
-          // Log de implicit cache statistieken in Cloudflare Workers logs
           const cachedTokens = geminiJson?.usageMetadata?.cachedContentTokenCount || 0;
           const promptTokens = geminiJson?.usageMetadata?.promptTokenCount || 0;
           console.log(`[Cache Status] Model: ${gebruiktModel} | Gecached: ${cachedTokens} / ${promptTokens} tokens`);
 
-          let pureAiText = geminiJson?.candidates?.[0]?.content?.parts?.[0]?.text;
+          let pureAiText = geminiJson?.candidates?.?.content?.parts?.?.text;
           if (!pureAiText) {
             pureAiText = geminiJson?.error
               ? `🚨 API FOUT: ${geminiJson.error.message}`
@@ -175,6 +195,24 @@ STRIKTE GEBRUIKERSCONTEXT:
 
           const finaleRespons = JSON.stringify({ model: gebruiktModel, diagnose: pureAiText });
           await writer.write(encoder.encode(`---FINAL_RESPONSE---\n${finaleRespons}`));
+
+          // TEST-LOGGING IN CLOUDFLARE KV (Indien ingeschakeld via env.ENABLE_TEST_LOGGING === "true")
+          if (env.LOGS_KV && env.ENABLE_TEST_LOGGING === "true") {
+            const tijdstempel = new Date().toISOString();
+            const auditKey = `audit:${tijdstempel}_${crypto.randomUUID().slice(0, 6)}`;
+            const auditRecord = {
+              tijdstip: tijdstempel,
+              type: isEersteRun ? "startanalyse" : "vervolgvraag",
+              model: gebruiktModel,
+              cacheStats: { cachedTokens, promptTokens },
+              userProfile,
+              laatsteVraag: actueleVraag,
+              aiAntwoord: pureAiText,
+              messages,
+              logData
+            };
+            await env.LOGS_KV.put(auditKey, JSON.stringify(auditRecord), { expirationTtl: 1209600 });
+          }
 
         } catch (streamErr) {
           console.error("Streaming Fatal Error:", streamErr.message);
