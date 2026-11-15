@@ -72,6 +72,7 @@ STRIKTE SYSTEEM- EN HARDWARECONTEXT:
 STRIKTE RAG INSTRUCTIE:
 * OpenQuatt werkt naar keuze VERMOGENSGESTUURD op basis van huisverlies (phouseHouse) en de actuele vraag (phouseReq) of op basis van een klassieke stooklijn.
 * Kijk bij actuele vragen altijd naar de inhoud van het logbestand en naar de openstaande issues en documentatie die hieronder zijn meegezonden als dynamische kennis context.
+* Geef bij technische vragen over registers, instellingen of opties GEEN eigen speculaties, adviezen of zelfbedachte verklaringen als die niet letterlijk in de OpenQuatt-documentatie staan. Vermeld dan uitsluitend wat de documentatie erover zegt.
 
 DYNAMISCH GEPROMPTE KENNIS UIT DATABASE:
 <openquatt_docs>
@@ -99,20 +100,23 @@ STRIKTE GEBRUIKERSCONTEXT:
         contents = JSON.parse(JSON.stringify(messages));
       }
 
-      // Echte willekeurige hussel (Fisher-Yates) over alle beschikbare modellen
-      const geschuddeModellen = [
-        "gemini-3.8-flash",
-        "gemini-3.6-flash",
-        "gemini-3.1-flash-lite",
-        "gemini-3.5-flash-lite",
-        "gemini-3-flash-preview"
-      ];
-      for (let i = geschuddeModellen.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [geschuddeModellen[i], geschuddeModellen[j]] = [geschuddeModellen[j], geschuddeModellen[i]];
-      }
+      // Helper om een array willekeurig te husselen (Fisher-Yates)
+      const hussel = (arr) => {
+        const kopie = [...arr];
+        for (let i = kopie.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [kopie[i], kopie[j]] = [kopie[j], kopie[i]];
+        }
+        return kopie;
+      };
 
-      // Optioneel: houd het eerder succesvolle model uit deze chatsessie vooraan voor maximale cache-hits
+      // Groep 1: Volwaardige Flash-modellen (hoogste kwaliteit, eerst proberen)
+      // Groep 2: Lite-modellen (alleen als laatste vangnet bij drukte)
+      const primaireModellen = hussel(["gemini-3.8-flash", "gemini-3.6-flash", "gemini-3-flash-preview"]);
+      const vangnetModellen = hussel(["gemini-3.1-flash-lite", "gemini-3.5-flash-lite"]);
+      const geschuddeModellen = [...primaireModellen, ...vangnetModellen];
+
+      // Houd het eerder succesvolle model uit deze chatsessie vooraan voor maximale cache-hits
       if (preferredModel && geschuddeModellen.includes(preferredModel)) {
         const overige = geschuddeModellen.filter((m) => m !== preferredModel);
         geschuddeModellen.splice(0, geschuddeModellen.length, preferredModel, ...overige);
