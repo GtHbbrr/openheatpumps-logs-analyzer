@@ -1555,10 +1555,10 @@ function parseMarkdown(tekst) {
                     outputBox.innerHTML = `<div class="text-xs text-orange-400 mb-2">🔗 Gedeelde analyse geladen (ID: ${shareId})</div>`;
                     chatHistory.forEach(msg => {
                         if (msg.role === "user") {
-                            const tekst = msg.parts?.[0]?.text?.replace(/^GEBRUIKERSVRAAG\/KLACHT:/, "") || "";
+                            const tekst = msg.parts?.at(0)?.text?.replace(/^GEBRUIKERSVRAAG\/KLACHT:/, "") || "";
                             outputBox.innerHTML += `<br><div class="text-right"><span class="bg-gray-800 text-gray-200 border border-gray-700 px-3 py-2 rounded-lg inline-block text-sm max-w-[85%] text-left"><strong>Vraag:</strong><br>${esc(tekst)}</span></div>`;
                         } else if (msg.role === "model") {
-                            outputBox.innerHTML += `<br><div class="text-xs text-gray-500 mb-1">🤖 AI Analyse</div><div><span class="inline-block text-sm max-w-[95%]">${parseMarkdown(msg.parts?.[0]?.text || "")}</span></div>`;
+                            outputBox.innerHTML += `<br><div class="text-xs text-gray-500 mb-1">🤖 AI Analyse</div><div><span class="inline-block text-sm max-w-[95%]">${parseMarkdown(msg.parts?.at(0)?.text || "")}</span></div>`;
                         }
                     });
                     el('chat-container').classList.remove('hidden');
