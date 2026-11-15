@@ -193,7 +193,7 @@
     <script>
         const WORKER_URL = "https://api.openheatpumps.nl";
         
-        let activeLogData = null, chatHistory = [];
+        let activeLogData = null, chatHistory = [], activeSessionModel = null;
         const el = id => document.getElementById(id);
 
         // ============================================================
@@ -1012,6 +1012,7 @@ function parseMarkdown(tekst) {
         // 2. FUNCTIE: HET BESTAND ECHT INLEZEN EN DE UI ACTIVEREN
         async function laadBestand(file) {
             try {
+                activeSessionModel = null; // Nieuw logboek = nieuwe cache-sessie
                 el('file-name').textContent = file.name;
                 activeLogData = JSON.parse(await file.text());
                 
@@ -1202,7 +1203,7 @@ function parseMarkdown(tekst) {
             }
         });
 
-        // 6. EERSTE ANALYSE STARTEN (NU MET PRIVACY-FIRST STREAMING EN CORREKTE PAYLOAD-MAPPING)
+        // 6. EERSTE ANALYSE STARTEN (NU MET PRIVACY-FIRST STREAMING EN CACHE-BEHOUD)
         el('btn-diagnose').addEventListener('click', async () => {
             if (!activeLogData) return;
             el('loader').classList.remove('hidden');
@@ -1221,7 +1222,9 @@ function parseMarkdown(tekst) {
             }
             if (usedModelBadge) usedModelBadge.innerHTML = "";
 
+            // Reset sessie en cache-voorkeursmodel bij nieuwe startanalyse
             chatHistory = [];
+            activeSessionModel = null;
 
             const profile = { 
                 woning_type: el('woning_type').value, 
@@ -1231,9 +1234,13 @@ function parseMarkdown(tekst) {
             };
 
             const beginVraagTekst = el('begin_vraag').value.trim();
+            const startPrompt = beginVraagTekst 
+                ? `GEBRUIKERSVRAAG/KLACHT:${beginVraagTekst}` 
+                : `GEBRUIKERSVRAAG/KLACHT:Analyseer dit bestand.`;
             
+            chatHistory.push({ role: "user", parts: [{ text: startPrompt }] });
+
             if (beginVraagTekst) {
-                chatHistory.push({ role: "user", parts: [{ text: `Specifieke klacht/vraag van de gebruiker: ${beginVraagTekst}` }] });
                 outputBox.innerHTML += `<br><br><div><span class="text-xs text-gray-500">Omgevings-klacht meegegeven: "${beginVraagTekst}"</span></div>`;
             }
 
@@ -1241,14 +1248,14 @@ function parseMarkdown(tekst) {
             el('btn-diagnose').textContent = "AI analyseert het logboek...";
 
             try {
-                // Roep de streaming endpoint van je Cloudflare worker aan
                 const response = await fetch(WORKER_URL, { 
                     method: 'POST', 
                     headers: { 'Content-Type': 'application/json' }, 
                     body: JSON.stringify({ 
                         userProfile: profile, 
                         logData: activeLogData, 
-                        messages: chatHistory.length > 0 ? chatHistory : null 
+                        messages: chatHistory,
+                        preferredModel: null
                     }) 
                 });
 
@@ -1267,7 +1274,6 @@ function parseMarkdown(tekst) {
 
                     buffer += textDecoder.decode(value, { stream: true });
 
-                    // ENVELOP 1: Verwerk direct de binnengekomen RAG-kennis chunks
                     if (!contextDocsVerwerkt && buffer.includes("---CONTEXT_DOCS_END---")) {
                         const parts = buffer.split("---CONTEXT_DOCS_END---\n");
                         const headerPart = parts[0];
@@ -1283,7 +1289,6 @@ function parseMarkdown(tekst) {
                         }
                     }
 
-                    // ENVELOP 2: Verwerk de uiteindelijke Gemini AI-analyse en de modelnaam
                     if (buffer.includes("---FINAL_RESPONSE---")) {
                         const parts = buffer.split("---FINAL_RESPONSE---\n");
                         const finalJsonString = parts[1];
@@ -1291,10 +1296,13 @@ function parseMarkdown(tekst) {
                         if (finalJsonString && finalJsonString.trim().endsWith("}")) {
                             const d = JSON.parse(finalJsonString.trim());
                             
-                            // SUCCES: Verwerk het resultaat via JOUW eigen parseMarkdown() functie!
-                            // outputBox.innerHTML = `${parseMarkdown(d.diagnose)}`;
+                            // Sla het succesvolle model op voor vervolgvragen (behoudt Implicit Cache)
+                            if (d.model && d.model !== "Crash-pijp") {
+                                activeSessionModel = d.model;
+                            }
+
                             outputBox.innerHTML += `<br><br><div class="text-xs text-gray-500 mb-1">🤖 Beantwoord via model: ${d.model.toUpperCase()}</div><div><span class="inline-block text-sm max-w-[95%]">${parseMarkdown(d.diagnose)}</span></div>`;                            
-                            chatHistory.push({ role: "user", parts: [{ text: "Analyseer dit bestand." }] }, { role: "model", parts: [{ text: d.diagnose }] });                        
+                            chatHistory.push({ role: "model", parts: [{ text: d.diagnose }] });                        
                             
                             if (usedModelBadge) {
                                 usedModelBadge.innerHTML = `Ai model: ${d.model.toUpperCase()} (FREE ROTATION)`;
@@ -1307,7 +1315,7 @@ function parseMarkdown(tekst) {
                             
                             el('chat-container').classList.remove('hidden');
                             el('loader').classList.add('hidden');
-                            return; // Sluit de streaming loop succesvol af
+                            return;
                         }
                     }
                 }
@@ -1322,14 +1330,13 @@ function parseMarkdown(tekst) {
             el('loader').classList.add('hidden');
         });
 
-        // 7. VERVOLGVRAGEN VERSTUREN (NU OOK MET PRIVACY-FIRST STREAMING EN CORREKTE PAYLOAD-MAPPING)
+        // 7. VERVOLGVRAGEN VERSTUREN (MET PREFERRED MODEL VOOR MAXIMALE CACHE-HITS)
         el('btn-send').addEventListener('click', async () => {
             const inputField = el('chat-input');
             const outputBox = el('output-box');
             const loader = el('loader');
             const usedModelBadge = el('used-model-badge');
             
-            // Controleer of de knop in de fout-staat staat of dat er een foutmelding in de box staat
             const isFoutGeweest = el('btn-send').textContent.includes("Opnieuw Proberen") ||
                                  outputBox.innerHTML.includes("🚨 GOOGLE API FOUT") || 
                                  outputBox.innerHTML.includes("🚨 SYSTEMISCHE CRASH") || 
@@ -1354,11 +1361,9 @@ function parseMarkdown(tekst) {
             el('btn-send').disabled = true;
             el('btn-send').textContent = "Versturen...";
         
-            // Toon de live statusstappen onderaan de chat tijdens het wachten
-            outputBox.innerHTML += `<br><div id="live-chat-status" class="text-xs text-orange-400 animate-pulse mt-2">🎲 Model-selectie activeert alternatief ai model... Wachten op antwoord...</div>`;
+            outputBox.innerHTML += `<br><div id="live-chat-status" class="text-xs text-orange-400 animate-pulse mt-2">🎲 Model-selectie verwerkt vervolgvraag... Wachten op antwoord...</div>`;
             outputBox.scrollTop = outputBox.scrollHeight;
         
-            // Vlag om bij te houden of de AI succesvol een geldige diagnose heeft teruggestuurd
             let succesvolAfgerond = false;
         
             try {
@@ -1372,7 +1377,12 @@ function parseMarkdown(tekst) {
                 const response = await fetch(WORKER_URL, { 
                     method: 'POST', 
                     headers: { 'Content-Type': 'application/json' }, 
-                    body: JSON.stringify({ userProfile: profile, logData: activeLogData, messages: chatHistory }) 
+                    body: JSON.stringify({ 
+                        userProfile: profile, 
+                        logData: activeLogData, 
+                        messages: chatHistory,
+                        preferredModel: activeSessionModel
+                    }) 
                 });
                 
                 if (!response.ok) {
@@ -1390,7 +1400,6 @@ function parseMarkdown(tekst) {
         
                     buffer += textDecoder.decode(value, { stream: true });
         
-                    // ENVELOP 1: Verwerk de RAG-documenten
                     if (!contextDocsVerwerkt && buffer.includes("---CONTEXT_DOCS_END---")) {
                         const parts = buffer.split("---CONTEXT_DOCS_END---\n");
                         const headerPart = parts[0];
@@ -1406,7 +1415,6 @@ function parseMarkdown(tekst) {
                         }
                     }
         
-                    // ENVELOP 2: Verwerk de finale respons voor de vervolgvraag
                     if (buffer.includes("---FINAL_RESPONSE---")) {
                         const parts = buffer.split("---FINAL_RESPONSE---\n");
                         const finalJsonString = parts[1];
@@ -1414,13 +1422,16 @@ function parseMarkdown(tekst) {
                         if (finalJsonString && finalJsonString.trim().endsWith("}")) {
                             const d = JSON.parse(finalJsonString.trim());
                             
-                            // Verwijder de tijdelijke chat-statusregel en oude foutmeldingen
+                            // Update het sessiemodel (voor het geval een fallback nodig was)
+                            if (d.model && d.model !== "Crash-pijp") {
+                                activeSessionModel = d.model;
+                            }
+
                             const statusRegel = el('live-chat-status');
                             if (statusRegel) statusRegel.remove();
                             const oudeFouten = outputBox.querySelectorAll('.error-msg');
                             oudeFouten.forEach(fout => fout.remove());
         
-                            // VOEG HET ANTWOORD TOE EN TOON DE PARSER-OUTPUT IN DE TIJDLIJN
                             outputBox.innerHTML += `<br><br><div class="text-xs text-gray-500 mb-1">🤖 Beantwoord via model: ${d.model.toUpperCase()}</div><div><span class="inline-block text-sm max-w-[95%]">${parseMarkdown(d.diagnose)}</span></div>`;
                             chatHistory.push({ role: "model", parts: [{ text: d.diagnose }] });
                             
@@ -1432,13 +1443,12 @@ function parseMarkdown(tekst) {
                             el('btn-send').classList.remove('bg-red-600', 'hover:bg-red-700');
                             el('btn-send').classList.add('bg-orange-600', 'hover:bg-orange-700');
                             
-                            succesvolAfgerond = true; // Registreer succes!
+                            succesvolAfgerond = true;
                             break;
                         }
                     }
                 }
         
-                // Als de stream eindigde zonder de FINAL_RESPONSE envelop te parsen, werp handmatig een fout op
                 if (!succesvolAfgerond) {
                     throw new Error("De backend-stream sloot onverwacht zonder resultaat.");
                 }
@@ -1457,6 +1467,7 @@ function parseMarkdown(tekst) {
             el('btn-send').disabled = false;
             outputBox.scrollTop = outputBox.scrollHeight;
         });
+
         el('chat-input').addEventListener('keydown', (e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
