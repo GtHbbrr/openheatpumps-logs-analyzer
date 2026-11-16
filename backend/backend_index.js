@@ -24,6 +24,24 @@ var backend_index_default = {
 
     const url = new URL(request.url);
 
+    const stuurNaarPrivateFeed = (payload) => {
+      if (!env.NEWSFEED_SERVICE) return;
+      ctx.waitUntil(
+        env.NEWSFEED_SERVICE.fetch("https://internal/event", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ...payload,
+            geo: {
+              city: request.cf?.city || "Onbekend",
+              region: request.cf?.region || "Onbekend",
+              country: request.cf?.country || "NL"
+            }
+          })
+        })
+      );
+    };    
+
     // ROUTE A: Gedeelde analyse ophalen (GET /share?id=...)
     if (request.method === "GET" && url.pathname === "/share") {
       const shareId = url.searchParams.get("id");
@@ -46,6 +64,21 @@ var backend_index_default = {
         const payload = await request.json();
         const shareId = crypto.randomUUID().slice(0, 8);
         await env.LOGS_KV.put(`share:${shareId}`, JSON.stringify(payload), { expirationTtl: 604800 });
+
+        stuurNaarPrivateFeed({
+          existingShareId: shareId,
+          entry: {
+            tijdstip: new Date().toISOString(),
+            type: "share",
+            userProfile: payload.userProfile || {},
+            laatsteVraag: "Analyse gedeeld via link",
+            aiAntwoord: payload.aiAntwoord || "",
+            messages: payload.messages || [],
+            logData: payload.logData || null
+          }
+        });
+
+        
         return new Response(JSON.stringify({ status: "success", id: shareId }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       } catch (err) {
         return new Response(JSON.stringify({ status: "error", melding: err.message }), { status: 500, headers: corsHeaders });
@@ -164,14 +197,18 @@ STRIKTE GEBRUIKERSCONTEXT:
           }];
           await writer.write(encoder.encode(`---CONTEXT_DOCS_START---\n${JSON.stringify(geselecteerdeDocs)}\n---CONTEXT_DOCS_END---\n`));
 
+          const apiAttempts = [];
+
           for (const model of geschuddeModellen) {
             gebruiktModel = model;
-            const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${env.GEMINI_API_KEY}`;            
+            const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${env.GEMINI_API_KEY}`;
             const geminiResponse = await fetch(geminiUrl, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify(geminiPayload)
             });
+
+            apiAttempts.push({ model, status: geminiResponse.status });
 
             const responseText = await geminiResponse.text();
             geminiJson = responseText.trim().startsWith("{") ? JSON.parse(responseText) : null;
@@ -197,11 +234,10 @@ STRIKTE GEBRUIKERSCONTEXT:
           await writer.write(encoder.encode(`---FINAL_RESPONSE---\n${finaleRespons}`));
 
           // TEST-LOGGING IN CLOUDFLARE KV (Indien ingeschakeld via env.ENABLE_TEST_LOGGING === "true")
-          if (env.LOGS_KV && env.ENABLE_TEST_LOGGING === "true") {
-            const tijdstempel = new Date().toISOString();
-            const auditKey = `audit:${tijdstempel}_${crypto.randomUUID().slice(0, 6)}`;
-            const auditRecord = {
-              tijdstip: tijdstempel,
+          stuurNaarPrivateFeed({
+            apiAttempts,
+            entry: {
+              tijdstip: new Date().toISOString(),
               type: isEersteRun ? "startanalyse" : "vervolgvraag",
               model: gebruiktModel,
               cacheStats: { cachedTokens, promptTokens },
@@ -210,9 +246,8 @@ STRIKTE GEBRUIKERSCONTEXT:
               aiAntwoord: pureAiText,
               messages,
               logData
-            };
-            await env.LOGS_KV.put(auditKey, JSON.stringify(auditRecord), { expirationTtl: 1209600 });
-          }
+            }
+          });
 
         } catch (streamErr) {
           console.error("Streaming Fatal Error:", streamErr.message);
