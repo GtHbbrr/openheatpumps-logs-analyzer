@@ -1,6 +1,36 @@
-[OpenQuatt docs snapshot | fw: v0.58.1 | fetched: 2026-11-15T10:27:11.086Z]
+[OpenQuatt docs snapshot | fw: v0.58.1 | fetched: 2026-11-16T10:42:35.167Z]
 
 ---OPEN ISSUES---
+
+issue #963 (enhancement): [Feature] toevoegen openhaard modus - Niche feature maar wel fijne nice to have. Betreft toevoegen van een openhaard modus in OQ, die na activatie een instelbaar % van de PowerHouse vraag in stand houd en in-house temperatuur negeert. Hiermee blijft de warmtepomp doordraaien op x% om de bovenverdieping warm te houden terwijl beneden de openhaard staat te branden.
+
+issue #963 (enhancement): [Feature] toevoegen openhaard modus - Beproefde feature op meer geavanceerde thermostaten. Nuttig voor iedereen met open haard.
+
+issue #963 (enhancement): [Feature] toevoegen openhaard modus - Instelbaar percentage van PH-vraag die dan in stand blijft in instellingenmenu
+
+issue #963 (enhancement): [Feature] toevoegen openhaard modus - OQ blijft sturen op gereduceerde PH-vraag (fixed zolang openhaard actief is), en negeert hierbij kamertemperatuur
+
+issue #963 (enhancement): [Feature] toevoegen openhaard modus - - [x] User-facing entities/configuratie veranderen - [x] Runtime/control gedrag verandert mogelijk - [ ] Hardware, Modbus IO, actuator, safety, thermal, boiler, of flow gedrag wordt geraakt - [ ] Ik weet het niet zeker
+
+issue #960 (enhancement): [Feature] (e)CV aan tijdens defrost - Om grote temperatuurschommelingen in de aanvoer te beperken, maar toch zo min mogelijk gas/elektraverbruik door (e)-cv aan te schakelen zou het fijn zijn dat middels een instelling kan worden ingesteld of de (e)-cv moet helpen tijdens een defrost. Zo blijft te temperatuur in het systeem stabieler, waardoor Quatt het over het algemeen gemeen langer kan volhouden in z'n eentje met gewaarborgd comfort.
+
+issue #960 (enhancement): [Feature] (e)CV aan tijdens defrost - Quatt kan hierdoor langer op zichzelf aan, omdat grote schommelingen in het systeem beter ondervangen worden. DeWarmte heeft deze functionaliteit bijvoorbeeld al en Quatt zelf ook. Hopelijk dus "eenvoudig" te porteren.
+
+issue #960 (enhancement): [Feature] (e)CV aan tijdens defrost - - [ ] User-facing entities/configuratie veranderen - [ ] Runtime/control gedrag verandert mogelijk - [ ] Hardware, Modbus IO, actuator, safety, thermal, boiler, of flow gedrag wordt geraakt - [ ] Ik weet het niet zeker
+
+issue #959: [Feature] Verleng retentie van de Systeemrecorder (12+ uur) door deadbands, float-afronding en compactere PSRAM-opslag - ### Samenvatting & Aanleiding Op dit moment bewaart de PSRAM rolling recorder ( device-psram-delta-json-v1 , buffer size: 2097152 , interval s: 10 ) maximaal 2.461 samples (~6 uur en 50 minuten) op basis van een vaste reservering van sample row bytes: 852 .
+
+issue #959: [Feature] Verleng retentie van de Systeemrecorder (12+ uur) door deadbands, float-afronding en compactere PSRAM-opslag - In de praktijk ontstaan veel regeltechnische vragen of verstoringen juist 's nachts (bijv. pendelen, ontdooicycli of ongewenst bijspringen van de CV-ketel). Wanneer een gebruiker de volgende ochtend (bijv. rond 09:00–10:00 uur) de systeemrecorder bekijkt, zijn gebeurtenissen van eerder in de nacht (22:00–03:00 uur) al uit de 6u 50m PSRAM-ringbuffer gelopen.
+
+issue #959: [Feature] Verleng retentie van de Systeemrecorder (12+ uur) door deadbands, float-afronding en compactere PSRAM-opslag - ### Observaties uit een device-psram-delta-json-v1 export Bij analyse van een volledige opname van 2.461 samples (280 kolommen) vallen twee directe optimalisaties op waarmee we de opslag- en serialisatielast per sample flink kunnen verlagen, zonder diagnostische velden (zoals heap/PSRAM-telemetrie) weg te laten:
+
+issue #959: [Feature] Verleng retentie van de Systeemrecorder (12+ uur) door deadbands, float-afronding en compactere PSRAM-opslag - 1. Sub-ruis schommelingen worden elke 10s gelogd: Stabiele analoge waarden schommelen minimaal tussen twee 10s-stappen (bijv. waterSupplyTempEsp die steeds wisselt tussen 35.42 en 35.43 °C , of hp1Power tussen 391.4751 en 391.6209 W ). Hierdoor worden deze kolommen in vrijwel elke delta-rij opnieuw weggeschreven. 2. Onafgeronde IEEE-754 floats in de JSON-output: Waarden worden met volledige float-precisie geserialiseerd (bijv. [38, 391.4751] , [51, 8.400001] , [268, 0.014] ), wat zowel de JSON-omvang als de formatteertijd op de ESP32-S3 onnodig vergroot.
+
+issue #959: [Feature] Verleng retentie van de Systeemrecorder (12+ uur) door deadbands, float-afronding en compactere PSRAM-opslag - ### Voorstel Om binnen het bestaande 2 MB PSRAM-budget een langere retentie te halen (idealiter 12+ uur , zodat een volledige nacht behouden blijft) met behoud van het vaste 10s -interval en zonder extra aanspraak te doen op interne DRAM:
+
+issue #959: [Feature] Verleng retentie van de Systeemrecorder (12+ uur) door deadbands, float-afronding en compactere PSRAM-opslag - 1. Floats afronden op relevante decimalen vóór vergelijking en serialisatie: - 0 decimalen (gehele getallen) voor vermogen ( W ) en flow ( L/h ) - 1 decimaal voor druk ( bar ) - 2 decimalen voor temperaturen ( °C ) en responstijden ( s ) 2. Kleine deadband toepassen t.o.v. de laatst gelogde waarde ( abs(afgerond - laatst gelogd) = deadband ): - Temperaturen ( °C ): wijzigingen < 0.05 °C negeren - Vermogen ( W ): wijzigingen < 5 W negeren - Flow ( L/h ): wijzigingen < 5 L/h negeren - (Door te vergelijken met de laatst weggeschreven waarde i.p.v. t-10s blijft langzame drift over meerdere minuten gewoon behouden zodra de drempel wordt overschreden). 3. Periodieke sync-rij toevoegen met onafgeronde waarden (elke 5 minuten / 30 samples): - Schrijf eens per 30 samples de onafgeronde actuele waarden van de kernsensoren weg (en reset daarmee de referentie voor de volgende deadband-vergelijkingen). - Omdat dit slechts 1x per 5 minuten gebeurt is de extra data-omvang verwaarloosbaar, maar behoud je wél de volledige sensorprecisie om langzame drift te volgen en te verifiëren dat een sensor actief blijft uitlezen (i.p.v. vastgelopen op één waarde). 4. Rijgrootte ( sample row bytes ) verlagen of binaire opslag in PSRAM overwegen: - Korte termijn: Met minder ruis per delta-rij kan de vaste reservering ( sample row bytes: 852 ) omlaag (bijv. richting 400–450 bytes), waardoor het 10s -interval behouden blijft en de retentie groeit naar ~13–14,5 uur . - Langere termijn (optioneel): Als de ringbuffer in PSRAM compacte binaire records opslaat (2–4 bytes per gewijzigde waarde i.p.v. geformatteerde tekst) en pas bij export naar JSON serialiseert, past binnen dezelfde 2 MB PSRAM zonder zware compressiebuffers (zoals zlib/gzip in DRAM) eenvoudig 24+ uur aan historie.
+
+issue #959: [Feature] Verleng retentie van de Systeemrecorder (12+ uur) door deadbands, float-afronding en compactere PSRAM-opslag - ### Verwacht voordeel - Volledige nachtelijke diagnose: Gebruikers kunnen 's dan overdag terugkijken tot het begin van de avond/nacht zonder dat samples al zijn overschreven. - Behoud van nauwkeurigheid: Snelle events ( 10s -resolutie), langzame drift en sensordiagnostiek blijven volledig behouden. - Minder CPU- en klembord/export-belasting: Kleinere JSON-exports kopiëren en laden sneller in zowel de browser als externe diagnosetools (zoals OpenHeatPumps).
 
 issue #956 (enhancement): Evcc - Is there anyone who is using also EVCC and can test the new plugin? https://github.com/evcc-io/evcc/pull/36193
 
