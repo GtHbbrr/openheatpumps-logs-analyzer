@@ -25,5 +25,6 @@ crons = [
 binding = "LOGS_KV"
 id = "bd5c604915394db39ab1f77fd8dbbd8b"
 
-[vars]
-ENABLE_TEST_LOGGING = "true"
+[[services]]
+binding = "NEWSFEED_SERVICE"
+service = "openheatpumps-newsfeed"
