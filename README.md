@@ -1,51 +1,39 @@
 # OpenHeatPumps Logs Analyzer 🚀
 
-Welkom bij OpenHeatPumps.nl! Dit is een onafhankelijke en gebruiksvriendelijke hulpkit voor bezitters van een slimme warmtepomp (zoals de Quatt). 
+Welkom bij **OpenHeatPumps.nl**! Dit is een onafhankelijke hulpkit voor bezitters van slimme warmtepomp-systemen zoals de **OpenQuatt**.
 
-Wanneer een warmtepomp niet goed werkt, maakt de computer van de warmtepomp een groot databestand aan (een zogenaamd logbestand). Voor gewone mensen zijn deze bestanden onleesbaar. Deze website lost dat op. Je sleept het bestand simpelweg naar de website, en onze ingebouwde AI-assistent legt je in begrijpelijk Nederlands uit wat er aan de hand is.
-
----
-
-## 🛠️ Hoe werkt de website nu?
-
-De website bestaat uit twee delen die veilig in de cloud samenwerken:
-
-1.  **De Voorkant (Website):** Een overzichtelijke, webpagina. Met de knop "Koppel Log-map" zoekt de website automatisch het nieuwste logbestand op je computer. Je kunt het bestand er ook gewoon naartoe slepen.
-2.  **De Achterkant (De Slimme Motor):** Dit deeltje praat veilig met de kunstmatige intelligentie (AI) van Google Gemini. De motor leest de cijfers uit je logbestand en stuurt de begrijpelijke analyse terug naar jouw scherm. 
-
-Sinds de laatste update heeft de slimme motor een betrouwbaar 'geheugen' gekregen. We hebben de officiële handleidingen van de warmtepomp in dit geheugen opgeslagen. Als jij een vraag stelt over bijvoorbeeld de pompsnelheid, controleert de computer eerst de officiële regels voordat hij antwoord geeft. Hierdoor verzint de AI geen gekke dingen meer en krijg je altijd een betrouwbaar advies.
-
-## 🗺️ Wat gaan we in de toekomst verbeteren? (De Roadmap)
-
-Om de AI-assistent nog slimmer en betrouwbaarder te maken, breiden we de achterkant van de website stap voor stap uit. De gebruiker hoeft hier niets van te merken; het slepen van het bestand blijft het enige wat je hoeft te doen.
-
-### 📍 Fase 2: Lokaal geheugen opbouwen
-*   **Het doel:** Vragen kunnen beantwoorden zoals: *"Waarom verbruikt mijn pomp nu meer stroom dan vorige week?"*
-*   **Hoe we dit doen:** De website onthoudt anoniem de belangrijkste cijfers van de logs die je uploadt. Hierdoor kan de AI trends ontdekken en jouw warmtepomp-gedrag door de tijd heen vergelijken.
-
-### 📍 Fase 3: Het slimme RAG-geheugen (Nu actief in de testomgeving!)
-*   **Het doel:** Voorkomen dat de AI fout advies geeft of interfaces verzint die niet bestaan.
-*   **Hoe we dit doen:** We hebben een digitale bibliotheek (een vector-database) gekoppeld aan de website. Hierin staan de officiële installatieregels en de handleidingen van de makers. Voordat de AI antwoord geeft op een vervolgvraag, leest hij eerst razendsnel de echte regels door.
-
-### 📍 Fase 4: De Power House & Expert-regels toevoegen
-*   **Het doel:** De AI precies laten begrijpen waarom de warmtepomp op bepaalde momenten hard gaat draaien of juist stopt.
-*   **Hoe we dit doen:** We voeden de digitale bibliotheek met de wetten van de 'Power House-strategie'. De AI leert hierdoor dat de warmtepomp niet op ouderwetse temperatuurlijnen werkt, maar op basis van slimme berekeningen rondom huisverlies en de 'start-intentie' (Heat Intent). 
-
-### 📍 Fase 5: Installaties met elkaar vergelijken
-*   **Het doel:** Leren van andere warmtepomp-bezitters.
-*   **Hoe we dit doen:** De AI kan anoniem installaties met exact dezelfde kenmerken (bijvoorbeeld: een tussenwoning met radiatoren en een Intergas-ketel) naast elkaar leggen. Je krijgt dan direct advies zoals: *"Bij jouw buren met hetzelfde huis springt de CV-ketel veel minder vaak bij. Controleer instelling X."*
+Complexe databestanden (`.oqdebug.json`) die door de controller worden aangemaakt, worden door onze website omgezet in begrijpelijk Nederlandstalige diagnoses via een lichte frontend en een Cloudflare Workers-backend met Google Gemini-integratie en dagelijks gesynchroniseerde documentatie.
 
 ---
 
-## 🔒 Privacy & Veiligheid (Hoe we met je data omgaan)
+## 🛠 Hoe werkt de website nu? (v0.23.2+)
 
-Bij OpenHeatPumps.nl houden we van transparantie. Dit is hoe we nu met je gegevens omgaan:
-
-*   **Het logbestand gaat naar de AI:** Om een goede en volledige diagnose te kunnen stellen, wordt de inhoud van jouw `.oqdebug.json` bestand op dit moment **integraal (helemaal) meegestuurd** naar de AI-assistent. De AI heeft al deze cijfers en metingen simpelweg nodig om te kunnen ontdekken waarom je warmtepomp vreemd gedrag vertoont.
-*   **Geen accounts of permanente opslag:** We bewaren je bestanden **niet** in een database op internet. Er zijn geen gebruikersaccounts en we bouwen geen stiekem archief op met logs van de community.
-*   **Direct weer weg:** Alles draait in het tijdelijke geheugen van de internetbrowser en de tijdelijke cloud-aanroep. Zodra je het tabblad sluit of de website ververst, zijn alle gegevens direct volledig verdwenen.
+1. **Frontend:** Sleep je `.oqdebug.json` bestand naar het scherm, plak het vanaf je klembord of gebruik **"Koppel Log-map"**.
+2. **Backend & AI:** Cloudflare Workers verdeelt verzoeken slim over Google Gemini-modellen, ondersteund door dagelijks ververste documentatie en een RAG-geheugen.
+3. **Deelbare links:** Genereer met één klik een unieke diagnose-link die **7 dagen** geldig blijft.
 
 ---
+
+## 🗺 Roadmap
+
+* **Fase 1 & 2 (Live in v0.23.2+):** `.oqdebug.json` parsing, AI-diagnose, woningprofielen meesturen en tijdelijke deelbare links via Cloudflare KV.
+* **Fase 3 t/m 5 (Toekomst):** Verdieping van *Power House*- en *Heat Intent*-regels, historische trendvergelijkingen en anonieme installatie-benchmarks.
+
+---
+
+## 🔒 Privacy & Veiligheid
+
+* **AI-verwerking:** Bestanden worden tijdelijk naar de Google Gemini API gestuurd voor analyse.
+* **Geen accounts:** Er wordt geen persoonlijke informatie zoals namen of e-mailadressen gevraagd.
+* **Deelbare links:** Analysegegevens worden enkel opgeslagen na een bewuste klik op **"Deel analyse"** en worden na **7 dagen** automatisch gewist uit Cloudflare KV.
+* **Analytics:** Maakt gebruik van een eigen, cookievrije **Umami Analytics**-instantie.
+
+---
+
+## 💻 Meehelpen?
+
+Heb je ideeën of wil je bijdragen aan de backend? Open gerust een Issue of Pull Request op GitHub!
+
 
 
 ## 💻 Meehelpen?
