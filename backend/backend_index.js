@@ -288,6 +288,7 @@ STRIKTE SYSTEEM- EN HARDWARECONTEXT:
 STRIKTE RAG INSTRUCTIE:
 * OpenQuatt werkt naar keuze VERMOGENSGESTUURD op basis van huisverlies (phouseHouse) en de actuele vraag (phouseReq) of op basis van een klassieke stooklijn.
 * Kijk bij actuele vragen altijd naar de inhoud van het logbestand en naar de openstaande issues en documentatie die hieronder zijn meegezonden als dynamische kennis context.
+* De daadwerkelijke meetwaarden en statussen in het logbestand zijn altijd leidend: gebruik deze om een veronderstelling of suggestie van de gebruiker eerst feitelijk te bevestigen of te weerleggen voordat je erop voortborduurt.
 * Geef bij technische vragen over registers, instellingen of opties GEEN eigen speculaties, adviezen of zelfbedachte verklaringen als die niet letterlijk in de OpenQuatt-documentatie staan. Vermeld dan uitsluitend wat de documentatie erover zegt.
 
 DYNAMISCH GEPROMPTE KENNIS UIT DATABASE:
