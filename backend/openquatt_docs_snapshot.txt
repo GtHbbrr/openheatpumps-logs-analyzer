@@ -1,4 +1,4 @@
-[OpenQuatt docs snapshot | fw: v0.58.1 | fetched: 2026-11-16T10:42:35.167Z]
+[OpenQuatt docs snapshot | fw: v0.58.1 | fetched: 2026-11-17T11:31:36.946Z]
 
 ---OPEN ISSUES---
 
@@ -11,12 +11,6 @@ issue #963 (enhancement): [Feature] toevoegen openhaard modus - Instelbaar perce
 issue #963 (enhancement): [Feature] toevoegen openhaard modus - OQ blijft sturen op gereduceerde PH-vraag (fixed zolang openhaard actief is), en negeert hierbij kamertemperatuur
 
 issue #963 (enhancement): [Feature] toevoegen openhaard modus - - [x] User-facing entities/configuratie veranderen - [x] Runtime/control gedrag verandert mogelijk - [ ] Hardware, Modbus IO, actuator, safety, thermal, boiler, of flow gedrag wordt geraakt - [ ] Ik weet het niet zeker
-
-issue #960 (enhancement): [Feature] (e)CV aan tijdens defrost - Om grote temperatuurschommelingen in de aanvoer te beperken, maar toch zo min mogelijk gas/elektraverbruik door (e)-cv aan te schakelen zou het fijn zijn dat middels een instelling kan worden ingesteld of de (e)-cv moet helpen tijdens een defrost. Zo blijft te temperatuur in het systeem stabieler, waardoor Quatt het over het algemeen gemeen langer kan volhouden in z'n eentje met gewaarborgd comfort.
-
-issue #960 (enhancement): [Feature] (e)CV aan tijdens defrost - Quatt kan hierdoor langer op zichzelf aan, omdat grote schommelingen in het systeem beter ondervangen worden. DeWarmte heeft deze functionaliteit bijvoorbeeld al en Quatt zelf ook. Hopelijk dus "eenvoudig" te porteren.
-
-issue #960 (enhancement): [Feature] (e)CV aan tijdens defrost - - [ ] User-facing entities/configuratie veranderen - [ ] Runtime/control gedrag verandert mogelijk - [ ] Hardware, Modbus IO, actuator, safety, thermal, boiler, of flow gedrag wordt geraakt - [ ] Ik weet het niet zeker
 
 issue #959: [Feature] Verleng retentie van de Systeemrecorder (12+ uur) door deadbands, float-afronding en compactere PSRAM-opslag - ### Samenvatting & Aanleiding Op dit moment bewaart de PSRAM rolling recorder ( device-psram-delta-json-v1 , buffer size: 2097152 , interval s: 10 ) maximaal 2.461 samples (~6 uur en 50 minuten) op basis van een vaste reservering van sample row bytes: 852 .
 
