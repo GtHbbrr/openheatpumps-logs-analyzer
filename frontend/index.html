@@ -490,9 +490,17 @@
             // KAART 2: METADATA KAART (STANDAARD COMPACT INGEKLAPT ONDERAAN)
             // ============================================================
             const m = d.meta;
-            const started = m.started_at_ms ? new Date(m.started_at_ms).toLocaleString('nl-NL', { dateStyle: 'short', timeStyle: 'medium' }) : '–';
-            const ended = m.ended_at_ms ? new Date(m.ended_at_ms).toLocaleString('nl-NL', { dateStyle: 'short', timeStyle: 'medium' }) : '–';
-            const dur = m.duration_s ? `${m.duration_s}s (${(m.duration_s / 60).toFixed(1)} min)` : '–';
+            const formatMetaDatum = (val) => {
+                if (!val || val === '–') return '–';
+                if (typeof val === 'number') {
+                    const dt = new Date(val);
+                    return isNaN(dt.getTime()) ? '–' : dt.toLocaleString('nl-NL', { dateStyle: 'short', timeStyle: 'medium' });
+                }
+                return String(val); // Al geformatteerde string uit decodeLogbook direct tonen
+            };
+            const started = formatMetaDatum(m.started_at_ms);
+            const ended = formatMetaDatum(m.ended_at_ms);
+            const dur = m.duration_s ? `${Math.round(m.duration_s)}s (${(m.duration_s / 60).toFixed(1)} min)` : '–';            
 
             const metaItems = [
                 ['Start', started], ['Einde', ended], ['Duur', dur],
