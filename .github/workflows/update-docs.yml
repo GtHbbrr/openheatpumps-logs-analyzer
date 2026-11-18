@@ -1,8 +1,23 @@
-name: Dagelijkse Docs Update
+# ==============================================================================
+# OVERZICHT VAN DE AUTOMATISERING (GITHUB -> CLOUDFLARE WORKER)
+# ==============================================================================
+# 1. Start GitHub Action (00:17 UTC = 01:17 wintertijd / 02:17 zomertijd NL):
+#    Minuut 17 is gekozen om piekdrukte en lange wachtrijen op GitHub te vermijden.
+# 2. Docs ophalen & opslaan:
+#    Het script 'fetch-docs.js' ververst 'backend/openquatt_docs_snapshot.txt'.
+# 3. Automatische uitrol (Deploy) naar Cloudflare:
+#    Bij wijzigingen pusht deze workflow de nieuwe versie naar de 'main'-branch.
+#    Cloudflare Workers detecteert deze commit en bouwt automatisch een nieuwe
+#    versie met het bijgewerkte .txt-bestand (via de [[rules]] in wrangler.toml).
+# 4. Dagelijkse controle in Cloudflare (03:00 UTC = 04:00 / 05:00 uur NL):
+#    De cron in Cloudflare draait ruim twee uur later, zodat de nieuwe build
+#    altijd op tijd live staat voor de dagelijkse synchronisatie.
+# ======name: Dagelijkse Docs Update
 
 on:
   schedule:
-    - cron: '0 3 * * *'
+    # Start elke nacht om 00:17 UTC (01:17 wintertijd / 02:17 zomertijd in NL)
+    - cron: '17 0 * * *'
   workflow_dispatch:
 
 jobs:
