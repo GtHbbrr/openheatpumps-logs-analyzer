@@ -1949,6 +1949,14 @@ function parseMarkdown(tekst) {
             }
 
             const teasers = [];
+            const opstTxt = el('qs-opstelling')?.textContent;
+            const duurTxt = el('qs-duur')?.textContent;
+            const tempTxt = el('qs-temp')?.textContent;
+            const startsTxt = el('qs-starts')?.textContent;
+            if (opstTxt && opstTxt !== '-') teasers.push(`⚙️ Opstelling & firmware: ${opstTxt}`);
+            if (duurTxt && duurTxt !== '-') teasers.push(`⏱️ Opnameduur & metingen: ${duurTxt} meetpunten vastgelegd`);
+            if (tempTxt && tempTxt !== '-') teasers.push(`🏡 Kamertemperatuur vs. doel: ${tempTxt}`);
+            if (startsTxt && startsTxt !== '-') teasers.push(`🔄 Compressorstarts afgelopen 72 uur: ${startsTxt}`);
             if (copCount > 0) { const avgCop = (sumCop / copCount).toFixed(1).replace('.', ','); teasers.push(`⚡ Rendement tijdens verwarmen: gemiddeld COP ${avgCop} (${avgCop} kW warmte per 1 kW stroom)`); }
             if (flowCount > 0) { const avgFl = Math.round(sumFlow / flowCount); const dtTxt = dtCount > 0 ? ` met een Delta T van ${(sumDeltaT / dtCount).toFixed(1).replace('.', ',')}°C` : ''; teasers.push(`💧 Waterstroom: gemiddeld ${avgFl} L/u${dtTxt} over je afgiftesysteem`); }
             if (maxSup > 0) teasers.push(`🌡️ Aanvoertemperatuur lag tussen ${minSup.toFixed(1).replace('.', ',')}°C en ${maxSup.toFixed(1).replace('.', ',')}°C`);
