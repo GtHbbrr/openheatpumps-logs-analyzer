@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="nl">
 <head>
     <script defer src="https://analytics.aldisluitaf.nl/script.js" data-website-id="f27ff60f-04e7-4bfc-afb1-dfaa1fdb384a"></script>
@@ -17,7 +17,7 @@
             <div class="max-w-6xl mx-auto flex justify-between items-center">
                 <h1 class="text-xl font-bold text-orange-500 tracking-wide">OpenHeatPumps <span class="text-xs text-gray-400 font-normal">AI Analytics</span></h1>
                 <div class="flex items-center space-x-3">
-                    <span class="bg-orange-950 text-orange-400 border border-orange-800 text-xs px-2 py-1 rounded">OpenQuatt debug logs analyzer v0.23.3</span>
+                    <span class="bg-orange-950 text-orange-400 border border-orange-800 text-xs px-2 py-1 rounded">OpenQuatt debug logs analyzer v0.23.4</span>
                 </div>
             </div>
 
@@ -86,6 +86,16 @@
                         <div class="pt-2">
                             <label class="block text-xs text-orange-400 font-medium mb-1">Wat is de klacht of vraag? (Optioneel)</label>
                             <textarea id="begin_vraag" rows="2" placeholder="Bijv: Warmtepomp pendelt, of maakt suizend geluid..." class="w-full bg-gray-900 border border-gray-700 rounded p-2 text-sm text-gray-300 focus:outline-none focus:border-orange-500 resize-none placeholder-gray-600"></textarea>
+                            <div class="mt-2">
+                                <label for="start-image-input" class="w-full bg-gray-900 hover:bg-gray-800 text-gray-300 border border-dashed border-gray-700 hover:border-orange-500 rounded p-2 text-xs text-center cursor-pointer transition flex items-center justify-center gap-1.5">
+                                    📷 Screenshot / foto toevoegen (of plak met Ctrl+V)
+                                </label>
+                                <input type="file" id="start-image-input" accept="image/*" class="hidden">
+                                <div id="start-image-preview-wrap" class="hidden mt-2 relative inline-block">
+                                    <img id="start-image-preview" class="max-h-24 rounded border border-gray-700" alt="Voorbeeld">
+                                    <button type="button" id="btn-remove-start-image" title="Verwijder afbeelding" class="absolute -top-2 -right-2 bg-red-600 hover:bg-red-700 text-white rounded-full w-5 h-5 text-xs flex items-center justify-center shadow">✕</button>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -164,8 +174,14 @@
                         <div id="loader" class="hidden text-orange-400 animate-pulse text-xs font-medium mb-1 flex items-center gap-1">
                             ⏳ AI denkt na en raadpleegt de logs en de documentatie...
                         </div>
-                        <div class="flex gap-2 items-end">
-                            <textarea id="chat-input" rows="2" placeholder="Stel een vervolgvraag over je warmtepomp-gedrag... (Shift+Enter voor nieuwe regel)" class="flex-1 bg-gray-900 border border-gray-700 rounded-lg p-3 text-sm focus:outline-none focus:border-orange-500 text-gray-200 resize-none overflow-y-auto max-h-40"></textarea>
+                        <div id="chat-image-preview-wrap" class="hidden mb-1 relative inline-block self-start">
+                            <img id="chat-image-preview" class="max-h-20 rounded border border-gray-700" alt="Chat voorbeeld">
+                            <button type="button" id="btn-remove-chat-image" title="Verwijder afbeelding" class="absolute -top-2 -right-2 bg-red-600 hover:bg-red-700 text-white rounded-full w-5 h-5 text-xs flex items-center justify-center shadow">✕</button>
+                        </div>
+                        <div class="flex gap-2 items-end w-full">
+                            <label for="chat-image-input" title="Screenshot of foto meesturen" class="bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-200 px-3 py-3 rounded-lg text-sm cursor-pointer transition flex items-center justify-center">📷</label>
+                            <input type="file" id="chat-image-input" accept="image/*" class="hidden">
+                            <textarea id="chat-input" rows="2" placeholder="Stel een vervolgvraag of plak een screenshot (Ctrl+V)..." class="flex-1 bg-gray-900 border border-gray-700 rounded-lg p-3 text-sm focus:outline-none focus:border-orange-500 text-gray-200 resize-none overflow-y-auto max-h-40"></textarea>
                             <button id="btn-send" class="bg-orange-600 hover:bg-orange-700 px-5 py-3 rounded-lg text-sm font-semibold transition">Verstuur</button>
                         </div>
                     </div>                    
@@ -1603,6 +1619,125 @@ function parseMarkdown(tekst) {
             });
         }
 
+
+        let startAfbeelding = null;
+        let chatAfbeelding = null;
+
+        function updateDiagnoseKnopStatus() {
+            const btn = el('btn-diagnose');
+            if (!btn) return;
+            if (activeLogData || startAfbeelding) {
+                btn.disabled = false;
+                btn.classList.remove('opacity-50', 'cursor-not-allowed', 'bg-green-700');
+                btn.classList.add('hover:bg-green-600', 'bg-green-600');
+            } else {
+                btn.disabled = true;
+                btn.classList.add('opacity-50', 'cursor-not-allowed', 'bg-green-700');
+                btn.classList.remove('hover:bg-green-600', 'bg-green-600');
+            }
+        }
+
+        function verkleinAfbeelding(file, maxBreedte = 1200, kwaliteit = 0.82) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        let w = img.width, h = img.height;
+                        if (w > maxBreedte) { h = Math.round((h * maxBreedte) / w); w = maxBreedte; }
+                        const canvas = document.createElement('canvas');
+                        canvas.width = w; canvas.height = h;
+                        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+                        const dataUrl = canvas.toDataURL('image/jpeg', kwaliteit);
+                        resolve({ mimeType: 'image/jpeg', data: dataUrl.split(',')[1], dataUrl });
+                    };
+                    img.onerror = reject;
+                    img.src = ev.target.result;
+                };
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+        }
+
+        async function stelStartAfbeeldingIn(file) {
+            if (!file || !file.type.startsWith('image/')) return;
+            startAfbeelding = await verkleinAfbeelding(file);
+            el('start-image-preview').src = startAfbeelding.dataUrl;
+            el('start-image-preview-wrap').classList.remove('hidden');
+            updateDiagnoseKnopStatus();
+        }
+
+        async function stelChatAfbeeldingIn(file) {
+            if (!file || !file.type.startsWith('image/')) return;
+            chatAfbeelding = await verkleinAfbeelding(file);
+            el('chat-image-preview').src = chatAfbeelding.dataUrl;
+            el('chat-image-preview-wrap').classList.remove('hidden');
+        }
+
+        el('start-image-input')?.addEventListener('change', async (e) => {
+            if (e.target.files?.[0]) await stelStartAfbeeldingIn(e.target.files[0]);
+            e.target.value = '';
+        });
+        el('btn-remove-start-image')?.addEventListener('click', () => {
+            startAfbeelding = null;
+            el('start-image-preview-wrap').classList.add('hidden');
+            updateDiagnoseKnopStatus();
+        });
+        el('chat-image-input')?.addEventListener('change', async (e) => {
+            if (e.target.files?.[0]) await stelChatAfbeeldingIn(e.target.files[0]);
+            e.target.value = '';
+        });
+        el('btn-remove-chat-image')?.addEventListener('click', () => {
+            chatAfbeelding = null;
+            el('chat-image-preview-wrap').classList.add('hidden');
+        });
+
+        document.addEventListener('paste', async (e) => {
+            const items = e.clipboardData?.items;
+            if (!items) return;
+            for (const item of items) {
+                if (item.type.startsWith('image/')) {
+                    const file = item.getAsFile();
+                    if (!file) continue;
+                    e.preventDefault();
+                    const chatOpen = !el('chat-container')?.classList.contains('hidden');
+                    if (chatOpen) await stelChatAfbeeldingIn(file);
+                    else await stelStartAfbeeldingIn(file);
+                    break;
+                }
+            }
+        });
+
+        const _origFetch = window.fetch;
+        window.fetch = async function(resource, init) {
+            if (typeof resource === 'string' && resource.includes('api.openheatpumps.nl') && init?.body && typeof init.body === 'string') {
+                try {
+                    const parsed = JSON.parse(init.body);
+                    if (parsed && 'logData' in parsed) {
+                        if (startAfbeelding) {
+                            const tekst = el('begin_vraag')?.value.trim() || 'Analyseer deze afbeelding en eventuele logdata.';
+                            parsed.messages = [{ role: 'user', parts: [{ text: tekst }, { inlineData: { mimeType: startAfbeelding.mimeType, data: startAfbeelding.data } }] }];
+                            if (el('output-box')) el('output-box').innerHTML += '<div class="mt-2"><img src="' + startAfbeelding.dataUrl + '" class="max-h-36 rounded border border-gray-700" alt="Bijgevoegde afbeelding"></div>';
+                            startAfbeelding = null;
+                            el('start-image-preview-wrap')?.classList.add('hidden');
+                        } else if (chatAfbeelding && Array.isArray(parsed.messages) && parsed.messages.length > 0) {
+                            const laatste = parsed.messages[parsed.messages.length - 1];
+                            if (laatste.role === 'user' && Array.isArray(laatste.parts)) laatste.parts.push({ inlineData: { mimeType: chatAfbeelding.mimeType, data: chatAfbeelding.data } });
+                            if (el('output-box')) el('output-box').innerHTML += '<div class="text-right mt-1"><img src="' + chatAfbeelding.dataUrl + '" class="max-h-32 rounded border border-gray-700 inline-block" alt="Chat afbeelding"></div>';
+                            chatAfbeelding = null;
+                            el('chat-image-preview-wrap')?.classList.add('hidden');
+                        }
+                        init.body = JSON.stringify(parsed);
+                    }
+                } catch (err) { console.warn('Afbeelding-hook fout:', err); }
+            }
+            return _origFetch.apply(this, arguments);
+        };
+
+        el('btn-diagnose')?.addEventListener('click', () => {
+            if (!activeLogData && startAfbeelding) activeLogData = { _alleen_afbeelding: true };
+        }, true);
     </script>
 </body>
 </html>
+

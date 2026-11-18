@@ -148,7 +148,17 @@ var backend_index_default = {
 
     const url = new URL(request.url);
 
+    const stripAfbeeldingenVoorOpslag = (msgs) => {
+      if (!Array.isArray(msgs)) return [];
+      return msgs.map(m => ({
+        ...m,
+        parts: Array.isArray(m.parts) ? m.parts.map(p => p.inlineData ? { text: "[Afbeelding bijgevoegd door gebruiker]" } : p) : m.parts
+      }));
+    };
+
     const stuurNaarPrivateFeed = (payload) => {
+      if (payload && Array.isArray(payload.messages)) payload.messages = stripAfbeeldingenVoorOpslag(payload.messages);
+      if (payload?.entry && Array.isArray(payload.entry.messages)) payload.entry.messages = stripAfbeeldingenVoorOpslag(payload.entry.messages);
       if (!env.NEWSFEED_SERVICE) return;
       ctx.waitUntil(
         env.NEWSFEED_SERVICE.fetch("https://internal/event", {
@@ -272,7 +282,8 @@ var backend_index_default = {
       }
 
       const compacteDocs = maakCompacteDocs(openquattDocsSnapshot);
-      const logVoorAi = bereidLogVoorAi(logData);
+      const isAlleenAfbeelding = !logData || logData._alleen_afbeelding === true;
+      const logVoorAi = isAlleenAfbeelding ? { info: "Geen .oqdebug.json logbestand meegestuurd; analyseer op basis van de meegestuurde afbeelding(en) en gebruikersvraag." } : bereidLogVoorAi(logData);
 
       const systemInstruction = `Je bent de 'OpenHeatPumps AI Assistent'.
 
@@ -302,6 +313,9 @@ LOGDATA:
 ${JSON.stringify(logVoorAi)}
 
 --- EINDE LOGDATA ---
+
+VISUELE BIJLAGEN (SCREENSHOTS / FOTOS):
+* Als de gebruiker een screenshot of foto meestuurt (zoals OpenQuatt-instellingen, grafieken, thermostaat of bedrading), analyseer deze dan nauwkeurig en combineer de zichtbare instellingen/waarden met eventuele logdata en de OpenQuatt-documentatie.
 
 STRIKTE GEBRUIKERSCONTEXT:
 * Woningtype: ${userProfile?.woning_type || "Onbekend"}
