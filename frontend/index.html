@@ -1668,7 +1668,7 @@ function parseMarkdown(tekst) {
                         canvas.width = w; canvas.height = h;
                         canvas.getContext('2d').drawImage(img, 0, 0, w, h);
                         const dataUrl = canvas.toDataURL('image/jpeg', kwaliteit);
-                        resolve({ mimeType: 'image/jpeg', data: dataUrl.split(',')[1], dataUrl });
+                        resolve({ mimeType: 'image/jpeg', data: dataUrl.split(',')[1][1], dataUrl });
                     };
                     img.onerror = reject;
                     img.src = ev.target.result;
