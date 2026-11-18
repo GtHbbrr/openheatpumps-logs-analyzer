@@ -410,40 +410,57 @@ STRIKTE GEBRUIKERSCONTEXT:
 
             const apiAttempts = [];
             let aantal429 = 0;
+            let pogingNr = 0;
+            let gelukt = false;
+            const startTijd = Date.now();
 
-            for (const model of geselecteerdeModellen) {
-              gebruiktModel = model;
-              const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${env.GEMINI_API_KEY}`;              
-              const geminiResponse = await fetch(geminiUrl, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(geminiPayload)
-              });
-
-              apiAttempts.push({ model, status: geminiResponse.status });
-
-              const responseText = await geminiResponse.text();
-              geminiJson = responseText.trim().startsWith("{")
-                ? JSON.parse(responseText)
-                : null;
-
-              if (geminiResponse.ok && geminiJson && !geminiJson.error) {
-                break;
+            // Doorlopende modelrotatie tot Gemini antwoord geeft (met 45s veiligheidsmarge voor Cloudflare-limiet)
+            while (!gelukt && Date.now() - startTijd < 45000) {
+              if (pogingNr > 0) {
+                await new Promise((r) => setTimeout(r, 1200));
               }
+              for (const model of geselecteerdeModellen) {
+                if (Date.now() - startTijd >= 45000) break;
+                pogingNr++;
+                gebruiktModel = model;
 
-              if (geminiResponse.status === 429) {
-                aantal429++;
-                if (aantal429 >= 2) {
-                  console.warn(
-                    "Meerdere 429-limieten bereikt, breek fallback-keten af."
-                  );
+                await writer.write(
+                  encoder.encode(
+                    `---MODEL_TRY---${JSON.stringify({ model: model.toUpperCase(), attempt: pogingNr })}---\n`
+                  )
+                );
+
+                if (aantal429 >= 1 && !gebruikCompressie && !isAlleenAfbeelding) {
+                  gebruikCompressie = true;
+                  geminiPayload.systemInstruction.parts.text = bouwSystemInstruction(bereidLogVoorAi(logData));
+                  console.log("Schakel na 429 automatisch over op gecomprimeerde 2-minuten log voor", model);
+                }
+
+                const geminiUrl = `https://googleapis.com${model}:generateContent?key=${env.GEMINI_API_KEY}`;
+                const geminiResponse = await fetch(geminiUrl, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify(geminiPayload)
+                });
+
+                apiAttempts.push({ model, status: geminiResponse.status });
+
+                const responseText = await geminiResponse.text();
+                geminiJson = responseText.trim().startsWith("{")
+                  ? JSON.parse(responseText)
+                  : null;
+
+                if (geminiResponse.ok && geminiJson && !geminiJson.error) {
+                  gelukt = true;
                   break;
                 }
-              }
 
-              console.warn(
-                `Model ${model} faalde (${geminiResponse.status}), schakel door naar volgende model...`
-              );
+                if (geminiResponse.status === 429) {
+                  aantal429++;
+                }
+
+                console.warn(`Model ${model} faalde (${geminiResponse.status}) in poging ${pogingNr}, volgende poging...`);
+              }
             }
 
             const cachedTokens =
@@ -461,9 +478,8 @@ STRIKTE GEBRUIKERSCONTEXT:
               if (laatsteStatus === 429) {
                 pureAiText =
                   "⏳ **De AI heeft het op dit moment erg druk (limiet bereikt).** Je logbestand is vrij uitgebreid. Wacht 1 minuut en probeer het dan opnieuw — vaker achter elkaar klikken helpt helaas niet.";
-              } else if (laatsteStatus === 503) {
-                pureAiText =
-                  "⏳ **De AI-servers van Google zijn op dit moment tijdelijk overbelast.** Probeer je vraag over een paar tellen nog eens.";
+              } else if (laatsteStatus === 503 || pogingNr >= 3) {
+                  pureAiText = `⏳ **Google AI Studio reageert op dit moment uitzonderlijk traag (${pogingNr} pogingen gedaan).** Klik gerust nogmaals op **Start AI Systeem Analyse** (of verstuur je bericht opnieuw) — je logboek en vraag staan nog klaar!`;
               } else {
                 pureAiText = geminiJson?.error
                   ? `🚨 API FOUT: ${geminiJson.error.message}`
