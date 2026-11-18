@@ -1838,7 +1838,7 @@ function parseMarkdown(tekst) {
         const _origLaadBestand = laadBestand;
         laadBestand = async function(file) {
             await _origLaadBestand(file);
-            if (activeLogData) { updateQuickSummaryCard(activeLogData); startTeaserCarrousel(activeLogData); }
+            if (activeLogData) { stopTeaserCarrousel(false); updateQuickSummaryCard(activeLogData); }
         };
 
         const _origParseMarkdown = parseMarkdown;
@@ -2019,9 +2019,7 @@ function parseMarkdown(tekst) {
                 const overige = teasers.filter(t => !zichtbaar.includes(t));
                 if (overige.length === 0) return;
                 const nieuwInzicht = overige.at(Math.floor(Math.random() * overige.length));
-                const kandidaten = [0, 1, 2].filter(s => s !== laatsteSlot);
-                const gekozenSlot = kandidaten.at(Math.floor(Math.random() * kandidaten.length));
-                laatsteSlot = gekozenSlot;
+                const gekozenSlot = Math.floor(Math.random() * 3);
 
                 const slotEl = el('teaser-slot-' + gekozenSlot);
                 if (slotEl) {
