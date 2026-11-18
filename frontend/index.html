@@ -1792,7 +1792,7 @@ function parseMarkdown(tekst) {
                 }
             }
 
-            const getVal = (n) => { const i = cols.indexOf(n); return i >= 0 ? state[i] : null; };
+            const getVal = (n) => { const i = cols.findIndex(c => c === n || c?.name === n || c?.key === n); return i >= 0 ? state[i] : null; };
             let cfg = {};
             try { const rawCfg = getVal('configurationSnapshot'); if (typeof rawCfg === 'string') cfg = JSON.parse(rawCfg); } catch(e) {}
             const topo = cfg.installationTopology === 'duo' ? 'Duo' : 'Single';
@@ -1859,5 +1859,6 @@ function parseMarkdown(tekst) {
     </script>
 </body>
 </html>
+
 
 
