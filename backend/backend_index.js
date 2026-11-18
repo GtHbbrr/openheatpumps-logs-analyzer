@@ -427,6 +427,9 @@ STRIKTE GEBRUIKERSCONTEXT:
               if (laatsteStatus === 429) {
                 pureAiText =
                   "⏳ **De AI heeft het op dit moment erg druk (limiet bereikt).** Je logbestand is vrij uitgebreid. Wacht 1 minuut en probeer het dan opnieuw — vaker achter elkaar klikken helpt helaas niet.";
+              } else if (laatsteStatus === 503) {
+                pureAiText =
+                  "⏳ **De AI-servers van Google zijn op dit moment tijdelijk overbelast.** Probeer je vraag over een paar tellen nog eens.";
               } else {
                 pureAiText = geminiJson?.error
                   ? `🚨 API FOUT: ${geminiJson.error.message}`
