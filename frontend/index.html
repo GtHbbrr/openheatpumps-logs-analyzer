@@ -17,7 +17,7 @@
             <div class="max-w-6xl mx-auto flex justify-between items-center">
                 <h1 class="text-xl font-bold text-orange-500 tracking-wide">OpenHeatPumps <span class="text-xs text-gray-400 font-normal">AI Analytics</span></h1>
                 <div class="flex items-center space-x-3">
-                    <span class="bg-orange-950 text-orange-400 border border-orange-800 text-xs px-2 py-1 rounded">OpenQuatt debug logs analyzer v0.23.5</span>
+                    <span class="bg-orange-950 text-orange-400 border border-orange-800 text-xs px-2 py-1 rounded">OpenQuatt debug logs analyzer v0.23.6</span>
                 </div>
             </div>
 
@@ -1855,6 +1855,168 @@ function parseMarkdown(tekst) {
                 return _origParseMarkdown(hoofdTekst.trim());
             }
             return _origParseMarkdown(tekst);
+        };
+
+        let _teaserTimer = null;
+
+        function bouwLogTeasers(data) {
+            if (!data || !Array.isArray(data.columns) || !Array.isArray(data.initial)) return [];
+            const cols = data.columns;
+            const idxOf = (n) => cols.findIndex(c => c === n || c?.name === n || c?.key === n);
+            const state = [];
+            for (const item of data.initial) { if (Array.isArray(item)) state[item.at(0)] = item.at(1); }
+
+            const iComp1 = idxOf('hp1Compressor'), iComp2 = idxOf('hp2Compressor'), iFreq1 = idxOf('hp1Freq');
+            const iPower = idxOf('totalPower'), iHeatPower = idxOf('heatingPowerInput');
+            const iHeat1 = idxOf('hp1Heat'), iHeat2 = idxOf('hp2Heat'), iFlow = idxOf('flowSelected');
+            const iWIn = idxOf('hp1WaterIn'), iWOut = idxOf('hp1WaterOut'), iSup = idxOf('supplyTemp');
+            const iOutT = idxOf('outsideTempSelected'), iRoomT = idxOf('roomTemp'), iRoomSet = idxOf('roomSetpoint');
+            const iBoiler = idxOf('boilerActive'), iSilent = idxOf('silentModeOverride'), iStrat = idxOf('strategy');
+            const iPhHouse = idxOf('phouseHouse'), iPhReq = idxOf('phouseReq'), iRunExt = idxOf('phRunExtensionStatus');
+            const iPt1000 = idxOf('pt1000ReadProblem'), iCicStale = idxOf('cicDataStale');
+            const iFail1 = idxOf('hp1Failures'), iFail2 = idxOf('hp2Failures');
+
+            let prevT = 0, maxT = 0, sumCop = 0, copCount = 0, sumFlow = 0, flowCount = 0, sumDeltaT = 0, dtCount = 0;
+            let maxSup = -99, minSup = 999, minOut = 999, maxOut = -99, minRoom = 999, maxRoom = -99;
+            let minFreq = 999, maxFreq = 0, maxPower = 0, sumPowerAll = 0, sampleSteps = 0;
+            let energyWh = 0, heatWh = 0, boilerSec = 0, runs = 0, wasRunning = false, curRunSec = 0, longestRunSec = 0;
+            let oilReturns = 0, defrosts = 0, hasWarmRestart = false, sensorErrors = 0, hp1OnCount = 0, hp2OnCount = 0;
+
+            const verwerkPunt = (dtSec) => {
+                sampleSteps++;
+                const pTot = Number(state.at(iPower)) || 0;
+                const pHeatIn = Number(state.at(iHeatPower)) || pTot;
+                const hOut = (Number(state.at(iHeat1)) || 0) + (Number(state.at(iHeat2)) || 0);
+                if (pTot > maxPower) maxPower = pTot;
+                sumPowerAll += pTot;
+                if (dtSec > 0) { energyWh += (pTot * dtSec) / 3600; heatWh += (hOut * dtSec) / 3600; if (state.at(iBoiler) === true) boilerSec += dtSec; }
+
+                const c1 = state.at(iComp1) === true || (Number(state.at(iFreq1)) || 0) > 0;
+                const c2 = state.at(iComp2) === true;
+                const running = c1 || c2;
+                if (c1) hp1OnCount++; if (c2) hp2OnCount++;
+
+                if (running) {
+                    if (!wasRunning) { runs++; curRunSec = 0; }
+                    curRunSec += dtSec;
+                    if (curRunSec > longestRunSec) longestRunSec = curRunSec;
+                    const f1 = Number(state.at(iFreq1)) || 0;
+                    if (f1 > 0) { if (f1 < minFreq) minFreq = f1; if (f1 > maxFreq) maxFreq = f1; }
+                    if (pHeatIn > 80 && hOut > 100) { const cop = hOut / pHeatIn; if (cop > 1 && cop < 12) { sumCop += cop; copCount++; } }
+                    const fl = Number(state.at(iFlow)) || 0;
+                    if (fl > 50) { sumFlow += fl; flowCount++; }
+                    const wIn = Number(state.at(iWIn)), wOut = Number(state.at(iWOut));
+                    if (!isNaN(wIn) && !isNaN(wOut) && wOut > wIn) { sumDeltaT += (wOut - wIn); dtCount++; }
+                }
+                wasRunning = running;
+
+                const sup = Number(state.at(iSup)); if (!isNaN(sup) && sup > 5) { if (sup > maxSup) maxSup = sup; if (sup < minSup) minSup = sup; }
+                const ot = Number(state.at(iOutT)); if (!isNaN(ot)) { if (ot < minOut) minOut = ot; if (ot > maxOut) maxOut = ot; }
+                const rt = Number(state.at(iRoomT)); if (!isNaN(rt) && rt > 5) { if (rt < minRoom) minRoom = rt; if (rt > maxRoom) maxRoom = rt; }
+                if (String(state.at(iRunExt) || '').includes('warm_restart')) hasWarmRestart = true;
+                if (state.at(iPt1000) === true || state.at(iCicStale) === true) sensorErrors++;
+            };
+
+            if (Array.isArray(data.samples)) {
+                for (const sItem of data.samples) {
+                    const t = sItem.at(0), deltas = sItem.at(1);
+                    const dt = Math.max(0, t - prevT); prevT = t;
+                    if (t > maxT) maxT = t;
+                    if (Array.isArray(deltas)) {
+                        for (const dItem of deltas) {
+                            const c = dItem.at(0), v = dItem.at(1);
+                            state[c] = v;
+                            if (c === iFail1 || c === iFail2) {
+                                const s = String(v || '');
+                                if (s.includes('oil return')) oilReturns++;
+                                if (s.includes('Defrost')) defrosts++;
+                            }
+                        }
+                    }
+                    verwerkPunt(dt || 10);
+                }
+            }
+
+            const teasers = [];
+            if (copCount > 0) { const avgCop = (sumCop / copCount).toFixed(1).replace('.', ','); teasers.push(`⚡ Rendement tijdens verwarmen: gemiddeld COP ${avgCop} (${avgCop} kW warmte per 1 kW stroom)`); }
+            if (flowCount > 0) { const avgFl = Math.round(sumFlow / flowCount); const dtTxt = dtCount > 0 ? ` met een Delta T van ${(sumDeltaT / dtCount).toFixed(1).replace('.', ',')}°C` : ''; teasers.push(`💧 Waterstroom: gemiddeld ${avgFl} L/u${dtTxt} over je afgiftesysteem`); }
+            if (maxSup > 0) teasers.push(`🌡️ Aanvoertemperatuur lag tussen ${minSup.toFixed(1).replace('.', ',')}°C en ${maxSup.toFixed(1).replace('.', ',')}°C`);
+            if (minOut < 100) teasers.push(`🌤️ Buitentemperatuur bewoog tijdens deze opname tussen ${minOut.toFixed(1).replace('.', ',')}°C en ${maxOut.toFixed(1).replace('.', ',')}°C`);
+            const boilerMin = Math.round(boilerSec / 60);
+            teasers.push(boilerMin === 0 ? '🔥 CV-ketel heeft 0 minuten bijgesprongen — 100% verwarmd door de warmtepomp' : `🔥 CV-ketel heeft ${boilerMin} minuten meegedraaid ter ondersteuning`);
+            if (maxFreq > 0) teasers.push(`🎛️ Compressor draaide tussen ${minFreq} Hz en ${maxFreq} Hz (${maxFreq <= 45 ? 'rustige laaglast' : 'hogere vermogensvraag'})`);
+            const strat = state.at(iStrat) || 'Power House';
+            const phH = Math.round(Number(state.at(iPhHouse)) || 0), phR = Math.round(Number(state.at(iPhReq)) || 0);
+            teasers.push((strat === 'Power House' && phH > 0) ? `🧠 Power House balans: huisverlies ${phH} W bij actuele warmtevraag van ${phR} W` : `🧠 Actieve regelstrategie: ${strat} (doeltemperatuur ${Number(state.at(iRoomSet) || 20).toFixed(1).replace('.', ',')}°C)`);
+            if (hasWarmRestart) teasers.push("⏳ 'Langer doorverwarmen' (warm restart) was actief om pendelen te voorkomen");
+            if (state.at(iSilent)) teasers.push(`🤫 Stiltemodus staat op '${state.at(iSilent)}' om geluid in de avond/nacht te beperken`);
+            teasers.push(sensorErrors === 0 ? '📡 Alle temperatuursensoren (PT1000) en de CIC-koppeling reageren stabiel zonder fouten' : `📡 Let op: ${sensorErrors} tijdelijke sensormelding(en) gezien in de datastroom`);
+            if (hp2OnCount > 0) { const p1 = Math.round((hp1OnCount / (hp1OnCount + hp2OnCount)) * 100); teasers.push(`✌️ Quatt Duo verdeling: HP1 leverde ${p1}% en HP2 ${100 - p1}% van de draaitijd`); }
+
+            if (maxT >= 2700) {
+                teasers.push(`🔋 Geschat verbruik in deze opname: ~${(energyWh / 1000).toFixed(2).replace('.', ',')} kWh stroom → ~${(heatWh / 1000).toFixed(1).replace('.', ',')} kWh warmte`);
+                const langstMin = Math.round(longestRunSec / 60);
+                const langstTxt = langstMin >= 60 ? `${Math.floor(langstMin / 60)}u ${langstMin % 60}m` : `${langstMin} min`;
+                teasers.push(`🔄 ${runs} verwarmingsrun(s) geteld; de langste aaneengesloten run duurde ${langstTxt}`);
+                if (minRoom < 100) teasers.push(`🏠 Kamertemperatuur bleef binnen ${(maxRoom - minRoom).toFixed(1).replace('.', ',')}°C (${minRoom.toFixed(1).replace('.', ',')}°C – ${maxRoom.toFixed(1).replace('.', ',')}°C)`);
+                teasers.push(`📈 Piekvermogen was ${Math.round(maxPower)} W, gemiddeld verbruik lag op ${sampleSteps > 0 ? Math.round(sumPowerAll / sampleSteps) : 0} W`);
+                teasers.push(`🛠️ Onderhoud in deze periode: ${oilReturns}x olieretour en ${defrosts}x ontdooicyclus`);
+            }
+            return teasers;
+        }
+
+        function startTeaserCarrousel(data) {
+            stopTeaserCarrousel(false);
+            const wrap = el('teaser-carousel-wrap');
+            if (!wrap) return;
+            const teasers = bouwLogTeasers(data);
+            if (teasers.length === 0) return;
+
+            wrap.classList.remove('hidden');
+            el('teaser-status-label').textContent = '✨ Live inzichten uit jouw logboek tijdens het analyseren...';
+            el('teaser-status-label').classList.add('animate-pulse');
+            el('teaser-count-label').textContent = teasers.length + ' inzichten gevonden';
+
+            const geschud = [...teasers].sort(() => Math.random() - 0.5);
+            const zichtbaar = [0, 1, 2].map(i => geschud.at(i % geschud.length));
+            [0, 1, 2].forEach(i => { if (el('teaser-slot-' + i)) el('teaser-slot-' + i).textContent = zichtbaar.at(i); });
+
+            if (teasers.length <= 3) return;
+            let volgendSlot = 0;
+
+            _teaserTimer = setInterval(() => {
+                const overige = teasers.filter(t => !zichtbaar.includes(t));
+                if (overige.length === 0) return;
+                const nieuwInzicht = overige.at(Math.floor(Math.random() * overige.length));
+                const slotEl = el('teaser-slot-' + volgendSlot);
+                if (slotEl) {
+                    slotEl.style.opacity = '0.25';
+                    setTimeout(() => {
+                        zichtbaar[volgendSlot] = nieuwInzicht;
+                        slotEl.textContent = nieuwInzicht;
+                        slotEl.style.opacity = '1';
+                        volgendSlot = (volgendSlot + 1) % 3;
+                    }, 220);
+                }
+            }, 3200);
+        }
+
+        function stopTeaserCarrousel(toonAfgerond = true) {
+            if (_teaserTimer) { clearInterval(_teaserTimer); _teaserTimer = null; }
+            if (toonAfgerond && el('teaser-status-label')) {
+                el('teaser-status-label').textContent = '✅ Belangrijkste meetinzichten uit je logboek:';
+                el('teaser-status-label').classList.remove('animate-pulse');
+            }
+        }
+
+        el('btn-diagnose')?.addEventListener('click', () => {
+            if (activeLogData && !activeLogData._alleen_afbeelding) startTeaserCarrousel(activeLogData);
+        });
+
+        const _origParseMdTeaser = parseMarkdown;
+        parseMarkdown = function(tekst) {
+            if (tekst && tekst.length > 40) stopTeaserCarrousel(true);
+            return _origParseMdTeaser(tekst);
         };
     </script>
 </body>
