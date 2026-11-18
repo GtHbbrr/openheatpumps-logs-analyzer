@@ -1,4 +1,4 @@
-import openquattDocsSnapshot from "./openquatt_docs_snapshot.txt";
+﻿import openquattDocsSnapshot from "./openquatt_docs_snapshot.txt";
 
 // ====================================================================
 // HULPFUNCTIES VOOR TOKENBESPARING (SNAPSHOT & DELTA-LOG)
@@ -423,7 +423,7 @@ STRIKTE GEBRUIKERSCONTEXT:
                 )
               );
 
-              const geminiUrl = `https://googleapis.com${model}:generateContent?key=${env.GEMINI_API_KEY}`;
+              const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${env.GEMINI_API_KEY}`;
               const geminiResponse = await fetch(geminiUrl, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -535,3 +535,4 @@ STRIKTE GEBRUIKERSCONTEXT:
 };
 
 export { backend_index_default as default };
+
