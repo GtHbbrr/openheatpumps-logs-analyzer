@@ -1269,7 +1269,7 @@ function parseMarkdown(tekst) {
 
             outputBox.innerHTML = `⚙️ <span class="text-gray-400">Verbinding maken met Cloudflare gateway...</span><br>` +
                                   `🔍 <span class="text-gray-400">OpenQuatt-documentatie toevoegen uit Github repository...</span><br>` +
-                                  `🎲 <span class="text-orange-400 animate-pulse">Gemini model-selectie activeert... Wachten op Google AI Studio...</span>`;
+                                  `🎲 <span id="live-model-status-text" class="text-orange-400 animate-pulse">Gemini model-selectie activeert... Wachten op Google AI Studio...</span>`;
             
             if (contextScroller) {
                 contextScroller.classList.remove("hidden");
@@ -1342,6 +1342,20 @@ function parseMarkdown(tekst) {
                         } catch (jsonErr) {
                             console.warn("RAG JSON parsing mislukt:", jsonErr.message);
                         }
+                    }
+
+                    while (buffer.includes("---MODEL_TRY---")) {
+                        const mMatch = buffer.match(/---MODEL_TRY---(\{.*?\})---\n?/);
+                        if (!mMatch) break;
+                        buffer = buffer.replace(mMatch.at(0), "");
+                        try {
+                            const info = JSON.parse(mMatch.at(1));
+                            const labelTekst = `Gemini model-selectie probeert nu ${info.model} (poging ${info.attempt})...`;
+                            const startSpan = el("live-model-status-text");
+                            if (startSpan) startSpan.textContent = labelTekst;
+                            const chatStatus = el("live-chat-status");
+                            if (chatStatus) chatStatus.innerHTML = `🎲 <span class="text-orange-400 animate-pulse">${labelTekst}</span>`;
+                        } catch (e) {}
                     }
 
                     if (buffer.includes("---FINAL_RESPONSE---")) {
@@ -1472,6 +1486,20 @@ function parseMarkdown(tekst) {
                         }
                     }
         
+                    while (buffer.includes("---MODEL_TRY---")) {
+                        const mMatch = buffer.match(/---MODEL_TRY---(\{.*?\})---\n?/);
+                        if (!mMatch) break;
+                        buffer = buffer.replace(mMatch.at(0), "");
+                        try {
+                            const info = JSON.parse(mMatch.at(1));
+                            const labelTekst = `Gemini model-selectie probeert nu ${info.model} (poging ${info.attempt})...`;
+                            const startSpan = el("live-model-status-text");
+                            if (startSpan) startSpan.textContent = labelTekst;
+                            const chatStatus = el("live-chat-status");
+                            if (chatStatus) chatStatus.innerHTML = `🎲 <span class="text-orange-400 animate-pulse">${labelTekst}</span>`;
+                        } catch (e) {}
+                    }
+
                     if (buffer.includes("---FINAL_RESPONSE---")) {
                         const parts = buffer.split("---FINAL_RESPONSE---\n");
                         const finalJsonString = parts[1];
