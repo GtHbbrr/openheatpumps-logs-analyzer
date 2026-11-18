@@ -283,17 +283,26 @@ var backend_index_default = {
 
       const compacteDocs = maakCompacteDocs(openquattDocsSnapshot);
       const isAlleenAfbeelding = !logData || logData._alleen_afbeelding === true;
-      const logVoorAi = isAlleenAfbeelding ? { info: "Geen .oqdebug.json logbestand meegestuurd; analyseer op basis van de meegestuurde afbeelding(en) en gebruikersvraag." } : bereidLogVoorAi(logData);
+      const schoonRuweLog = (ruweLog) => {
+        if (!ruweLog || !Array.isArray(ruweLog.columns) || !Array.isArray(ruweLog.samples)) return ruweLog;
+        const ruis = new Set(["freeHeap", "freePsram", "minFreeHeap", "largestFreeHeapBlock", "uptimeMs"]);
+        const ruisIdx = new Set(ruweLog.columns.map((n, i) => ruis.has(n) ? i : -1).filter(i => i >= 0));
+        return {
+          ...ruweLog,
+          samples: ruweLog.samples.map(([t, d]) => [t, Array.isArray(d) ? d.filter(([c]) => !ruisIdx.has(c)) : d]).filter(([, d]) => d.length > 0)
+        };
+      };
 
-      const systemInstruction = `Je bent de 'OpenHeatPumps AI Assistent'.
+      const bouwSystemInstruction = (actieveLog) => `Je bent de 'OpenHeatPumps AI Assistent'.
 
 STRIKTE SYSTEEM- EN HARDWARECONTEXT:
 * Deze analyse betreft ALTIJD een Quatt warmtepomp (Hybrid Single of Duo) die lokaal wordt aangestuurd via de open-source OpenQuatt-controller (ESPHome / Q-edition hardware).
 * De originele Quatt CiC-controller is ofwel volledig losgekoppeld, ofwel degradeerd tot een passieve Modbus-slave (via poort M2) om uitsluitend telemetrie door te geven aan de Quatt-app.
 * OpenQuatt is de ENIGE actieve en leidende regelaar van het complete warmtepompsysteem!
-* Geef altijd een korte samenvatting in B1 NL van het .oqdebug JSON logbestand dat is meegezonden. Laat B1 NL onbenoemd.
+* Geef altijd een korte, scanbare samenvatting in begrijpelijke taal (B1-niveau, zonder dat label te noemen) van het logbestand.
 * Gebruik altijd de timestamps en werkelijke waarden uit het meegezonden .oqdebug JSON logbestand. GEEN fabulaties en gefantaseerde waarden en tijdstippen!
-* Configuratieveld installationTopology "single" of "double" geeft aan of deze Quatt warmtepomp een Quatt Single configuratie met 1 ODU, of een Quatt Duo configuratie met 2 ODU's betreft.
+* BELANGRIJK OVER ONDERHOUDSCYCLI: De velden hp1Failures en hp2Failures bevatten zowel echte storingen als normale onderhoudscycli van de buitenunit, zoals "Compressor oil return" (olieretour na langdurig laaglast) en "Defrost" (ontdooien). Classificeer olieretour en ontdooien NOOIT als storing, fout of hardwareprobleem, maar leg ze uit als normaal, gezond onderhoud van de warmtepomp.
+* Configuratieveld installationTopology "single" of "duo" geeft aan of deze Quatt warmtepomp 1 of 2 buitenunits (ODU's) heeft.
 * Het logbestand gebruikt 'device-psram-delta-json-v1': de array 'columns' bevat de kolomnamen op index 0..N, 'initial' bevat de startwaarden op t=0, en elke stap in 'samples' bevat [offset_s, [[kolom_index, nieuwe_waarde], ...]] waarbij ongewijzigde kolommen hun vorige waarde behouden.
 
 STRIKTE RAG INSTRUCTIE:
@@ -301,6 +310,13 @@ STRIKTE RAG INSTRUCTIE:
 * Kijk bij actuele vragen altijd naar de inhoud van het logbestand en naar de openstaande issues en documentatie die hieronder zijn meegezonden als dynamische kennis context.
 * De daadwerkelijke meetwaarden en statussen in het logbestand zijn altijd leidend: gebruik deze om een veronderstelling of suggestie van de gebruiker eerst feitelijk te bevestigen of te weerleggen voordat je erop voortborduurt.
 * Geef bij technische vragen over registers, instellingen of opties GEEN eigen speculaties, adviezen of zelfbedachte verklaringen als die niet letterlijk in de OpenQuatt-documentatie staan. Vermeld dan uitsluitend wat de documentatie erover zegt.
+
+ANTWOORDOPMAAK & VERVOLGVRAGEN:
+* Sluit je antwoord helemaal onderaan ALTIJD af met exact dit blok (zonder extra tekst erna) met 3 korte, relevante vervolgvragen voor deze specifieke log:
+---VERVOLGVRAGEN---
+- Vraag 1?
+- Vraag 2?
+- Vraag 3?
 
 DYNAMISCH GEPROMPTE KENNIS UIT DATABASE:
 <openquatt_docs>
@@ -310,7 +326,7 @@ ${compacteDocs}
 --- EINDE DAGELIJKSE CONTEXT ---
 
 LOGDATA:
-${JSON.stringify(logVoorAi)}
+${JSON.stringify(actieveLog)}
 
 --- EINDE LOGDATA ---
 
@@ -322,6 +338,10 @@ STRIKTE GEBRUIKERSCONTEXT:
 * Afgiftesysteem: ${userProfile?.afgiftesysteem || "Onbekend"}
 * Aanwezige CV-ketel: ${userProfile?.cv_ketel || "GEEN KETEL AANWEZIG"}
 * Thermostaat: ${userProfile?.thermostaat || "Onbekend"}`;
+
+      let gebruikCompressie = false;
+      const logVoorAi = isAlleenAfbeelding ? { info: "Geen .oqdebug.json logbestand meegestuurd; analyseer op basis van de meegestuurde afbeelding(en) en gebruikersvraag." } : schoonRuweLog(logData);
+      let systemInstruction = bouwSystemInstruction(logVoorAi);
       let contents = [];
       if (!messages || messages.length === 0) {
         const initieelBericht = `GEBRUIKERSVRAAG/KLACHT:${actueleVraag}`;
