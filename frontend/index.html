@@ -1871,7 +1871,7 @@ function parseMarkdown(tekst) {
         function toonStartInzichtenInRaampjes(data) {
             stopTeaserCarrousel(false);
             const teasers = bouwLogTeasers(data);
-            el('teaser-status-label').textContent = '📊 Basisgegevens uit je logboek (klik op Start voor live analyse):';
+            el('teaser-status-label').textContent = '📊 Basisgegevens uit je logboek (klik op Start voor AI analyse):';
             el('teaser-status-label').classList.remove('animate-pulse');
             el('teaser-count-label').textContent = teasers.length + ' inzichten klaar';
             if (el('teaser-slot-0')) el('teaser-slot-0').textContent = '⚙️ Opstelling: ' + _qsBasis.opst;
@@ -2030,7 +2030,7 @@ function parseMarkdown(tekst) {
                         slotEl.style.opacity = '1';
                     }, 220);
                 }
-            }, 2600);
+            }, 4200);
         }
 
         function stopTeaserCarrousel(toonAfgerond = true) {
