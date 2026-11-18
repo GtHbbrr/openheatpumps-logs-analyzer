@@ -415,12 +415,12 @@ STRIKTE GEBRUIKERSCONTEXT:
             const startTijd = Date.now();
 
             // Doorlopende modelrotatie tot Gemini antwoord geeft (met 45s veiligheidsmarge voor Cloudflare-limiet)
-            while (!gelukt && Date.now() - startTijd < 45000) {
+            while (!gelukt && pogingNr < 25 && Date.now() - startTijd < 45000) {
               if (pogingNr > 0) {
                 await new Promise((r) => setTimeout(r, 1200));
               }
               for (const model of geselecteerdeModellen) {
-                if (Date.now() - startTijd >= 45000) break;
+                if (pogingNr >= 25 || Date.now() - startTijd >= 45000) break;
                 pogingNr++;
                 gebruiktModel = model;
 
@@ -459,7 +459,8 @@ STRIKTE GEBRUIKERSCONTEXT:
                   aantal429++;
                 }
 
-                console.warn(`Model ${model} faalde (${geminiResponse.status}) in poging ${pogingNr}, volgende poging...`);
+                console.warn(`Model ${model} faalde (${geminiResponse.status}) in poging ${pogingNr}, wacht 1.5s...`);
+                await new Promise((r) => setTimeout(r, 1500));
               }
             }
 
