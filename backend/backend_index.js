@@ -339,9 +339,10 @@ STRIKTE GEBRUIKERSCONTEXT:
 * Aanwezige CV-ketel: ${userProfile?.cv_ketel || "GEEN KETEL AANWEZIG"}
 * Thermostaat: ${userProfile?.thermostaat || "Onbekend"}`;
 
-      let gebruikCompressie = false;
-      const logVoorAi = isAlleenAfbeelding ? { info: "Geen .oqdebug.json logbestand meegestuurd; analyseer op basis van de meegestuurde afbeelding(en) en gebruikersvraag." } : schoonRuweLog(logData);
-      let systemInstruction = bouwSystemInstruction(logVoorAi);
+      const logVoorAi = isAlleenAfbeelding
+        ? { info: "Geen .oqdebug.json logbestand meegestuurd; analyseer op basis van de meegestuurde afbeelding(en) en gebruikersvraag." }
+        : bereidLogVoorAi(logData);
+      const systemInstruction = bouwSystemInstruction(logVoorAi);
       let contents = [];
       if (!messages || messages.length === 0) {
         const initieelBericht = `GEBRUIKERSVRAAG/KLACHT:${actueleVraag}`;
@@ -411,57 +412,44 @@ STRIKTE GEBRUIKERSCONTEXT:
             const apiAttempts = [];
             let aantal429 = 0;
             let pogingNr = 0;
-            let gelukt = false;
-            const startTijd = Date.now();
 
-            // Doorlopende modelrotatie tot Gemini antwoord geeft (met 45s veiligheidsmarge voor Cloudflare-limiet)
-            while (!gelukt && pogingNr < 25 && Date.now() - startTijd < 45000) {
-              if (pogingNr > 0) {
-                await new Promise((r) => setTimeout(r, 1200));
+            for (const model of geselecteerdeModellen) {
+              pogingNr++;
+              gebruiktModel = model;
+
+              await writer.write(
+                encoder.encode(
+                  `---MODEL_TRY---${JSON.stringify({ model: model.toUpperCase(), attempt: pogingNr })}---\n`
+                )
+              );
+
+              const geminiUrl = `https://googleapis.com${model}:generateContent?key=${env.GEMINI_API_KEY}`;
+              const geminiResponse = await fetch(geminiUrl, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(geminiPayload)
+              });
+
+              apiAttempts.push({ model, status: geminiResponse.status });
+
+              const responseText = await geminiResponse.text();
+              geminiJson = responseText.trim().startsWith("{")
+                ? JSON.parse(responseText)
+                : null;
+
+              if (geminiResponse.ok && geminiJson && !geminiJson.error) {
+                break;
               }
-              for (const model of geselecteerdeModellen) {
-                if (pogingNr >= 25 || Date.now() - startTijd >= 45000) break;
-                pogingNr++;
-                gebruiktModel = model;
 
-                await writer.write(
-                  encoder.encode(
-                    `---MODEL_TRY---${JSON.stringify({ model: model.toUpperCase(), attempt: pogingNr })}---\n`
-                  )
-                );
-
-                if (aantal429 >= 1 && !gebruikCompressie && !isAlleenAfbeelding) {
-                  gebruikCompressie = true;
-                  geminiPayload.systemInstruction.parts.text = bouwSystemInstruction(bereidLogVoorAi(logData));
-                  console.log("Schakel na 429 automatisch over op gecomprimeerde 2-minuten log voor", model);
-                }
-
-                const geminiUrl = `https://googleapis.com${model}:generateContent?key=${env.GEMINI_API_KEY}`;
-                const geminiResponse = await fetch(geminiUrl, {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify(geminiPayload)
-                });
-
-                apiAttempts.push({ model, status: geminiResponse.status });
-
-                const responseText = await geminiResponse.text();
-                geminiJson = responseText.trim().startsWith("{")
-                  ? JSON.parse(responseText)
-                  : null;
-
-                if (geminiResponse.ok && geminiJson && !geminiJson.error) {
-                  gelukt = true;
+              if (geminiResponse.status === 429) {
+                aantal429++;
+                if (aantal429 >= 2) {
+                  console.warn("Meerdere 429-limieten bereikt, breek fallback-keten af.");
                   break;
                 }
-
-                if (geminiResponse.status === 429) {
-                  aantal429++;
-                }
-
-                console.warn(`Model ${model} faalde (${geminiResponse.status}) in poging ${pogingNr}, wacht 1.5s...`);
-                await new Promise((r) => setTimeout(r, 1500));
               }
+
+              console.warn(`Model ${model} faalde (${geminiResponse.status}), schakel door naar volgende model...`);
             }
 
             const cachedTokens =
