@@ -1840,8 +1840,7 @@ function parseMarkdown(tekst) {
             const marker = "---VERVOLGVRAGEN---";
             if (tekst.includes(marker)) {
                 const [hoofdTekst, vragenDeel] = tekst.split(marker);
-                const vragen = vragenDeel.split('
-').map(r => r.replace(/^[-*•d.)s]+/, '').trim()).filter(r => r.length > 5 && r.endsWith('?')).slice(0, 3);
+                const vragen = vragenDeel.split(/\r?\n/).map(r => r.replace(/^[-*•d.)s]+/, '').trim()).filter(r => r.length > 5 && r.endsWith('?')).slice(0, 3);
                 const chipsBox = el('followup-chips');
                 if (chipsBox && vragen.length > 0) {
                     chipsBox.innerHTML = vragen.map(v => '<button type="button" class="followup-chip text-xs bg-gray-900 hover:bg-orange-950 text-orange-300 border border-gray-700 hover:border-orange-500 px-3 py-1.5 rounded-full transition text-left">💬 ' + esc(v) + '</button>').join('');
