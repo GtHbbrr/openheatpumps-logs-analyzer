@@ -1808,7 +1808,7 @@ function parseMarkdown(tekst) {
 
             const kTemp = getVal('roomTemp');
             const kSet = getVal('roomSetpoint') ?? getVal('thermostatRoomSetpoint') ?? getVal('phouseRoomSetpoint') ?? getVal('targetRoomTemp');
-            el('qs-temp').textContent = (typeof kTemp === 'number' ? kTemp.toFixed(1) + '°C' : '-') + ' / ' + (typeof kSet === 'number' ? kSet.toFixed(1) + '°C' : '-');
+            el('qs-temp').textContent = (typeof kTemp === 'number' ? kTemp.toFixed(1) + '°C' : '-') + ' / ' + ((kSet !== null && kSet !== undefined && !isNaN(Number(kSet))) ? Number(kSet).toFixed(1) + '°C' : '-');
 
             const s1 = getVal('hp1CompressorStarts72h');
             const s2 = getVal('hp2CompressorStarts72h');
@@ -1859,6 +1859,7 @@ function parseMarkdown(tekst) {
     </script>
 </body>
 </html>
+
 
 
 
