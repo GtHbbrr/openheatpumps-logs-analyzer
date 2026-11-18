@@ -1807,7 +1807,7 @@ function parseMarkdown(tekst) {
             el('qs-duur').textContent = (uren > 0 ? uren + 'u ' + restMin + 'm' : min + ' min') + ' (' + (data.samples?.length || 0) + ')';
 
             const kTemp = getVal('roomTemp');
-            const kSet = getVal('roomSetpoint');
+            const kSet = getVal('roomSetpoint') ?? getVal('thermostatRoomSetpoint') ?? getVal('phouseRoomSetpoint') ?? getVal('targetRoomTemp');
             el('qs-temp').textContent = (typeof kTemp === 'number' ? kTemp.toFixed(1) + '°C' : '-') + ' / ' + (typeof kSet === 'number' ? kSet.toFixed(1) + '°C' : '-');
 
             const s1 = getVal('hp1CompressorStarts72h');
@@ -1859,4 +1859,5 @@ function parseMarkdown(tekst) {
     </script>
 </body>
 </html>
+
 
