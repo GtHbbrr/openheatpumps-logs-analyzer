@@ -155,11 +155,7 @@
                         <span class="text-xs font-semibold text-gray-300 uppercase tracking-wider">⚡ Directe Log-samenvatting</span>
                         <span id="qs-badge" class="text-xs px-2.5 py-0.5 rounded-full font-medium bg-green-950 text-green-300 border border-green-800">Gereed</span>
                     </div>
-                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-                        <div class="bg-gray-900/70 p-2.5 rounded border border-gray-800/80"><div class="text-gray-500">Opstelling</div><div id="qs-opstelling" class="text-gray-200 font-semibold mt-0.5">-</div></div>
-                        <div class="bg-gray-900/70 p-2.5 rounded border border-gray-800/80"><div class="text-gray-500">Meetduur</div><div id="qs-duur" class="text-gray-200 font-semibold mt-0.5">-</div></div>
-                        <div class="bg-gray-900/70 p-2.5 rounded border border-gray-800/80"><div class="text-gray-500">Kamer / Doel</div><div id="qs-temp" class="text-gray-200 font-semibold mt-0.5">-</div></div>
-                        <div class="bg-gray-900/70 p-2.5 rounded border border-gray-800/80"><div class="text-gray-500">Starts (72u)</div><div id="qs-starts" class="text-gray-200 font-semibold mt-0.5">-</div></div>
+                    
                     <div id="teaser-carousel-wrap" class="hidden col-span-full pt-3 mt-1 border-t border-gray-800/80 space-y-2">
                         <div class="flex justify-between items-center text-[11px] text-orange-400">
                             <span id="teaser-status-label" class="font-medium animate-pulse">✨ Live inzichten uit jouw logboek...</span>
@@ -1810,20 +1806,21 @@ function parseMarkdown(tekst) {
             const gen = cfg.hp1Generation || '';
             const strat = getVal('heatingStrategy') || 'Power House';
             const fw = getVal('projectVersionText') ? ' · ' + getVal('projectVersionText') : '';
-            el('qs-opstelling').textContent = (topo + ' ' + gen + ' · ' + strat + fw).trim();
+            _qsBasis.opst = (topo + ' ' + gen + ' · ' + strat + fw).trim();
 
             const min = Math.round(maxTijd / 60);
             const uren = Math.floor(min / 60);
             const restMin = min % 60;
-            el('qs-duur').textContent = (uren > 0 ? uren + 'u ' + restMin + 'm' : min + ' min') + ' (' + (data.samples?.length || 0) + ')';
+            _qsBasis.duur = (uren > 0 ? uren + 'u ' + restMin + 'm' : min + ' min') + ' (' + (data.samples?.length || 0) + ')';
 
             const kTemp = getVal('roomTemp');
             const kSet = getVal('roomSetpoint') ?? getVal('thermostatRoomSetpoint') ?? getVal('phouseRoomSetpoint') ?? getVal('targetRoomTemp');
-            el('qs-temp').textContent = (typeof kTemp === 'number' ? kTemp.toFixed(1) + '°C' : '-') + ' / ' + ((kSet !== null && kSet !== undefined && !isNaN(Number(kSet))) ? Number(kSet).toFixed(1) + '°C' : '-');
+            _qsBasis.temp = (typeof kTemp === 'number' ? kTemp.toFixed(1) + '°C' : '-') + ' / ' + ((kSet !== null && kSet !== undefined && !isNaN(Number(kSet))) ? Number(kSet).toFixed(1) + '°C' : '-');
 
             const s1 = getVal('hp1CompressorStarts72h');
             const s2 = getVal('hp2CompressorStarts72h');
-            el('qs-starts').textContent = cfg.installationTopology === 'duo' ? ('HP1: ' + (s1 ?? '-') + ' / HP2: ' + (s2 ?? '-')) : (s1 ?? '-');
+            _qsBasis.starts = cfg.installationTopology === 'duo' ? ('HP1: ' + (s1 ?? '-') + ' / HP2: ' + (s2 ?? '-')) : (s1 ?? '-');
+            toonStartInzichtenInRaampjes(data);
 
             const badge = el('qs-badge');
             if (echteFout) {
@@ -1869,6 +1866,20 @@ function parseMarkdown(tekst) {
         };
 
         let _teaserTimer = null;
+
+        let _qsBasis = { opst: '-', duur: '-', temp: '-', starts: '-' };
+
+        function toonStartInzichtenInRaampjes(data) {
+            stopTeaserCarrousel(false);
+            const teasers = bouwLogTeasers(data);
+            el('teaser-status-label').textContent = '📊 Basisgegevens uit je logboek (klik op Start voor live analyse):';
+            el('teaser-status-label').classList.remove('animate-pulse');
+            el('teaser-count-label').textContent = teasers.length + ' inzichten klaar';
+            if (el('teaser-slot-0')) el('teaser-slot-0').textContent = '⚙️ Opstelling: ' + _qsBasis.opst;
+            if (el('teaser-slot-1')) el('teaser-slot-1').textContent = '⏱️ Meetduur: ' + _qsBasis.duur;
+            if (el('teaser-slot-2')) el('teaser-slot-2').textContent = '🏡 Kamer / Doel: ' + _qsBasis.temp;
+        }
+
 
         function bouwLogTeasers(data) {
             if (!data || !Array.isArray(data.columns) || !Array.isArray(data.initial)) return [];
@@ -1949,10 +1960,7 @@ function parseMarkdown(tekst) {
             }
 
             const teasers = [];
-            const opstTxt = el('qs-opstelling')?.textContent;
-            const duurTxt = el('qs-duur')?.textContent;
-            const tempTxt = el('qs-temp')?.textContent;
-            const startsTxt = el('qs-starts')?.textContent;
+            const opstTxt = _qsBasis.opst, duurTxt = _qsBasis.duur, tempTxt = _qsBasis.temp, startsTxt = _qsBasis.starts;
             if (opstTxt && opstTxt !== '-') teasers.push(`⚙️ Opstelling & firmware: ${opstTxt}`);
             if (duurTxt && duurTxt !== '-') teasers.push(`⏱️ Opnameduur & metingen: ${duurTxt} meetpunten vastgelegd`);
             if (tempTxt && tempTxt !== '-') teasers.push(`🏡 Kamertemperatuur vs. doel: ${tempTxt}`);
