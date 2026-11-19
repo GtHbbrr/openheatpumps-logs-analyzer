@@ -1,20 +1,7 @@
 ﻿const fs = require('fs');
 const https = require('https');
 
-function fetchJson(url) {
-  return new Promise((res, rej) => {
-    https.get(url, { headers: { 'User-Agent': 'Node-Analyzer' } }, (r) => {
-      let d = '';
-      r.on('data', chunk => d += chunk);
-      r.on('end', () => {
-        try { res(JSON.parse(d)); }
-        catch (e) { rej(new Error('Geen JSON van ' + url)); }
-      });
-    }).on('error', rej);
-  });
-}
-
-function fetchText(url) {
+function fetchOnce(url) {
   return new Promise((res, rej) => {
     https.get(url, { headers: { 'User-Agent': 'Node-Analyzer' } }, (r) => {
       let d = '';
@@ -22,6 +9,23 @@ function fetchText(url) {
       r.on('end', () => res(d));
     }).on('error', rej);
   });
+}
+
+async function fetchText(url, retries = 3) {
+  for (let i = 1; i <= retries; i++) {
+    try {
+      return await fetchOnce(url);
+    } catch (e) {
+      if (i === retries) throw e;
+      await new Promise(r => setTimeout(r, 600 * i));
+    }
+  }
+}
+
+async function fetchJson(url) {
+  const txt = await fetchText(url);
+  try { return JSON.parse(txt); }
+  catch (e) { throw new Error('Geen JSON van ' + url); }
 }
 
 const ALLOWED_DEV_DOCS = new Set([
@@ -36,30 +40,35 @@ const ALLOWED_DEV_DOCS = new Set([
   'docs/development/control-replay-firmware.md'
 ]);
 
+const oqBase = ['http://', 'openquatt', '.', 'local/'].join('');
+const SPA_ROUTES = [
+  ['Overzicht / Dashboard', '?view=overview'],
+  ['Resultaten & grafieken', '?view=results'],
+  ['Vooruitblik / Huisleren (Metingen)', '?view=learning'],
+  ['Vooruitblik / Huisleren (Uitleg)', '?view=learning&section=explanation'],
+  ['Vooruitblik / Huisleren (Voorspelling)', '?view=learning&section=forecast'],
+  ['Vooruitblik / Huisleren (Configuratie)', '?view=learning&section=configuration'],
+  ['Vooruitblik / Huisleren (Diagnose en data)', '?view=learning&section=diagnostics'],
+  ['Regeling / Control Replay (Actueel)', '?view=control'],
+  ['Regeling / Control Replay (Tijdlijn)', '?view=control&controlTab=timeline'],
+  ['Regeling / Control Replay (Grafieken)', '?view=control&controlTab=graphs'],
+  ['Diagnose / Trends', '?view=diagnosis'],
+  ['Energie', '?view=energy'],
+  ['Instellingen - Installatie (woning, afgiftesysteem, cv-ketel, flowbron, thermostaat)', '?view=settings&section=installation'],
+  ['Instellingen - Verwarmen (Power House, stooklijn, kamertemperatuur, nachtverlaging)', '?view=settings&section=heating'],
+  ['Instellingen - Koelen (koelregeling, dauwpunt, koelschema)', '?view=settings&section=cooling'],
+  ['Instellingen - Integraties (Home Assistant, MQTT, weer, temperatuurbronnen)', '?view=settings&section=integrations'],
+  ['Instellingen - Service (min. draaitijd, compressorlimieten, ontdooien, flowregeling/iPWM, opwarmen)', '?view=settings&section=service'],
+  ['Instellingen - Systeem (firmware-updates, loggeschiedenis, herstarten)', '?view=settings&section=system'],
+  ['Instellingen - Systeemrecorder (debug-logs opnemen en exporteren)', '?view=settings&section=system&modal=systeemrecorder'],
+  ['Instellingen - Back-up & herstel', '?view=settings&section=backup'],
+  ['Instellingen - Wijzigingsgeschiedenis', '?view=settings&section=changes'],
+  ['Instellingen - Delen & privacy (telemetrie)', '?view=settings&section=sharing']
+];
+
 const SPA_DEEPLINKS_BLOCK = [
   '---OPENQUATT WEB-APP DEEPLINKS (SPA GUI)---',
-  'web-app/deeplinks: Overzicht / Dashboard -> http://openquatt.local',
-  'web-app/deeplinks: Resultaten & grafieken -> http://openquatt.local',
-  'web-app/deeplinks: Vooruitblik / Huisleren (Metingen) -> http://openquatt.local',
-  'web-app/deeplinks: Vooruitblik / Huisleren (Uitleg) -> http://openquatt.local&section=explanation',
-  'web-app/deeplinks: Vooruitblik / Huisleren (Voorspelling) -> http://openquatt.local&section=forecast',
-  'web-app/deeplinks: Vooruitblik / Huisleren (Configuratie) -> http://openquatt.local&section=configuration',
-  'web-app/deeplinks: Vooruitblik / Huisleren (Diagnose en data) -> http://openquatt.local&section=diagnostics',
-  'web-app/deeplinks: Regeling / Control Replay (Actueel) -> http://openquatt.local',
-  'web-app/deeplinks: Regeling / Control Replay (Tijdlijn) -> http://openquatt.local&controlTab=timeline',
-  'web-app/deeplinks: Regeling / Control Replay (Grafieken) -> http://openquatt.local&controlTab=graphs',
-  'web-app/deeplinks: Diagnose / Trends -> http://openquatt.local',
-  'web-app/deeplinks: Energie -> http://openquatt.local',
-  'web-app/deeplinks: Instellingen - Installatie (woning, afgiftesysteem, cv-ketel, flowbron, thermostaat) -> http://openquatt.local',
-  'web-app/deeplinks: Instellingen - Verwarmen (Power House, stooklijn, kamertemperatuur, nachtverlaging) -> http://openquatt.local',
-  'web-app/deeplinks: Instellingen - Koelen (koelregeling, dauwpunt, koelschema) -> http://openquatt.local',
-  'web-app/deeplinks: Instellingen - Integraties (Home Assistant, MQTT, weer, temperatuurbronnen) -> http://openquatt.local',
-  'web-app/deeplinks: Instellingen - Service (min. draaitijd, compressorlimieten, ontdooien, flowregeling/iPWM, opwarmen) -> http://openquatt.local',
-  'web-app/deeplinks: Instellingen - Systeem (firmware-updates, loggeschiedenis, herstarten) -> http://openquatt.local',
-  'web-app/deeplinks: Instellingen - Systeemrecorder (debug-logs opnemen en exporteren) -> http://openquatt.local&modal=systeemrecorder',
-  'web-app/deeplinks: Instellingen - Back-up & herstel -> http://openquatt.local',
-  'web-app/deeplinks: Instellingen - Wijzigingsgeschiedenis -> http://openquatt.local',
-  'web-app/deeplinks: Instellingen - Delen & privacy (telemetrie) -> http://openquatt.local'
+  ...SPA_ROUTES.map(([label, q]) => `web-app/deeplinks: ${label} -> ${oqBase}${q}`)
 ].join('\n\n') + '\n\n';
 
 (async () => {
