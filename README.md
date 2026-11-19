@@ -1,41 +1,33 @@
-# OpenHeatPumps Logs Analyzer 🚀
+﻿# OpenHeatPumps Logs Analyzer (`openheatpumps.nl`)
 
-Welkom bij **OpenHeatPumps.nl**! Dit is een onafhankelijke hulpkit voor bezitters van slimme warmtepomp-systemen zoals de **OpenQuatt**.
+Publieke eerstelijns AI-diagnosetool en zelfhulpschil voor **[OpenQuatt](https://github.com)**-gebruikers. Warmtepompbezitters kunnen hiermee hun `.oqdebug.json` logbestanden en screenshots van instellingen of grafieken direct laten analyseren in begrijpelijk Nederlands, gekoppeld aan de actuele OpenQuatt-documentatie.
 
-Complexe databestanden (`.oqdebug.json`) die door de controller worden aangemaakt, worden door onze website omgezet in begrijpelijk Nederlandstalige diagnoses via een lichte frontend en een Cloudflare Workers-backend met Google Gemini-integratie en dagelijks gesynchroniseerde documentatie.
+## Architectuur & Onderdelen
 
----
+* **Frontend (`frontend/index.html`):**
+  * **Systeemprofiel:** Keuze voor woningtype, afgiftesysteem, aanwezige cv-ketel en thermostaat voor contextbewuste diagnoses.
+  * **Logboek koppelen:** Ondersteunt het koppelen van een volledige log-map, een los `.oqdebug.json` bestand (via upload of drag-and-drop) of plakken vanaf het klembord.
+  * **Quick-scan logboek:** Toont direct na het laden 3 willekeurige basisinzichten uit de logs en wisselt tijdens de AI-analyse rustig door de meetpunten (4,2s interval) met live weergave van het actieve Gemini-model en pogingnummer.
+  * **Multimodale bijlagen:** Ondersteunt het uploaden of plakken (`Ctrl+V`) van screenshots en foto's (zoals OpenQuatt-instellingen, bedrading of thermostaat). Afbeeldingen worden in de browser verkleind naar JPEG (`maxBreedte: 1200px`) en als pure base64 (`inlineData`) meegestuurd bij zowel de startanalyse als vervolgvragen.
+  * **Deelbare links (`?id=<shareId>`):** Genereert een publieke deellink (7 dagen geldig) om een analyse en gesprek eenvoudig te delen in bijvoorbeeld Discord of op Tweakers.
 
-## 🛠 Hoe werkt de website nu? (v0.23.2+)
+* **Backend Worker (`backend/backend_index.js`):**
+  * **Slimme logcompressie met kolomnamen (`bereidLogVoorAi`):** Filtert technische ruisvelden weg (`uptimeMs`, `freeHeap`, etc.), behoudt alle statuswisselingen en storingen, en vertaalt indexnummers direct naar leesbare `"kolomnaam": waarde`-paren om telfouten bij AI-modellen uit te sluiten.
+  * **Gecontroleerde 5-modellen rotatie:** Verdeelt aanvragen binnen de Gemini free tier over één volledige ronde van 5 modellen (`gemini-3.8-flash`, `gemini-3.6-flash`, `gemini-3-flash-preview`, `gemini-3.1-flash-lite`, `gemini-3.5-flash-lite`). Bij een `400 Bad Request` breekt de rotatie direct af; bij `429` of `503` schakelt de worker na 800 ms automatisch door naar het volgende model.
+  * **RAG-documentatie:** Combineert de logdata en afbeeldingen met de actuele `openquatt_docs_snapshot.txt`.
+  * **Koppeling met tweedelijns newsfeed:** Stuurt elke afgeronde startanalyse, vervolgvraag en gedeelde link via de Cloudflare Service Binding (`NEWSFEED_SERVICE` -> `https://internal/event`) naar `openheatpumps-newsfeed` (zonder zware base64-afbeeldingen mee te sturen naar het archief).
 
-1. **Frontend:** Sleep je `.oqdebug.json` bestand naar het scherm, plak het vanaf je klembord of gebruik **"Koppel Log-map"**.
-2. **Backend & AI:** Cloudflare Workers verdeelt verzoeken slim over Google Gemini-modellen, ondersteund door dagelijks ververste documentatie en een RAG-geheugen.
-3. **Deelbare links:** Genereer met één klik een unieke diagnose-link die **7 dagen** geldig blijft.
+## Cloudflare Bindings & Secrets
 
----
+* `LOGS_KV` (`PUBLIC_SHARE_KV`): Slaat gedeelde analyses op onder `share:<shareId>` met een TTL van 7 dagen.
+* `NEWSFEED_SERVICE`: Service Binding naar de privé `openheatpumps-newsfeed` worker.
+* `GEMINI_API_KEY`: API-sleutel voor Google AI Studio / Gemini.
 
-## 🗺 Roadmap
+## Lokaal ontwikkelen & Deployen
 
-* **Fase 1 & 2 (Live in v0.23.2+):** `.oqdebug.json` parsing, AI-diagnose, woningprofielen meesturen en tijdelijke deelbare links via Cloudflare KV.
-* **Fase 3 t/m 5 (Toekomst):** Verdieping van *Power House*- en *Heat Intent*-regels, historische trendvergelijkingen en anonieme installatie-benchmarks.
-
----
-
-## 🔒 Privacy & Veiligheid
-
-* **AI-verwerking:** Bestanden worden tijdelijk naar de Google Gemini API gestuurd voor analyse.
-* **Geen accounts:** Er wordt geen persoonlijke informatie zoals namen of e-mailadressen gevraagd.
-* **Deelbare links:** Analysegegevens worden enkel opgeslagen na een bewuste klik op **"Deel analyse"** en worden na **7 dagen** automatisch gewist uit Cloudflare KV.
-* **Analytics:** Maakt gebruik van een eigen, cookievrije **Umami Analytics**-instantie.
-
----
-
-## 💻 Meehelpen?
-
-Heb je ideeën of wil je bijdragen aan de backend? Open gerust een Issue of Pull Request op GitHub!
-
-
-
-## 💻 Meehelpen?
-
-Dit project is gemaakt voor en door warmtepomp-bezitters die van duidelijke taal houden. Heb je ideeën om de website nog simpeler te maken of wil je meebouwen aan de cloud-motor? Open dan een Issue of Pull Request op GitHub!
+1. Zorg dat de Wrangler CLI geïnstalleerd is (`npm install`).
+2. Test de backend lokaal vanuit de map `backend`:
+   ```bash
+   npx wrangler dev
+   ```
+3. Wijzigingen op `main` worden automatisch uitgerold naar Cloudflare Pages / Workers.
