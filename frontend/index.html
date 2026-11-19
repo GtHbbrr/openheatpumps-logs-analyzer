@@ -2169,6 +2169,59 @@ function parseMarkdown(tekst) {
             window.parent?.postMessage({ type: 'OQ_EMBED_READY' }, '*');
         })();
     </script>
+    <script>
+        // ==========================================
+        // UX SCROLL & VIEWPORT OPTIMALISATIE (Web + Embed)
+        // ==========================================
+        (function initChatViewportUx() {
+            const isEmbed = new URLSearchParams(window.location.search).get('embed') === '1';
+            const style = document.createElement('style');
+            style.textContent = `
+                #output-box {
+                    max-height: ${isEmbed ? 'calc(100vh - 215px)' : '58vh'} !important;
+                    overflow-y: auto !important;
+                    scroll-behavior: smooth;
+                    padding-right: 0.5rem;
+                }
+                #chat-container {
+                    position: sticky;
+                    bottom: 0;
+                    background-color: #030712;
+                    padding-top: 0.75rem;
+                    padding-bottom: 0.5rem;
+                    z-index: 20;
+                }
+                ${isEmbed ? `
+                body.oq-embed-mode { height: 100vh !important; overflow: hidden !important; }
+                body.oq-embed-mode #status-banner,
+                body.oq-embed-mode #model-status,
+                body.oq-embed-mode h3 { display: none !important; }
+                ` : ''}
+            `;
+            document.head.appendChild(style);
+
+            const box = document.getElementById('output-box');
+            if (!box) return;
+
+            let lastAlignedMarker = null;
+            const alignLatestResponseTop = () => {
+                const markers = Array.from(box.querySelectorAll('div')).filter(d => d.textContent && d.textContent.includes('AI Analyse'));
+                const latest = markers[markers.length - 1];
+                if (latest && latest !== lastAlignedMarker) {
+                    lastAlignedMarker = latest;
+                    box.scrollTop = Math.max(0, latest.offsetTop - box.offsetTop - 8);
+                } else if (!latest && box.children.length > 0 && lastAlignedMarker !== 'first') {
+                    lastAlignedMarker = 'first';
+                    box.scrollTop = 0;
+                }
+            };
+
+            const observer = new MutationObserver(() => {
+                requestAnimationFrame(alignLatestResponseTop);
+            });
+            observer.observe(box, { childList: true, subtree: true });
+        })();
+    </script>
 </body>
 </html>
 
