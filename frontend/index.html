@@ -1626,8 +1626,8 @@ function parseMarkdown(tekst) {
                     const virtueelBestand = new File([JSON.stringify(data.logData)], `gedeeld-${shareId}.json`, { type: "application/json" });
                     await laadBestand(virtueelBestand);
                 }
-                if (Array.isArray(data.chatHistory)) {
-                    chatHistory = data.chatHistory;
+                const loadedHistory = Array.isArray(data.chatHistory) ? data.chatHistory : (Array.isArray(data.messages) ? data.messages : null);`n                if (loadedHistory) {
+                    chatHistory = loadedHistory;
                     activeSessionModel = data.model || null;
                     const outputBox = el('output-box');
                     outputBox.innerHTML = `<div class="text-xs text-orange-400 mb-2">🔗 Gedeelde analyse geladen (ID: ${shareId})</div>`;
