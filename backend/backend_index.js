@@ -376,11 +376,7 @@ STRIKTE GEBRUIKERSCONTEXT:
         geschuddeModellen = [preferredModel, ...overige];
       }
 
-      // Beperk tot max 3 pogingen (2 Flash + 1 Lite) om quota-uitputting te voorkomen
-      const geselecteerdeModellen = [
-        ...geschuddeModellen.filter((m) => !m.includes("lite")).slice(0, 2),
-        ...geschuddeModellen.filter((m) => m.includes("lite")).slice(0, 1)
-      ];
+      const geselecteerdeModellen = geschuddeModellen;
 
       const geminiPayload = {
         systemInstruction: { parts: [{ text: systemInstruction }] },
@@ -410,46 +406,44 @@ STRIKTE GEBRUIKERSCONTEXT:
             );
 
             const apiAttempts = [];
-            let aantal429 = 0;
             let pogingNr = 0;
+            let gelukt = false;
+            const startTijd = Date.now();
 
-            for (const model of geselecteerdeModellen) {
-              pogingNr++;
-              gebruiktModel = model;
+            while (!gelukt && pogingNr < 15 && Date.now() - startTijd < 42000) {
+              for (const model of geselecteerdeModellen) {
+                if (pogingNr >= 15 || Date.now() - startTijd >= 42000) break;
+                pogingNr++;
+                gebruiktModel = model;
 
-              await writer.write(
-                encoder.encode(
-                  `---MODEL_TRY---${JSON.stringify({ model: model.toUpperCase(), attempt: pogingNr })}---\n`
-                )
-              );
+                await writer.write(
+                  encoder.encode(
+                    `---MODEL_TRY---${JSON.stringify({ model: model.toUpperCase(), attempt: pogingNr })}---\n`
+                  )
+                );
 
-              const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${env.GEMINI_API_KEY}`;
-              const geminiResponse = await fetch(geminiUrl, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(geminiPayload)
-              });
+                const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${env.GEMINI_API_KEY}`;
+                const geminiResponse = await fetch(geminiUrl, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify(geminiPayload)
+                });
 
-              apiAttempts.push({ model, status: geminiResponse.status });
+                apiAttempts.push({ model, status: geminiResponse.status });
 
-              const responseText = await geminiResponse.text();
-              geminiJson = responseText.trim().startsWith("{")
-                ? JSON.parse(responseText)
-                : null;
+                const responseText = await geminiResponse.text();
+                geminiJson = responseText.trim().startsWith("{")
+                  ? JSON.parse(responseText)
+                  : null;
 
-              if (geminiResponse.ok && geminiJson && !geminiJson.error) {
-                break;
-              }
-
-              if (geminiResponse.status === 429) {
-                aantal429++;
-                if (aantal429 >= 2) {
-                  console.warn("Meerdere 429-limieten bereikt, breek fallback-keten af.");
+                if (geminiResponse.ok && geminiJson && !geminiJson.error) {
+                  gelukt = true;
                   break;
                 }
-              }
 
-              console.warn(`Model ${model} faalde (${geminiResponse.status}), schakel door naar volgende model...`);
+                console.warn(`Model ${model} faalde (${geminiResponse.status}) in poging ${pogingNr}, wacht 1.5s...`);
+                await new Promise((r) => setTimeout(r, 1500));
+              }
             }
 
             const cachedTokens =
