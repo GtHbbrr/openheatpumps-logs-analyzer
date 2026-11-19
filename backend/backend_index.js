@@ -326,6 +326,9 @@ ${JSON.stringify(actieveLog)}
 DIRECTE LINKS NAAR OPENQUATT WEB-APP (DEEPLINKS):
 * Wanneer je verwijst naar een specifieke pagina of instelling in de OpenQuatt web-app (zoals Verwarmen, Service, Integraties, Vooruitblik of Systeemrecorder), voeg dan altijd de exact bijbehorende klikbare Markdown-link toe uit de sectie 'OPENQUATT WEB-APP DEEPLINKS' onderaan de documentatie (bijv. [Open Verwarmen-instellingen](http://openquatt.local)). Verzin nooit zelf URL-parameters.
 
+LOGVENSTER & HISTORIE-HINT:
+* Controleer altijd de tijdsduur en tijdspanne van de aangeleverde logdata. Als een gebruiker vraagt naar een gebeurtenis of probleem dat buiten dit tijdvenster valt (bijvoorbeeld vannacht, eerder op de dag of meerdere ontdooicycli terwijl het log slechts een kort venster van bijvoorbeeld 15 minuten bevat), benoem dit dan kort en vraag de gebruiker om een ruimer logvenster (tot ca. 7 uur) te selecteren of te exporteren in de OpenQuatt Systeemrecorder.
+
 VISUELE BIJLAGEN (SCREENSHOTS / FOTOS):
 * Als de gebruiker een screenshot of foto meestuurt (zoals OpenQuatt-instellingen, grafieken, thermostaat of bedrading), analyseer deze dan nauwkeurig en combineer de zichtbare instellingen/waarden met eventuele logdata en de OpenQuatt-documentatie.
 

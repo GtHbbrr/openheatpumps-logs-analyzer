@@ -2081,6 +2081,91 @@ function parseMarkdown(tekst) {
             return _origParseMdTeaser(tekst);
         };
     </script>
+    <script>
+        // ==========================================
+        // EMBED SIDEPANEL POC (?embed=1 voor OpenQuatt SPA)
+        // ==========================================
+        (function initOpenQuattEmbed() {
+            const isEmbed = new URLSearchParams(window.location.search).get('embed') === '1';
+            if (!isEmbed) return;
+
+            document.body.classList.add('oq-embed-mode');
+
+            const style = document.createElement('style');
+            style.textContent = `
+                body.oq-embed-mode { background-color: #030712 !important; }
+                body.oq-embed-mode header,
+                body.oq-embed-mode footer,
+                body.oq-embed-mode #left-panel-wrapper,
+                body.oq-embed-mode #log-viewer,
+                body.oq-embed-mode #right-panel,
+                body.oq-embed-mode #context-panel { display: none !important; }
+                body.oq-embed-mode #main-grid {
+                    max-width: 100% !important;
+                    padding: 0.75rem !important;
+                    margin: 0 !important;
+                    gap: 0.75rem !important;
+                }
+                body.oq-embed-mode #center-panel,
+                body.oq-embed-mode main > div {
+                    width: 100% !important;
+                    max-width: 100% !important;
+                    margin: 0 !important;
+                }
+            `;
+            document.head.appendChild(style);
+
+            const bar = document.createElement('div');
+            bar.id = 'oq-embed-bar';
+            bar.className = 'bg-gray-950 border-b border-gray-800 px-3 py-2 flex items-center justify-between text-xs sticky top-0 z-50';
+            bar.innerHTML = `
+                <div class="flex items-center gap-2">
+                    <span class="font-bold text-orange-500">✨ OpenQuatt AI</span>
+                    <span id="oq-embed-status" class="text-gray-400 bg-gray-900 border border-gray-800 px-2 py-0.5 rounded">⏳ Wachten op logdata...</span>
+                </div>
+                <span class="text-[11px] text-gray-500">PoC Sideframe</span>
+            `;
+            document.body.insertBefore(bar, document.body.firstChild);
+
+            window.addEventListener('message', async (event) => {
+                const msg = event.data;
+                if (!msg || typeof msg !== 'object') return;
+
+                if (msg.type === 'OQ_LOGDATA' && msg.logData) {
+                    try {
+                        if (msg.userProfile) {
+                            if (msg.userProfile.woning_type && el('woning_type')) el('woning_type').value = msg.userProfile.woning_type;
+                            if (msg.userProfile.afgiftesysteem && el('afgiftesysteem')) el('afgiftesysteem').value = msg.userProfile.afgiftesysteem;
+                            if (msg.userProfile.cv_ketel && el('cv_ketel')) el('cv_ketel').value = msg.userProfile.cv_ketel;
+                            if (msg.userProfile.thermostaat && el('thermostaat')) el('thermostaat').value = msg.userProfile.thermostaat;
+                        }
+                        const virtueelBestand = new File([JSON.stringify(msg.logData)], 'openquatt-live.oqdebug.json', { type: 'application/json' });
+                        await laadBestand(virtueelBestand);
+
+                        const sampleCount = Array.isArray(msg.logData.samples) ? msg.logData.samples.length : 0;
+                        const intervalS = msg.logData.recording?.interval_s || 10;
+                        const mins = Math.round((sampleCount * intervalS) / 60);
+                        const statusEl = document.getElementById('oq-embed-status');
+                        if (statusEl) {
+                            statusEl.textContent = `✅ Log gekoppeld (${mins > 0 ? mins + ' min • ' : ''}${sampleCount} samples)`;
+                            statusEl.className = 'text-green-400 bg-green-950/50 border border-green-800 px-2 py-0.5 rounded';
+                        }
+                    } catch (e) {
+                        console.error('Fout bij verwerken OQ_LOGDATA:', e);
+                    }
+                }
+            });
+
+            document.addEventListener('click', (e) => {
+                const link = e.target.closest('a[href^="http://openquatt.local"]');
+                if (!link) return;
+                e.preventDefault();
+                window.parent?.postMessage({ type: 'OQ_NAVIGATE', href: link.getAttribute('href') }, '*');
+            });
+
+            window.parent?.postMessage({ type: 'OQ_EMBED_READY' }, '*');
+        })();
+    </script>
 </body>
 </html>
 
