@@ -1,18 +1,135 @@
-﻿<!DOCTYPE html><html lang="nl"><head><meta charset="UTF-8"><title>OpenQuatt AI Sideframe PoC</title><link rel="stylesheet" href="https://cloudflare.com"></head>
+﻿<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OpenQuatt SPA + AI Sideframe PoC</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css">
+</head>
 <body class="bg-gray-900 text-white h-screen overflow-hidden flex flex-col">
-<div class="bg-gray-950 border-b border-gray-800 px-4 py-2 flex items-center justify-between text-xs">
-  <div class="flex items-center gap-3"><span class="font-bold text-orange-500">OpenQuatt SPA + AI Sideframe PoC</span><label class="bg-gray-800 hover:bg-gray-700 px-2.5 py-1 rounded cursor-pointer border border-gray-700">📂 Laad .oqdebug.json<input type="file" id="f" accept=".json" class="hidden"></label><span id="st" class="text-gray-400">Kies een logbestand</span></div>
-  <div class="flex items-center gap-2"><span id="nb" class="hidden text-green-400 font-mono"></span><button id="tg" class="bg-orange-600 px-3 py-1 rounded font-semibold">✨ AI Hulp sluiten</button></div>
-</div>
-<div class="flex-1 flex overflow-hidden">
-  <iframe id="oq" src="https://github.io?view=overview" class="flex-1 h-full border-0"></iframe>
-  <aside id="dr" class="border-l border-gray-800 bg-gray-950 flex-shrink-0" style="width:440px"><iframe id="ai" src="./?embed=1" class="w-full h-full border-0"></iframe></aside>
-</div>
-<script>
-const oq = document.getElementById('oq'), ai = document.getElementById('ai'), dr = document.getElementById('dr'), tg = document.getElementById('tg');
-let log = null;
-tg.onclick = () => { const h = dr.classList.toggle('hidden'); tg.textContent = h ? '✨ AI Hulp openen' : '✨ AI Hulp sluiten'; };
-function send(){ if(log && ai.contentWindow){ ai.contentWindow.postMessage({type:'OQ_LOGDATA',logData:log,userProfile:{woning_type:'tussenwoning',afgiftesysteem:'alleen radiatoren',cv_ketel:'Intergas',thermostaat:'Honeywell'}},'*'); document.getElementById('st').textContent='✅ Log actief in AI'; } }
-document.getElementById('f').onchange = async e => { if(e.target.files){ log = JSON.parse(await e.target.files.text()); send(); } };
-window.onmessage = e => { if(e.data?.type==='OQ_EMBED_READY') send(); if(e.data?.type==='OQ_NAVIGATE'){ const u = e.data.href.replace(/^http:\/\/openquatt\.local\//i,'https://github.io'); oq.src = u; const nb = document.getElementById('nb'); nb.textContent = u.replace('https://github.io',''); nb.classList.remove('hidden'); } };
-</script></body></html>
+  <div class="bg-gray-950 border-b border-gray-800 px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs">
+    <div class="flex items-center gap-3">
+      <span class="font-bold text-orange-500 text-sm">OpenQuatt SPA + AI Sideframe PoC</span>
+      <label class="bg-gray-800 hover:bg-gray-700 text-gray-200 px-3 py-1.5 rounded cursor-pointer border border-gray-700 font-medium">
+        📂 Laad .oqdebug.json in AI
+        <input type="file" id="poc-file" accept=".json" class="hidden">
+      </label>
+      <span id="poc-status" class="text-gray-400">Wachten op .oqdebug.json testbestand...</span>
+    </div>
+    <button id="toggle-drawer" class="bg-orange-600 hover:bg-orange-500 text-white px-3 py-1.5 rounded font-semibold shadow">
+      ✨ AI Hulp sluiten
+    </button>
+  </div>
+
+  <div class="flex-1 flex overflow-hidden">
+    <!-- Links: Interactieve OpenQuatt SPA Simulatie -->
+    <div class="flex-1 bg-gray-900 p-6 overflow-y-auto flex flex-col justify-between">
+      <div class="max-w-2xl space-y-6">
+        <div class="bg-gray-950 border border-gray-800 rounded-xl p-5">
+          <div class="flex items-center justify-between border-b border-gray-800 pb-3 mb-4">
+            <div>
+              <div class="text-xs text-blue-400 font-semibold uppercase tracking-wider">OpenQuatt Web-App (ESP32-S3)</div>
+              <h2 id="spa-title" class="text-lg font-bold text-white mt-0.5">Overzicht / Dashboard</h2>
+            </div>
+            <span id="spa-route" class="text-xs font-mono bg-gray-900 border border-gray-700 text-blue-300 px-2.5 py-1 rounded">?view=overview</span>
+          </div>
+          <p id="spa-desc" class="text-sm text-gray-300 leading-relaxed">
+            Dit simuleert het hoofdvenster van de OpenQuatt web-app op de ESP32-S3. Laad bovenaan een <code class="text-orange-300">.oqdebug.json</code> bestand en klik in het AI-zijpaneel rechts op een instellingenlink: dit scherm schakelt dan direct mee naar de juiste pagina.
+          </p>
+          <div class="mt-4 pt-4 border-t border-gray-800 flex flex-wrap gap-2 text-xs">
+            <button data-route="?view=overview" data-name="Overzicht / Dashboard" class="spa-tab bg-blue-600 text-white px-3 py-1.5 rounded">Overzicht</button>
+            <button data-route="?view=learning" data-name="Vooruitblik / Huisleren" class="spa-tab bg-gray-800 hover:bg-gray-700 text-gray-300 px-3 py-1.5 rounded">Vooruitblik</button>
+            <button data-route="?view=control" data-name="Regeling / Control Replay" class="spa-tab bg-gray-800 hover:bg-gray-700 text-gray-300 px-3 py-1.5 rounded">Regeling</button>
+            <button data-route="?view=settings&section=heating" data-name="Instellingen → Verwarmen" class="spa-tab bg-gray-800 hover:bg-gray-700 text-gray-300 px-3 py-1.5 rounded">Instellingen: Verwarmen</button>
+            <button data-route="?view=settings&section=service" data-name="Instellingen → Service" class="spa-tab bg-gray-800 hover:bg-gray-700 text-gray-300 px-3 py-1.5 rounded">Instellingen: Service</button>
+            <button data-route="?view=settings&section=system" data-name="Instellingen → Systeem" class="spa-tab bg-gray-800 hover:bg-gray-700 text-gray-300 px-3 py-1.5 rounded">Instellingen: Systeem</button>
+          </div>
+        </div>
+      </div>
+      <div class="text-xs text-gray-500">De ESP32-S3 host alleen de &lt;iframe&gt; en stuurt via postMessage de JSON-logdata door (~0 extra RAM/CPU).</div>
+    </div>
+
+    <!-- Rechts: AI Sideframe -->
+    <aside id="ai-drawer" class="border-l border-gray-800 bg-gray-950 flex-shrink-0 h-full" style="width: 460px; max-width: 100vw;">
+      <iframe id="ai-frame" src="./?embed=1" class="w-full h-full border-0"></iframe>
+    </aside>
+  </div>
+
+  <script>
+    const aiFrame = document.getElementById('ai-frame');
+    const drawer = document.getElementById('ai-drawer');
+    const toggleBtn = document.getElementById('toggle-drawer');
+    const statusEl = document.getElementById('poc-status');
+    const spaTitle = document.getElementById('spa-title');
+    const spaRoute = document.getElementById('spa-route');
+    const spaDesc = document.getElementById('spa-desc');
+    let cachedLog = null;
+
+    const ROUTE_LABELS = {
+      '?view=overview': 'Overzicht / Dashboard',
+      '?view=results': 'Resultaten & Grafieken',
+      '?view=learning': 'Vooruitblik / Huisleren',
+      '?view=control': 'Regeling / Control Replay',
+      '?view=diagnosis': 'Diagnose / Trends',
+      '?view=energy': 'Energie',
+      '?view=settings&section=installation': 'Instellingen → Installatie',
+      '?view=settings&section=heating': 'Instellingen → Verwarmen (Power House)',
+      '?view=settings&section=cooling': 'Instellingen → Koelen',
+      '?view=settings&section=integrations': 'Instellingen → Integraties',
+      '?view=settings&section=service': 'Instellingen → Service',
+      '?view=settings&section=system': 'Instellingen → Systeem',
+      '?view=settings&section=system&modal=systeemrecorder': 'Instellingen → Systeemrecorder'
+    };
+
+    function setSpaRoute(route, customName) {
+      spaRoute.textContent = route;
+      spaTitle.textContent = customName || ROUTE_LABELS[route] || ('OpenQuatt pagina (' + route + ')');
+      spaDesc.innerHTML = '✅ De OpenQuatt SPA is direct genavigeerd naar <strong class="text-orange-400">' + spaTitle.textContent + '</strong> (<code class="text-blue-300">' + route + '</code>) zonder de pagina opnieuw te laden.';
+    }
+
+    document.querySelectorAll('.spa-tab').forEach(btn => {
+      btn.addEventListener('click', () => setSpaRoute(btn.dataset.route, btn.dataset.name));
+    });
+
+    toggleBtn.addEventListener('click', () => {
+      const hidden = drawer.classList.toggle('hidden');
+      toggleBtn.textContent = hidden ? '✨ AI Hulp openen' : '✨ AI Hulp sluiten';
+    });
+
+    function sendLogToAi() {
+      if (!cachedLog || !aiFrame.contentWindow) return;
+      aiFrame.contentWindow.postMessage({
+        type: 'OQ_LOGDATA',
+        logData: cachedLog,
+        userProfile: {
+          woning_type: 'tussenwoning',
+          afgiftesysteem: 'alleen radiatoren',
+          cv_ketel: 'Intergas',
+          thermostaat: 'Honeywell'
+        }
+      }, '*');
+      statusEl.textContent = '✅ Logbestand actief in AI-zijpaneel';
+      statusEl.className = 'text-green-400 font-medium';
+    }
+
+    document.getElementById('poc-file').addEventListener('change', async (e) => {
+      const files = e.target.files;
+      if (!files || !files.length) return;
+      cachedLog = JSON.parse(await files.item(0).text());
+      sendLogToAi();
+    });
+
+    window.addEventListener('message', (event) => {
+      const msg = event.data;
+      if (!msg || typeof msg !== 'object') return;
+      if (msg.type === 'OQ_EMBED_READY') {
+        sendLogToAi();
+      } else if (msg.type === 'OQ_NAVIGATE' && typeof msg.href === 'string') {
+        const qIndex = msg.href.indexOf('?');
+        const route = qIndex >= 0 ? msg.href.slice(qIndex) : '?view=overview';
+        setSpaRoute(route);
+      }
+    });
+  </script>
+</body>
+</html>
