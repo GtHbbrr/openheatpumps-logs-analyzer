@@ -2099,8 +2099,8 @@ function parseMarkdown(tekst) {
                 body.oq-embed-mode #left-panel-wrapper,
                 body.oq-embed-mode #log-viewer,
                 body.oq-embed-mode #right-panel,
-                body.oq-embed-mode #context-panel { display: none !important; }
-                body.oq-embed-mode #main-grid {
+                body.oq-embed-mode #context-panel, body.oq-embed-mode .border-dashed, body.oq-embed-mode #quick-scan-box, body.oq-embed-mode #btn-diagnose { display: none !important; }
+                body.oq-embed-mode #main-grid { display: block !important; width: 100% !important;
                     max-width: 100% !important;
                     padding: 0.75rem !important;
                     margin: 0 !important;
@@ -2141,6 +2141,9 @@ function parseMarkdown(tekst) {
                         }
                         const virtueelBestand = new File([JSON.stringify(msg.logData)], 'openquatt-live.oqdebug.json', { type: 'application/json' });
                         await laadBestand(virtueelBestand);
+                        document.querySelectorAll('.border-dashed, #quick-scan-box, #btn-diagnose').forEach(node => node.classList.add('hidden'));
+                        const diagBtn = el('btn-diagnose');
+                        if (diagBtn && !diagBtn.disabled) diagBtn.click();
 
                         const sampleCount = Array.isArray(msg.logData.samples) ? msg.logData.samples.length : 0;
                         const intervalS = msg.logData.recording?.interval_s || 10;
