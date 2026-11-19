@@ -2181,7 +2181,7 @@ function parseMarkdown(tekst) {
                     max-height: ${isEmbed ? 'calc(100vh - 215px)' : '58vh'} !important;
                     overflow-y: auto !important;
                     scroll-behavior: smooth;
-                    padding-right: 0.5rem;
+                    padding-right: 0.5rem; padding-bottom: 1.5rem;
                 }
                 #chat-container {
                     position: sticky;
@@ -2204,7 +2204,7 @@ function parseMarkdown(tekst) {
 
             let lastAlignedMarker = null;
             const alignLatestResponseTop = () => {
-                const markers = Array.from(box.querySelectorAll('div')).filter(d => d.textContent && d.textContent.includes('AI Analyse'));
+                const markers = Array.from(box.querySelectorAll('div, span')).filter(d => d.textContent && (d.textContent.includes('Beantwoord via model:') || d.textContent.includes('AI Analyse')) && d.textContent.length < 120);
                 const latest = markers[markers.length - 1];
                 if (latest && latest !== lastAlignedMarker) {
                     lastAlignedMarker = latest;
