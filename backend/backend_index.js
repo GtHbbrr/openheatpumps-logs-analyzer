@@ -1,4 +1,4 @@
-﻿import openquattDocsSnapshot from "./openquatt_docs_snapshot.txt";
+import openquattDocsSnapshot from "./openquatt_docs_snapshot.txt";
 
 // ====================================================================
 // HULPFUNCTIES VOOR TOKENBESPARING (SNAPSHOT & DELTA-LOG)
@@ -404,40 +404,43 @@ STRIKTE GEBRUIKERSCONTEXT:
             let gelukt = false;
             const startTijd = Date.now();
 
-            while (!gelukt && pogingNr < 15 && Date.now() - startTijd < 42000) {
-              for (const model of geselecteerdeModellen) {
-                if (pogingNr >= 15 || Date.now() - startTijd >= 42000) break;
-                pogingNr++;
-                gebruiktModel = model;
+            for (const model of geselecteerdeModellen) {
+              if (Date.now() - startTijd >= 42000) break;
+              pogingNr++;
+              gebruiktModel = model;
 
-                await writer.write(
-                  encoder.encode(
-                    `---MODEL_TRY---${JSON.stringify({ model: model.toUpperCase(), attempt: pogingNr })}---\n`
-                  )
-                );
+              await writer.write(
+                encoder.encode(
+                  `---MODEL_TRY---${JSON.stringify({ model: model.toUpperCase(), attempt: pogingNr })}---\n`
+                )
+              );
 
-                const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${env.GEMINI_API_KEY}`;
-                const geminiResponse = await fetch(geminiUrl, {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify(geminiPayload)
-                });
+              const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${env.GEMINI_API_KEY}`;
+              const geminiResponse = await fetch(geminiUrl, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(geminiPayload)
+              });
 
-                apiAttempts.push({ model, status: geminiResponse.status });
+              apiAttempts.push({ model, status: geminiResponse.status });
 
-                const responseText = await geminiResponse.text();
-                geminiJson = responseText.trim().startsWith("{")
-                  ? JSON.parse(responseText)
-                  : null;
+              const responseText = await geminiResponse.text();
+              geminiJson = responseText.trim().startsWith("{")
+                ? JSON.parse(responseText)
+                : null;
 
-                if (geminiResponse.ok && geminiJson && !geminiJson.error) {
-                  gelukt = true;
-                  break;
-                }
-
-                console.warn(`Model ${model} faalde (${geminiResponse.status}) in poging ${pogingNr}, wacht 1.5s...`);
-                await new Promise((r) => setTimeout(r, 1500));
+              if (geminiResponse.ok && geminiJson && !geminiJson.error) {
+                gelukt = true;
+                break;
               }
+
+              if (geminiResponse.status === 400) {
+                console.warn(`Model ${model} gaf 400 Bad Request, breek rotatie direct af.`);
+                break;
+              }
+
+              console.warn(`Model ${model} faalde (${geminiResponse.status}) in poging ${pogingNr}, schakel door...`);
+              await new Promise((r) => setTimeout(r, 800));
             }
 
             const cachedTokens =
