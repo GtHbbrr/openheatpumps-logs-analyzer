@@ -2141,7 +2141,7 @@ function parseMarkdown(tekst) {
                         }
                         const virtueelBestand = new File([JSON.stringify(msg.logData)], 'openquatt-live.oqdebug.json', { type: 'application/json' });
                         await laadBestand(virtueelBestand);
-                        document.querySelectorAll('.border-dashed, #quick-scan-box, #btn-diagnose').forEach(node => node.classList.add('hidden'));
+                        document.querySelectorAll('.border-dashed, #quick-scan-box, #btn-diagnose, #context-scroller').forEach(node => node.classList.add('hidden')); const qs = el('teaser-status-label')?.closest('.bg-gray-900, .bg-gray-950'); if (qs) qs.classList.add('hidden');
                         const diagBtn = el('btn-diagnose');
                         if (diagBtn && !diagBtn.disabled) diagBtn.click();
 
@@ -2193,8 +2193,7 @@ function parseMarkdown(tekst) {
                 }
                 ${isEmbed ? `
                 body.oq-embed-mode { height: 100vh !important; overflow: hidden !important; }
-                body.oq-embed-mode #status-banner,
-                body.oq-embed-mode #model-status,
+                body.oq-embed-mode #context-scroller,
                 body.oq-embed-mode h3 { display: none !important; }
                 ` : ''}
             `;
