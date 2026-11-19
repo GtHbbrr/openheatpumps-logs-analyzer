@@ -110,15 +110,14 @@ const bereidLogVoorAi = (ruweLog) => {
       (heeftKritiekEvent || isBeginOfEind || isTijdVoorPeriodiek) &&
       wachtendeDeltas.size > 0
     ) {
-      gecomprimeerd.push([tijd, Array.from(wachtendeDeltas.entries())]);
+      const benoemdeWaarden = {}; for (const [colIdx, val] of wachtendeDeltas.entries()) { benoemdeWaarden[cols[colIdx] || `col_${colIdx}`] = val; } gecomprimeerd.push({ t: tijd, waarden: benoemdeWaarden });
       wachtendeDeltas.clear();
       laatsteBewaardTijd = tijd;
     }
   }
 
   return {
-    ...ruweLog,
-    _compressie_info: `Gecomprimeerd van ${ruweLog.samples.length} naar ${gecomprimeerd.length} event- en 2-minuten-snapshots (alle statuswisselingen en storingen behouden).`,
+    ...(Object.fromEntries(Object.entries(ruweLog).filter(([k]) => k !== "columns"))), _compressie_info: `Gecomprimeerd van ${ruweLog.samples.length} naar ${gecomprimeerd.length} event- en 2-minuten-snapshots met directe kolomnamen.`,
     samples: gecomprimeerd
   };
 };
