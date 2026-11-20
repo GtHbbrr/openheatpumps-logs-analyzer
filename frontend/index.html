@@ -2146,7 +2146,34 @@ function parseMarkdown(tekst) {
                         document.querySelectorAll('.border-dashed, #quick-scan-box, #btn-diagnose, #context-scroller').forEach(node => node.classList.add('hidden')); const qs = el('teaser-status-label')?.closest('.bg-gray-900, .bg-gray-950'); if (qs) qs.classList.add('hidden');
                         const diagBtn = el('btn-diagnose');
                         el('chat-container')?.classList.remove('hidden');
-                        if (!document.getElementById('oq-embed-quick-actions')) {
+                        const outBox = el('output-box');
+if (outBox && !document.getElementById('oq-cf-welcome')) {
+  const hr = new Date().getHours();
+  const groet = hr < 12 ? 'Goedemorgen.' : (hr < 18 ? 'Goedemiddag.' : 'Goedenavond.');
+  outBox.innerHTML = `<div id="oq-cf-welcome" class="flex flex-col items-center justify-center py-8 px-3 text-center space-y-4"><div class="w-11 h-11 rounded-2xl bg-orange-600 flex items-center justify-center text-xl shadow">🔥</div><div><h2 class="text-base font-bold text-white">${groet}</h2><p class="text-xs text-gray-400">Waarmee kan ik je vandaag helpen?</p></div><div id="oq-cf-cards" class="w-full max-w-xs space-y-2 text-left"></div></div>`;
+  const cards = document.getElementById('oq-cf-cards');
+  [
+    ['🧭','Rondleiding','Ontdek alle OpenQuatt menu\'s en instellingen','Geef een duidelijke rondleiding door mijn OpenQuatt menu\'s en instellingen met klikbare links.'],
+    ['⚙️','Verbeter instellingen','Analyseer mijn logdata voor optimalisaties','Analyseer mijn actuele logdata en geef voorstellen om mijn OpenQuatt instellingen te verbeteren met links.'],
+    ['🥶','Het wordt niet warm','Zoek de oorzaak in mijn actuele systeemlogs','Het wordt niet warm genoeg in huis. Onderzoek mijn logdata op oorzaken en geef oplossingen met links.']
+  ].forEach(([ic,t,s,pr]) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'w-full flex items-center gap-3 px-3 py-2 rounded-xl bg-gray-900 hover:bg-gray-800 border border-gray-800 hover:border-orange-500 transition cursor-pointer';
+    b.innerHTML = `<span class="text-base">${ic}</span><span class="flex flex-col min-w-0"><span class="text-xs font-semibold text-gray-100">${t}</span><span class="text-[11px] text-gray-400 truncate">${s}</span></span>`;
+    b.onclick = () => {
+      document.getElementById('oq-cf-welcome')?.remove();
+      outBox.textContent = 'De resultaten verschijnen hier na de scan...';
+      const q = el('user-question') || el('chat-input'); if (q) q.value = pr;
+      const sb = el('btn-send-chat') || el('btn-diagnose'); if (sb && !sb.disabled) sb.click();
+    };
+    cards.appendChild(b);
+  });
+  (el('btn-send-chat') || el('btn-diagnose'))?.addEventListener('click', () => {
+    if (document.getElementById('oq-cf-welcome')) { document.getElementById('oq-cf-welcome').remove(); outBox.textContent = 'De resultaten verschijnen hier na de scan...'; }
+  }, { once: true });
+}
+if (false) {
                             const qBar = document.createElement('div');
                             qBar.id = 'oq-embed-quick-actions';
                             qBar.className = 'flex flex-wrap gap-1.5 px-3 py-2 bg-gray-900 border-b border-gray-800 text-xs';
