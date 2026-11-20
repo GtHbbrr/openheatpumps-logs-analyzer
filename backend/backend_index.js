@@ -338,7 +338,7 @@ STRIKTE GEBRUIKERSCONTEXT:
 * Aanwezige CV-ketel: ${userProfile?.cv_ketel || "GEEN KETEL AANWEZIG"}
 * Thermostaat: ${userProfile?.thermostaat || "Onbekend"}`;
 
-      const logVoorAi = isAlleenAfbeelding
+      const userKey = typeof body?.byokApiKey === "string" ? body.byokApiKey.trim() : ""; const userProvider = userKey ? (body?.byokProvider === "openai" ? "openai" : "gemini") : ""; const logVoorAi = isAlleenAfbeelding
         ? { info: "Geen .oqdebug.json logbestand meegestuurd; analyseer op basis van de meegestuurde afbeelding(en) en gebruikersvraag." }
         : bereidLogVoorAi(logData);
       const systemInstruction = bouwSystemInstruction(logVoorAi);
@@ -409,7 +409,38 @@ STRIKTE GEBRUIKERSCONTEXT:
             let gelukt = false;
             const startTijd = Date.now();
 
-            for (const model of geselecteerdeModellen) {
+            if (userKey && userProvider === "openai") {
+              gebruiktModel = "gpt-4o (eigen OpenAI key)";
+              await writer.write(encoder.encode(`---MODEL_TRY---${JSON.stringify({ model: "OPENAI GPT-4O", attempt: 1 })}---\n`));
+              const oaiMessages = [{ role: "system", content: systemInstruction }];
+              for (const msg of contents) {
+                const role = msg.role === "model" ? "assistant" : "user";
+                const parts = Array.isArray(msg.parts) ? msg.parts : [];
+                const contentArr = [];
+                for (const p of parts) {
+                  if (p.text) contentArr.push({ type: "text", text: p.text });
+                  if (p.inlineData?.data && p.inlineData?.mimeType) {
+                    contentArr.push({ type: "image_url", image_url: { url: `data:${p.inlineData.mimeType};base64,${p.inlineData.data}` } });
+                  }
+                }
+                oaiMessages.push({ role, content: contentArr.length === 1 && contentArr[0].type === "text" ? contentArr[0].text : contentArr });
+              }
+              const oaiRes = await fetch("https://openai.com", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${userKey}` },
+                body: JSON.stringify({ model: "gpt-4o", messages: oaiMessages, temperature: 0.3 })
+              });
+              const oaiData = await oaiRes.json().catch(() => null);
+              if (oaiRes.ok && oaiData?.choices?.[0]?.message?.content) {
+                geminiJson = { candidates: [{ content: { parts: [{ text: oaiData.choices[0].message.content }] } }] };
+                gelukt = true;
+              } else {
+                const errMsg = oaiData?.error?.message || `HTTP ${oaiRes.status}`;
+                geminiJson = { error: { message: `OpenAI API fout: ${errMsg}` } };
+              }
+            }
+
+            for (const model of (gelukt || (userKey && userProvider === "openai") ? [] : geselecteerdeModellen)) {
               if (Date.now() - startTijd >= 42000) break;
               pogingNr++;
               gebruiktModel = model;
