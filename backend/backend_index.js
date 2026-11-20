@@ -451,7 +451,7 @@ STRIKTE GEBRUIKERSCONTEXT:
                 )
               );
 
-              const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${env.GEMINI_API_KEY}`;
+              const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${(userKey && userProvider === "gemini") ? userKey : env.GEMINI_API_KEY}`; if (userKey && userProvider === "gemini") gebruiktModel = `${model} (eigen Gemini key)`;
               const geminiResponse = await fetch(geminiUrl, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
