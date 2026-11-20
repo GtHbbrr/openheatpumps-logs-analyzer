@@ -2305,7 +2305,7 @@ if (false) {
                     countSpan.className = 'text-green-400/80';
                     const syncBadgeText = () => {
                         const m = statusBadge.textContent.match(/(\d+)\s*samples/);
-                        if (m) countSpan.textContent = `• ${m[1]}`;
+                        if (m) countSpan.textContent = `• ${m[1]} samples`;
                         if (!statusBadge.contains(sel)) {
                             statusBadge.textContent = '✅ ';
                             statusBadge.append(sel, ' ', countSpan);
