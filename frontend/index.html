@@ -2165,7 +2165,7 @@ if (outBox && !document.getElementById('oq-cf-welcome')) {
       document.getElementById('oq-cf-welcome')?.remove();
       outBox.textContent = 'De resultaten verschijnen hier na de scan...';
       const q = document.querySelector('#chat-container textarea, #chat-container input[type=text]'); if (q) { q.value = pr; q.dispatchEvent(new Event('input', { bubbles: true })); }
-      const sb = document.querySelector('#chat-container button:last-of-type'); if (sb) sb.click();
+      const sb = Array.from(document.querySelectorAll('#chat-container button')).find(x => x.textContent.includes('Verstuur')); if (sb) sb.click(); else if (q) q.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, bubbles: true }));
     };
     cards.appendChild(b);
   });
