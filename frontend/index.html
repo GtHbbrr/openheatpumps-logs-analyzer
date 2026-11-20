@@ -2178,6 +2178,25 @@ function parseMarkdown(tekst) {
             const isEmbed = new URLSearchParams(window.location.search).get('embed') === '1';
             const style = document.createElement('style');
             style.textContent = `
+                /* Slanke donkere scrollbars */
+                * {
+                    scrollbar-width: thin;
+                    scrollbar-color: #374151 transparent;
+                }
+                ::-webkit-scrollbar {
+                    width: 6px;
+                    height: 6px;
+                }
+                ::-webkit-scrollbar-track {
+                    background: transparent;
+                }
+                ::-webkit-scrollbar-thumb {
+                    background-color: rgba(75, 85, 99, 0.55);
+                    border-radius: 9999px;
+                }
+                ::-webkit-scrollbar-thumb:hover {
+                    background-color: rgba(156, 163, 175, 0.8);
+                }
                 #output-box {
                     max-height: ${isEmbed ? 'calc(100vh - 215px)' : '58vh'} !important;
                     overflow-y: auto !important;
