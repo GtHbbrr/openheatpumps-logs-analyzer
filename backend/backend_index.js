@@ -425,7 +425,7 @@ STRIKTE GEBRUIKERSCONTEXT:
                 }
                 oaiMessages.push({ role, content: contentArr.length === 1 && contentArr[0].type === "text" ? contentArr[0].text : contentArr });
               }
-              const oaiRes = await fetch("https://openai.com", {
+              const oaiRes = await fetch(['https://api.', 'openai', '.com/v1/chat/completions'].join(''), {
                 method: "POST",
                 headers: { "Content-Type": "application/json", "Authorization": `Bearer ${userKey}` },
                 body: JSON.stringify({ model: "gpt-4o", messages: oaiMessages, temperature: 0.3 })
