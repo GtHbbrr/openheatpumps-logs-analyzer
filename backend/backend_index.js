@@ -464,7 +464,7 @@ STRIKTE GEBRUIKERSCONTEXT:
                 pureAiText =
                   "⏳ **De AI heeft het op dit moment erg druk (limiet bereikt).** Je logbestand is vrij uitgebreid. Wacht 1 minuut en probeer het dan opnieuw — vaker achter elkaar klikken helpt helaas niet.";
               } else if (laatsteStatus === 503 || pogingNr >= 3) {
-                  pureAiText = `⏳ **Google AI Studio reageert op dit moment uitzonderlijk traag (${pogingNr} pogingen gedaan).** Klik gerust nogmaals op **Start AI Systeem Analyse** (of verstuur je bericht opnieuw) — je logboek en vraag staan nog klaar!`;
+                  pureAiText = `⏳ **Het is even druk bij de AI-server.** Probeer het nog een keer — je loggegevens staan nog klaar.`;
               } else {
                 pureAiText = geminiJson?.error
                   ? `🚨 API FOUT: ${geminiJson.error.message}`
