@@ -2122,7 +2122,7 @@ function parseMarkdown(tekst) {
             bar.className = 'bg-gray-950 border-b border-gray-800 px-3 py-2 flex items-center justify-between text-xs sticky top-0 z-50';
             bar.innerHTML = `
                 <div class="flex items-center gap-2">
-                    <button type="button" onclick="window.parent?.postMessage({type:'OQ_CLOSE_DRAWER'},'*')" title="Klik om AI-zijpaneel te sluiten" class="font-bold text-orange-400 hover:text-orange-300 hover:underline text-sm inline-flex items-center gap-1.5 cursor-pointer transition"><span>✨ OpenQuatt AI</span><span class="text-xs text-gray-500 font-normal">✕</span></button>
+                    <button type="button" onclick="window.parent?.postMessage({type:'OQ_CLOSE_DRAWER'},'*')" title="Klik om AI-zijpaneel te sluiten" class="font-bold text-orange-400 hover:text-orange-300 hover:underline text-xs whitespace-nowrap inline-flex items-center gap-1 cursor-pointer transition flex-shrink-0"><span>✨ OpenQuatt AI</span><span class="text-xs text-gray-500 font-normal">✕</span></button>
                     <span id="oq-embed-status" class="text-gray-400 bg-gray-900 border border-gray-800 px-2 py-0.5 rounded">⏳ Wachten op logdata...</span>
                 </div>
                 <span class="w-16"></span>
@@ -2272,6 +2272,15 @@ if (false) {
             `;
             document.head.appendChild(style);
 
+            if (isEmbed) {
+                const sendBtn = Array.from(document.querySelectorAll('#chat-container button')).find(x => x.textContent.includes('Verstuur'));
+                if (sendBtn) {
+                    sendBtn.innerHTML = '<svg xmlns="http://w3.org" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 10l7-7m0 0l7 7m-7-7v18" /></svg>';
+                    sendBtn.setAttribute('aria-label', 'Verstuur');
+                    sendBtn.title = 'Verstuur vraag';
+                    sendBtn.className = 'w-9 h-9 rounded-full bg-green-600 hover:bg-green-500 text-white flex items-center justify-center flex-shrink-0 shadow transition cursor-pointer';
+                }
+            }
             const box = document.getElementById('output-box');
             if (!box) return;
 
