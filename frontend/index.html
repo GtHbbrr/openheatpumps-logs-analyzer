@@ -2163,14 +2163,14 @@ if (outBox && !document.getElementById('oq-cf-welcome')) {
     b.innerHTML = `<span class="text-base">${ic}</span><span class="flex flex-col min-w-0 text-left"><span class="text-xs font-semibold text-gray-100">${t}</span><span class="text-[11px] text-gray-400 truncate">${s}</span></span>`;
     b.onclick = () => {
       document.getElementById('oq-cf-welcome')?.remove();
-      outBox.textContent = 'De resultaten verschijnen hier na de scan...';
+      outBox.innerHTML = '';
       const q = document.querySelector('#chat-container textarea, #chat-container input[type=text]'); if (q) { q.value = pr; q.dispatchEvent(new Event('input', { bubbles: true })); }
       const sb = Array.from(document.querySelectorAll('#chat-container button')).find(x => x.textContent.includes('Verstuur')); if (sb) sb.click(); else if (q) q.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, bubbles: true }));
     };
     cards.appendChild(b);
   });
   (el('btn-send-chat') || el('btn-diagnose'))?.addEventListener('click', () => {
-    if (document.getElementById('oq-cf-welcome')) { document.getElementById('oq-cf-welcome').remove(); outBox.textContent = 'De resultaten verschijnen hier na de scan...'; }
+    if (document.getElementById('oq-cf-welcome')) { document.getElementById('oq-cf-welcome').remove(); outBox.innerHTML = ''; }
   }, { once: true });
 }
 if (false) {
@@ -2266,7 +2266,7 @@ if (false) {
                 }
                 ${isEmbed ? `
                 body.oq-embed-mode { height: 100vh !important; overflow: hidden !important; }
-                body.oq-embed-mode #context-scroller,
+                body.oq-embed-mode #context-scroller, body.oq-embed-mode #btn-share, body.oq-embed-mode #btn-share + *,
                 body.oq-embed-mode h3 { display: none !important; }
                 ` : ''}
             `;
