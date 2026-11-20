@@ -3,37 +3,36 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>OpenQuatt AI Zijpaneel - Gebruik op je eigen openquatt.local</title>
+  <title>OpenQuatt AI Zijpaneel - Testen op je eigen openquatt.local</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css">
 </head>
 <body class="bg-gray-900 text-white min-h-screen flex flex-col justify-between">
   <main class="max-w-2xl mx-auto px-6 py-12 space-y-8">
     <div class="space-y-3">
       <span class="inline-block bg-orange-950 text-orange-400 border border-orange-800 text-xs px-2.5 py-1 rounded">Test-PoC voor eigen OpenQuatt installatie</span>
-      <h1 class="text-3xl font-bold text-white">Gebruik OpenQuatt AI direct naast je eigen <code class="text-orange-400">openquatt.local</code></h1>
+      <h1 class="text-3xl font-bold text-white">Gebruik OpenQuatt AI direct naast je eigen <a href="http://openquatt.local" target="_blank" rel="noopener" class="text-blue-400 hover:text-blue-300 underline">openquatt.local</a></h1>
       <p class="text-gray-300 text-sm leading-relaxed">
-        Met deze 1-klik bladwijzer (bookmarklet) open je het AI-zijpaneel rechts naast je eigen OpenQuatt web-app. Het zijpaneel leest lokaal in je browser je actuele 15-minuten systeemlog uit en start direct met analyseren — zonder iets op je ESP32-S3 te installeren.
+        Met deze kleine browser-extensie verschijnt er rechtsonder op je eigen OpenQuatt web-app een zwevende knop <strong class="text-orange-400">✨ AI Hulp</strong>. Klik je daarop, dan schuift het AI-zijpaneel open, haalt direct je actuele 15-minuten systeemlog op en start meteen met analyseren — zonder iets op je ESP32-S3 te installeren.
       </p>
     </div>
 
     <div class="bg-gray-950 border border-gray-800 rounded-xl p-6 space-y-4 text-center">
-      <p class="text-xs text-gray-400 uppercase tracking-wider font-semibold">Stap 1 — Sleep deze knop naar je bladwijzerbalk</p>
+      <p class="text-xs text-gray-400 uppercase tracking-wider font-semibold">Stap 1 — Download en pak het mini-extensie mapje uit</p>
       <div>
-        <a href="javascript:(function(){var s=document.createElement('script');s.src='='+Date.now();document.body.appendChild(s);})();"
-           onclick="alert('Sleep deze knop met je muis naar je bladwijzerbalk bovenaan je browser (Ctrl+Shift+B als de balk verborgen is).'); return false;"
-           class="inline-block bg-orange-600 hover:bg-orange-500 text-white font-bold text-base px-6 py-3 rounded-lg shadow-lg cursor-move select-none">
-          ✨ OpenQuatt AI Hulp
+        <a href="./openquatt-ai-extension.zip" download="openquatt-ai-extension.zip"
+           class="inline-block bg-orange-600 hover:bg-orange-500 text-white font-bold text-base px-6 py-3 rounded-lg shadow-lg">
+          ⬇️ Download OpenQuatt AI Extensie (ZIP)
         </a>
       </div>
-      <p class="text-xs text-gray-500">Zie je geen bladwijzerbalk? Druk op <kbd class="bg-gray-800 px-1.5 py-0.5 rounded text-gray-300">Ctrl + Shift + B</kbd> (Windows) of <kbd class="bg-gray-800 px-1.5 py-0.5 rounded text-gray-300">Cmd + Shift + B</kbd> (Mac).</p>
+      <p class="text-xs text-gray-500">Pak het gedownloade ZIP-bestand uit naar een mapje op je computer (bijv. <code>openquatt-ai-extension</code>).</p>
     </div>
 
     <div class="bg-gray-950 border border-gray-800 rounded-xl p-6 space-y-3 text-sm text-gray-300">
-      <h2 class="font-semibold text-white text-base">Stap 2 &amp; 3 — Zo gebruik je hem</h2>
-      <ol class="list-decimal list-inside space-y-2 text-gray-300">
-        <li>Open in je browser je eigen OpenQuatt pagina (<code class="text-blue-300">http://openquatt.local</code>).</li>
-        <li>Klik in je bladwijzerbalk op <strong>✨ OpenQuatt AI Hulp</strong>.</li>
-        <li>Het AI-zijpaneel schuift rechts open, haalt automatisch de laatste 15 minuten systeemlogs op en start direct de diagnose. Klik je in het advies op een instellingenlink, dan springt je OpenQuatt-scherm meteen mee naar het juiste menu.</li>
+      <h2 class="font-semibold text-white text-base">Stap 2 &amp; 3 — In 20 seconden activeren (Chrome / Edge / Brave)</h2>
+      <ol class="list-decimal list-inside space-y-2.5 text-gray-300">
+        <li>Open in een nieuw tabblad <code class="text-orange-300 bg-gray-900 px-1.5 py-0.5 rounded">chrome://extensions</code> (of <code class="text-orange-300 bg-gray-900 px-1.5 py-0.5 rounded">edge://extensions</code>) en zet rechtsboven <strong>Ontwikkelaarsmodus</strong> (Developer mode) aan.</li>
+        <li>Klik linksboven op <strong>Uitgepakte extensie laden</strong> (Load unpacked) en selecteer het uitgepakte mapje.</li>
+        <li>Open nu je eigen OpenQuatt pagina via <a href="http://openquatt.local" target="_blank" rel="noopener" class="text-blue-400 hover:text-blue-300 underline font-medium">http://openquatt.local</a> en klik rechtsonder op <strong>✨ AI Hulp</strong>!</li>
       </ol>
     </div>
 
