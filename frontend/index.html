@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="nl">
 <head>
     <script>if (location.hostname === 'test-oqai.openheatpumps.nl' && (location.pathname === '/' || location.pathname === '')) { location.replace('/bookmarklet.html' + location.search); }
@@ -445,7 +445,7 @@
                 .map(([i, v]) => ({ index: i, name: nameOf(i), value: v, unit: unitOf(i) }));
 
             const changedColSet = new Set();
-            for (const s of samples for (const i of s.changed) changedColSet.add(i);
+            for (const s of samples) for (const i of s.changed) changedColSet.add(i);
             const changedCols = [...changedColSet].sort((a, b) => a - b);
 
             return { meta, initial, samples, changedCols, nameOf, unitOf };
