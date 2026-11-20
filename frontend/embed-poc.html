@@ -10,11 +10,11 @@
   <div class="bg-gray-950 border-b border-gray-800 px-4 py-2 flex flex-wrap items-center justify-between gap-3 text-xs z-20">
     <div class="flex items-center gap-3">
       <span class="font-bold text-orange-500 text-sm">OpenQuatt SPA + AI Sideframe PoC</span>
-      <label class="bg-gray-800 hover:bg-gray-700 text-gray-200 px-3 py-1 rounded cursor-pointer border border-gray-700 font-medium">
-        📂 Laad .oqdebug.json in AI
+      <span id="poc-status" class="text-gray-400">⏳ Demo-log ophalen uit OpenQuatt SPA...</span>
+      <label class="bg-gray-800 hover:bg-gray-700 text-gray-300 px-2.5 py-1 rounded cursor-pointer border border-gray-700">
+        📂 Eigen .oqdebug.json
         <input type="file" id="poc-file" accept=".json" class="hidden">
       </label>
-      <span id="poc-status" class="text-gray-400">Kies een .oqdebug.json logbestand om het AI-zijpaneel te starten</span>
     </div>
     <div class="flex items-center gap-2">
       <span id="nav-badge" class="hidden text-green-400 bg-green-950/60 border border-green-800 px-2 py-0.5 rounded font-mono"></span>
@@ -46,14 +46,15 @@
     const statusEl = document.getElementById('poc-status');
     const navBadge = document.getElementById('nav-badge');
     let cachedLog = null;
+    let aiReady = false;
 
     toggleBtn.addEventListener('click', () => {
       const hidden = drawer.classList.toggle('hidden');
       toggleBtn.textContent = hidden ? '✨ AI Hulp openen' : '✨ AI Hulp sluiten';
     });
 
-    function sendLogToAi() {
-      if (!cachedLog || !aiFrame.contentWindow) return;
+    function sendLogToAi(label) {
+      if (!cachedLog || !aiReady || !aiFrame.contentWindow) return;
       aiFrame.contentWindow.postMessage({
         type: 'OQ_LOGDATA',
         logData: cachedLog,
@@ -64,21 +65,46 @@
           thermostaat: 'Honeywell'
         }
       }, '*');
-      statusEl.textContent = '✅ Logbestand actief in AI-zijpaneel';
+      statusEl.textContent = label || '✅ Live demo-log gekoppeld aan AI-zijpaneel';
       statusEl.className = 'text-green-400 font-medium';
     }
+
+    async function loadDemoLogFromSpa() {
+      for (let attempt = 0; attempt < 15; attempt++) {
+        try {
+          const win = oqFrame.contentWindow;
+          if (win && typeof win.fetch === 'function') {
+            const res = await win.fetch('/openquatt/debug-recording/download?last_minutes=15');
+            if (res && res.ok) {
+              const data = await res.json();
+              if (data && Array.isArray(data.samples) && data.samples.length > 0) {
+                cachedLog = data;
+                sendLogToAi('✅ Live OpenQuatt demo-log (15 min) gekoppeld');
+                return;
+              }
+            }
+          }
+        } catch (_) {}
+        await new Promise(r => setTimeout(r, 400));
+      }
+    }
+
+    oqFrame.addEventListener('load', () => {
+      if (!cachedLog) loadDemoLogFromSpa();
+    });
 
     document.getElementById('poc-file').addEventListener('change', async (e) => {
       const files = e.target.files;
       if (!files || !files.length) return;
       cachedLog = JSON.parse(await files.item(0).text());
-      sendLogToAi();
+      sendLogToAi('✅ Eigen logbestand actief in AI-zijpaneel');
     });
 
     window.addEventListener('message', (event) => {
       const msg = event.data;
       if (!msg || typeof msg !== 'object') return;
       if (msg.type === 'OQ_EMBED_READY') {
+        aiReady = true;
         sendLogToAi();
       } else if (msg.type === 'OQ_NAVIGATE' && typeof msg.href === 'string') {
         const qIndex = msg.href.indexOf('?');
