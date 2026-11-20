@@ -2145,7 +2145,32 @@ function parseMarkdown(tekst) {
                         await laadBestand(virtueelBestand);
                         document.querySelectorAll('.border-dashed, #quick-scan-box, #btn-diagnose, #context-scroller').forEach(node => node.classList.add('hidden')); const qs = el('teaser-status-label')?.closest('.bg-gray-900, .bg-gray-950'); if (qs) qs.classList.add('hidden');
                         const diagBtn = el('btn-diagnose');
-                        if (diagBtn && !diagBtn.disabled) diagBtn.click();
+                        el('chat-container')?.classList.remove('hidden');
+                        if (!document.getElementById('oq-embed-quick-actions')) {
+                            const qBar = document.createElement('div');
+                            qBar.id = 'oq-embed-quick-actions';
+                            qBar.className = 'flex flex-wrap gap-1.5 px-3 py-2 bg-gray-900 border-b border-gray-800 text-xs';
+                            const presets = [
+                                { label: '🧭 Rondleiding', prompt: 'Geef een duidelijke rondleiding door mijn OpenQuatt menu\'s en instellingen met klikbare links naar de verschillende pagina\'s.' },
+                                { label: '⚙️ Verbeter instellingen', prompt: 'Analyseer mijn actuele logdata en geef concrete voorstellen om mijn OpenQuatt instellingen te verbeteren, inclusief directe links naar de juiste schermen.' },
+                                { label: '🥶 Het wordt niet warm', prompt: 'Het wordt niet warm genoeg in huis. Onderzoek mijn actuele logdata op mogelijke oorzaken (zoals flow, aanvoertemperatuur, stooklijn of cv-ketel) en geef gerichte oplossingen met links.' }
+                            ];
+                            presets.forEach(p => {
+                                const btn = document.createElement('button');
+                                btn.type = 'button';
+                                btn.textContent = p.label;
+                                btn.className = 'bg-gray-800 hover:bg-orange-600 text-gray-200 hover:text-white border border-gray-700 px-2.5 py-1 rounded-full transition font-medium cursor-pointer';
+                                btn.onclick = () => {
+                                    const qInput = el('user-question') || el('chat-input');
+                                    if (qInput) qInput.value = p.prompt;
+                                    const sendBtn = el('btn-send-chat') || el('btn-diagnose');
+                                    if (sendBtn && !sendBtn.disabled) sendBtn.click();
+                                };
+                                qBar.appendChild(btn);
+                            });
+                            const embedBar = document.getElementById('oq-embed-bar');
+                            if (embedBar) embedBar.insertAdjacentElement('afterend', qBar);
+                        }
 
                         const sampleCount = Array.isArray(msg.logData.samples) ? msg.logData.samples.length : 0;
                         const intervalS = msg.logData.recording?.interval_s || 10;
