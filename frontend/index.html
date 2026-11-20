@@ -2290,19 +2290,32 @@ if (false) {
             if (isEmbed) {
                 const statusBadge = document.getElementById('oq-embed-status');
                 if (statusBadge && !document.getElementById('oq-window-select')) {
+                    statusBadge.className = 'inline-flex items-center gap-1 text-[11px] bg-green-950/70 text-green-300 border border-green-800/80 px-2 py-0.5 rounded-full whitespace-nowrap';
                     const sel = document.createElement('select');
                     sel.id = 'oq-window-select';
-                    sel.title = 'Kies logvenster';
-                    sel.className = 'bg-transparent text-green-300 font-semibold focus:outline-none cursor-pointer ml-1';
+                    sel.title = 'Klik om ander logvenster te kiezen';
+                    sel.className = 'bg-transparent text-green-300 font-semibold focus:outline-none cursor-pointer';
                     [['15','15 min'],['30','30 min'],['60','60 min'],['120','2 uur'],['360','6 uur'],['0','Alles']].forEach(([v,lbl]) => {
                         const o = document.createElement('option');
                         o.value = v; o.textContent = lbl; o.className = 'bg-gray-900 text-white';
                         sel.appendChild(o);
                     });
+                    const countSpan = document.createElement('span');
+                    countSpan.id = 'oq-sample-count';
+                    countSpan.className = 'text-green-400/80';
+                    const syncBadgeText = () => {
+                        const m = statusBadge.textContent.match(/(\d+)\s*samples/);
+                        if (m) countSpan.textContent = `• ${m[1]}`;
+                        if (!statusBadge.contains(sel)) {
+                            statusBadge.textContent = '✅ ';
+                            statusBadge.append(sel, ' ', countSpan);
+                        }
+                    };
+                    syncBadgeText();
+                    new MutationObserver(syncBadgeText).observe(statusBadge, { childList: true, characterData: true });
                     sel.onchange = () => {
                         window.parent?.postMessage({ type: 'OQ_REQUEST_LOG', minutes: Number(sel.value) }, '*');
                     };
-                    statusBadge.insertAdjacentElement('afterend', sel);
                 }
             }
             const box = document.getElementById('output-box');
