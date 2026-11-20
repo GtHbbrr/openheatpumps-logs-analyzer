@@ -2281,6 +2281,24 @@ if (false) {
                     sendBtn.className = 'w-9 h-9 rounded-full bg-green-600 hover:bg-green-500 text-white flex items-center justify-center flex-shrink-0 shadow transition cursor-pointer';
                 }
             }
+            if (isEmbed) {
+                const statusBadge = document.getElementById('oq-embed-status');
+                if (statusBadge && !document.getElementById('oq-window-select')) {
+                    const sel = document.createElement('select');
+                    sel.id = 'oq-window-select';
+                    sel.title = 'Kies logvenster';
+                    sel.className = 'bg-transparent text-green-300 font-semibold focus:outline-none cursor-pointer ml-1';
+                    [['15','15 min'],['30','30 min'],['60','60 min'],['120','2 uur'],['360','6 uur'],['0','Alles']].forEach(([v,lbl]) => {
+                        const o = document.createElement('option');
+                        o.value = v; o.textContent = lbl; o.className = 'bg-gray-900 text-white';
+                        sel.appendChild(o);
+                    });
+                    sel.onchange = () => {
+                        window.parent?.postMessage({ type: 'OQ_REQUEST_LOG', minutes: Number(sel.value) }, '*');
+                    };
+                    statusBadge.insertAdjacentElement('afterend', sel);
+                }
+            }
             const box = document.getElementById('output-box');
             if (!box) return;
 
