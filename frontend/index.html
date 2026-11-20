@@ -2123,9 +2123,9 @@ function parseMarkdown(tekst) {
             bar.innerHTML = `
                 <div class="flex items-center gap-2">
                     <button type="button" onclick="window.parent?.postMessage({type:'OQ_CLOSE_DRAWER'},'*')" title="Klik om AI-zijpaneel te sluiten" class="font-bold text-orange-400 hover:text-orange-300 hover:underline text-xs whitespace-nowrap inline-flex items-center gap-1 cursor-pointer transition flex-shrink-0"><span>✨ OpenQuatt AI</span><span class="text-xs text-gray-500 font-normal">✕</span></button>
-                    <span id="oq-embed-status" class="text-gray-400 bg-gray-900 border border-gray-800 px-2 py-0.5 rounded">⏳ Wachten op logdata...</span>
+                    <span id="oq-embed-status" class="whitespace-nowrap text-gray-400 bg-gray-900 border border-gray-800 px-2 py-0.5 rounded">⏳ Wachten op logdata...</span>
                 </div>
-                <span class="w-16"></span>
+                
             `;
             document.body.insertBefore(bar, document.body.firstChild);
 
