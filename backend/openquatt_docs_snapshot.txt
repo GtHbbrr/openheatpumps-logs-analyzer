@@ -1,4 +1,4 @@
-[OpenQuatt docs snapshot | fw: v0.59.0 | fetched: 2026-11-21T07:22:21.183Z]
+[OpenQuatt docs snapshot | fw: v0.59.0 | fetched: 2026-11-22T07:02:22.279Z]
 
 ---OPEN ISSUES---
 
@@ -374,7 +374,7 @@ issue #927 (enhancement): [Feature] Neem pompvermogen stilstaande unit mee in af
 
 issue #927 (enhancement): [Feature] Neem pompvermogen stilstaande unit mee in afweging single/duo (Powerhouse) - Bij een Duo telt Power House voor single-kandidaten het pompverbruik van de stilstaande unit mee in de efficiëntievergelijking. Single en Duo worden dan op het werkelijke totaalverbruik vergeleken.
 
-issue #927 (enhancement): [Feature] Neem pompvermogen stilstaande unit mee in afweging single/duo (Powerhouse) - 1. Duo, één compressor draait (single-bedrijf), de andere staat op 0 Hz. 2. Kijk naar het opgenomen vermogen van de stilstaande unit: ~31–41 W, afhankelijk van de flow. 3. Dat verbruik zit niet in de elektrische schatting van de single-kandidaat waarmee Power House Duo vergelijkt.
+issue #927 (enhancement): [Feature] Neem pompvermogen stilstaande unit mee in afweging single/duo (Powerhouse) - 1. Duo, één compressor draait (single-bedrijf), de andere staat op 0 Hz. 2. Kijk naar het opgenomen vermogen van de stilstaande unit: ~31���41 W, afhankelijk van de flow. 3. Dat verbruik zit niet in de elektrische schatting van de single-kandidaat waarmee Power House Duo vergelijkt.
 
 issue #927 (enhancement): [Feature] Neem pompvermogen stilstaande unit mee in afweging single/duo (Powerhouse) - - [ ] User-facing entities/configuratie veranderen - [ ] Runtime/control gedrag verandert mogelijk - [ ] Hardware, Modbus IO, actuator, safety, thermal, boiler, of flow gedrag wordt geraakt - [ ] Ik weet het niet zeker
 
