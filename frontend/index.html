@@ -2349,6 +2349,66 @@ if (false) {
         function setByok(cfg) {
           if (!cfg || !cfg.apiKey) localStorage.removeItem(STORAGE_KEY);
           else localStorage.setItem(STORAGE_KEY, JSON.stringify(cfg));
+          // Herstel opgeslagen systeemprofiel uit localStorage en bewaar wijzigingen automatisch
+          const PROFILE_KEY = 'oq_user_profile_v1';
+          const profFields = ['woning_type', 'afgiftesysteem', 'cv_ketel', 'thermostaat'];
+          try {
+            const savedProf = JSON.parse(localStorage.getItem(PROFILE_KEY) || 'null');
+            if (savedProf) {
+              profFields.forEach(id => { if (savedProf[id] && document.getElementById(id)) document.getElementById(id).value = savedProf[id]; });
+            }
+          } catch (_) {}
+          const saveProfileToStorage = () => {
+            const obj = {};
+            profFields.forEach(id => { const n = document.getElementById(id); if (n) obj[id] = n.value; });
+            localStorage.setItem(PROFILE_KEY, JSON.stringify(obj));
+          };
+          profFields.forEach(id => {
+            const n = document.getElementById(id);
+            if (n) { n.addEventListener('change', saveProfileToStorage); n.addEventListener('input', saveProfileToStorage); }
+          });
+
+          function openProfileModal() {
+            document.getElementById('oq-profile-modal')?.remove();
+            const modal = document.createElement('div');
+            modal.id = 'oq-profile-modal';
+            modal.className = 'fixed inset-0 z-50 bg-black/75 flex items-center justify-center p-4';
+            const card = document.createElement('div');
+            card.className = 'bg-gray-900 border border-gray-700 rounded-xl max-w-md w-full p-5 space-y-3 text-left shadow-2xl text-xs';
+            card.innerHTML = `<div class="flex items-center justify-between"><h3 class="text-sm font-bold text-white">⚙️ Installatie- & systeemprofiel</h3><button type="button" id="prof-close" class="text-gray-400 hover:text-white text-sm cursor-pointer">✕</button></div><p class="text-gray-300">Deze gegevens worden lokaal in je browser bewaard en automatisch meegestuurd bij elke analyse.</p><div id="prof-fields-slot" class="space-y-2.5"></div><div class="flex justify-end pt-2"><button type="button" id="prof-done" class="px-4 py-1.5 rounded-lg bg-green-600 hover:bg-green-500 text-white font-semibold cursor-pointer">Opslaan & sluiten</button></div>`;
+            modal.appendChild(card);
+            document.body.appendChild(modal);
+            const slot = document.getElementById('prof-fields-slot');
+            const placeholders = [];
+            profFields.forEach(id => {
+              const orig = document.getElementById(id);
+              if (!orig) return;
+              const wrap = orig.closest('div') || orig;
+              const ph = document.createComment('ph-' + id);
+              wrap.parentNode.insertBefore(ph, wrap);
+              placeholders.push({ wrap, ph });
+              slot.appendChild(wrap);
+            });
+            const closeAndRestore = () => {
+              saveProfileToStorage();
+              placeholders.forEach(({ wrap, ph }) => ph.parentNode?.insertBefore(wrap, ph));
+              placeholders.forEach(({ ph }) => ph.remove());
+              modal.remove();
+            };
+            document.getElementById('prof-close').onclick = closeAndRestore;
+            document.getElementById('prof-done').onclick = closeAndRestore;
+          }
+
+          if (embedBar) {
+            const pBtn = document.createElement('button');
+            pBtn.type = 'button';
+            pBtn.textContent = '⚙️ Profiel';
+            pBtn.title = 'Woningtype, afgiftesysteem, cv-ketel en thermostaat instellen';
+            pBtn.className = 'text-[11px] bg-gray-800 text-gray-300 border border-gray-700 px-2 py-0.5 rounded-full cursor-pointer hover:border-orange-500 transition whitespace-nowrap';
+            pBtn.onclick = openProfileModal;
+            embedBar.insertBefore(pBtn, embedBar.children[1] || null);
+          }
+
           updateByokBadges();
         }
 
@@ -2357,7 +2417,7 @@ if (false) {
           try {
             const url = typeof input === 'string' ? input : (input?.url || '');
             const cfg = getByok();
-            if (cfg?.apiKey && init?.method?.toUpperCase() === 'POST' && typeof init.body === 'string' && url.includes('workers.dev')) {
+            if (cfg?.apiKey && init?.method?.toUpperCase() === 'POST' && typeof init.body === 'string' && (typeof WORKER_URL !== 'undefined' && url === WORKER_URL)) {
               const parsed = JSON.parse(init.body);
               parsed.byokProvider = cfg.provider || 'openai';
               parsed.byokApiKey = cfg.apiKey;
@@ -2447,6 +2507,66 @@ if (false) {
             b.onclick = openByokModal;
             header.appendChild(b);
           }
+          // Herstel opgeslagen systeemprofiel uit localStorage en bewaar wijzigingen automatisch
+          const PROFILE_KEY = 'oq_user_profile_v1';
+          const profFields = ['woning_type', 'afgiftesysteem', 'cv_ketel', 'thermostaat'];
+          try {
+            const savedProf = JSON.parse(localStorage.getItem(PROFILE_KEY) || 'null');
+            if (savedProf) {
+              profFields.forEach(id => { if (savedProf[id] && document.getElementById(id)) document.getElementById(id).value = savedProf[id]; });
+            }
+          } catch (_) {}
+          const saveProfileToStorage = () => {
+            const obj = {};
+            profFields.forEach(id => { const n = document.getElementById(id); if (n) obj[id] = n.value; });
+            localStorage.setItem(PROFILE_KEY, JSON.stringify(obj));
+          };
+          profFields.forEach(id => {
+            const n = document.getElementById(id);
+            if (n) { n.addEventListener('change', saveProfileToStorage); n.addEventListener('input', saveProfileToStorage); }
+          });
+
+          function openProfileModal() {
+            document.getElementById('oq-profile-modal')?.remove();
+            const modal = document.createElement('div');
+            modal.id = 'oq-profile-modal';
+            modal.className = 'fixed inset-0 z-50 bg-black/75 flex items-center justify-center p-4';
+            const card = document.createElement('div');
+            card.className = 'bg-gray-900 border border-gray-700 rounded-xl max-w-md w-full p-5 space-y-3 text-left shadow-2xl text-xs';
+            card.innerHTML = `<div class="flex items-center justify-between"><h3 class="text-sm font-bold text-white">⚙️ Installatie- & systeemprofiel</h3><button type="button" id="prof-close" class="text-gray-400 hover:text-white text-sm cursor-pointer">✕</button></div><p class="text-gray-300">Deze gegevens worden lokaal in je browser bewaard en automatisch meegestuurd bij elke analyse.</p><div id="prof-fields-slot" class="space-y-2.5"></div><div class="flex justify-end pt-2"><button type="button" id="prof-done" class="px-4 py-1.5 rounded-lg bg-green-600 hover:bg-green-500 text-white font-semibold cursor-pointer">Opslaan & sluiten</button></div>`;
+            modal.appendChild(card);
+            document.body.appendChild(modal);
+            const slot = document.getElementById('prof-fields-slot');
+            const placeholders = [];
+            profFields.forEach(id => {
+              const orig = document.getElementById(id);
+              if (!orig) return;
+              const wrap = orig.closest('div') || orig;
+              const ph = document.createComment('ph-' + id);
+              wrap.parentNode.insertBefore(ph, wrap);
+              placeholders.push({ wrap, ph });
+              slot.appendChild(wrap);
+            });
+            const closeAndRestore = () => {
+              saveProfileToStorage();
+              placeholders.forEach(({ wrap, ph }) => ph.parentNode?.insertBefore(wrap, ph));
+              placeholders.forEach(({ ph }) => ph.remove());
+              modal.remove();
+            };
+            document.getElementById('prof-close').onclick = closeAndRestore;
+            document.getElementById('prof-done').onclick = closeAndRestore;
+          }
+
+          if (embedBar) {
+            const pBtn = document.createElement('button');
+            pBtn.type = 'button';
+            pBtn.textContent = '⚙️ Profiel';
+            pBtn.title = 'Woningtype, afgiftesysteem, cv-ketel en thermostaat instellen';
+            pBtn.className = 'text-[11px] bg-gray-800 text-gray-300 border border-gray-700 px-2 py-0.5 rounded-full cursor-pointer hover:border-orange-500 transition whitespace-nowrap';
+            pBtn.onclick = openProfileModal;
+            embedBar.insertBefore(pBtn, embedBar.children[1] || null);
+          }
+
           updateByokBadges();
         });
       })();
