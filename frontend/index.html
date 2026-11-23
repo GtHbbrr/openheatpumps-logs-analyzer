@@ -2440,7 +2440,7 @@ if (false) {
                 <button type="button" id="byok-close" class="text-gray-400 hover:text-white text-sm cursor-pointer">✕</button>
               </div>
               <p class="text-xs text-gray-300 leading-relaxed">
-                Gebruik je eigen prepaid API-tegoed voor directe antwoorden zonder wachtrij. Je sleutel wordt <strong>alleen in je eigen browser</strong> bewaard en werkt zowel hier als in het zijpaneel naast <code class="text-orange-300">openquatt.local</code>.
+                Gebruik je eigen prepaid API-tegoed voor directe antwoorden zonder wachtrij. Je sleutel wordt <strong>alleen in je eigen browser</strong> bewaard en werkt zowel op <code class="text-orange-300">openheatpumps.nl</code> als in het OpenQuatt AI-zijpaneel.
               </p>
               <div class="space-y-3 text-xs">
                 <div>
@@ -2481,10 +2481,10 @@ if (false) {
           document.querySelectorAll('.oq-byok-trigger').forEach(btn => {
             if (cfg?.apiKey) {
               const name = cfg.provider === 'openai' ? 'OpenAI' : (cfg.provider === 'claude' ? 'Claude' : 'Gemini');
-              btn.textContent = `🔑 ${name} actief`;
+              btn.textContent = `🔑 ${name} actief`; btn.title = `Eigen ${name} API-sleutel actief — klik om te wijzigen of te wissen`;
               btn.className = 'oq-byok-trigger text-[11px] bg-green-950 text-green-300 border border-green-700 px-2 py-0.5 rounded-full cursor-pointer hover:bg-green-900 transition whitespace-nowrap';
             } else {
-              btn.textContent = '🔑 Eigen API-key';
+              btn.textContent = '🔑 Eigen API-key'; btn.title = 'Koppel je eigen OpenAI, Gemini of Claude API-sleutel (BYOK)';
               btn.className = 'oq-byok-trigger text-[11px] bg-gray-800 text-gray-300 border border-gray-700 px-2 py-0.5 rounded-full cursor-pointer hover:border-orange-500 transition whitespace-nowrap';
             }
           });
