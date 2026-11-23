@@ -2300,7 +2300,7 @@ if (false) {
                         o.value = v; o.textContent = lbl; o.className = 'bg-gray-900 text-white';
                         sel.appendChild(o);
                     });
-                    const countSpan = document.createElement('span');
+                    let reqTimer = null; let lastSampleLabel = ''; const countSpan = document.createElement('span');
                     countSpan.id = 'oq-sample-count';
                     countSpan.className = 'text-green-400/80';
                     const syncBadgeText = () => {
@@ -2314,7 +2314,7 @@ if (false) {
                     syncBadgeText();
                     new MutationObserver(syncBadgeText).observe(statusBadge, { childList: true, characterData: true });
                     sel.onchange = () => {
-                        window.parent?.postMessage({ type: 'OQ_REQUEST_LOG', minutes: Number(sel.value) }, '*');
+                        clearTimeout(reqTimer); countSpan.textContent = '• ⏳ laden...'; window.parent?.postMessage({ type: 'OQ_REQUEST_LOG', minutes: Number(sel.value) }, '*'); reqTimer = setTimeout(() => { countSpan.textContent = lastSampleLabel || '• geen extra data'; }, 3000);
                     };
                 }
             }
