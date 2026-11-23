@@ -2499,13 +2499,13 @@ if (false) {
             b.onclick = openByokModal;
             embedBar.insertBefore(b, embedBar.children[1] || null);
           }
-          const header = document.querySelector('header, h1');
+          const vBadge = Array.from(document.querySelectorAll('span, div')).find(el => el.textContent.trim().startsWith('OpenQuatt debug logs analyzer')); const header = vBadge?.parentElement || document.querySelector('header, h1');
           if (header && !document.body.classList.contains('oq-embed-mode')) {
             const b = document.createElement('button');
             b.type = 'button';
             b.className = 'oq-byok-trigger ml-3 align-middle';
             b.onclick = openByokModal;
-            header.appendChild(b);
+            if (vBadge) header.insertBefore(b, vBadge); else header.appendChild(b);
           }
           // Herstel opgeslagen systeemprofiel uit localStorage en bewaar wijzigingen automatisch
           const PROFILE_KEY = 'oq_user_profile_v1';
