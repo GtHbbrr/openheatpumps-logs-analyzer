@@ -17,7 +17,7 @@ Dit document bevat de architectuurregels, het gedeelde dataprotocol en de ontwik
 Bij nieuwe features of bugfixes mogen onderstaande bestaande onderdelen **nooit** worden overschreven, ingekort of verwijderd:
 
 * **BYOK & Privacy (rontend/index.html & ackend/backend_index.js):**
-  * yokProvider (openai | gemini) en yokApiKey worden uitsluitend meegestuurd naar WORKER_URL (https://openheatpumps.nl) en **nooit** naar /share of NEWSFEED_SERVICE.
+  * yokProvider (openai | gemini) en yokApiKey worden uitsluitend meegestuurd naar WORKER_URL (https://api.openheatpumps.nl) en **nooit** naar /share of NEWSFEED_SERVICE.
   * Bij een ingevulde BYOK-sleutel gebruikt de backend die sleutel direct zonder terug te vallen op de gedeelde server-key.
 * **Gecontroleerde 5-modellen rotatie (ackend/backend_index.js):**
   * Gebruik exact één ronde langs de 5 modellen (`gemini-3.8-flash`, `gemini-3.6-flash`, `gemini-3-flash-preview`, `gemini-3.1-flash-lite`, `gemini-3.5-flash-lite`).
