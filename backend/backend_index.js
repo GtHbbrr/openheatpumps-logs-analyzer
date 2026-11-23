@@ -1,4 +1,4 @@
-import openquattDocsSnapshot from "./openquatt_docs_snapshot.txt";
+﻿import openquattDocsSnapshot from "./openquatt_docs_snapshot.txt";
 
 // ====================================================================
 // HULPFUNCTIES VOOR TOKENBESPARING (SNAPSHOT & DELTA-LOG)
@@ -338,7 +338,7 @@ STRIKTE GEBRUIKERSCONTEXT:
 * Aanwezige CV-ketel: ${userProfile?.cv_ketel || "GEEN KETEL AANWEZIG"}
 * Thermostaat: ${userProfile?.thermostaat || "Onbekend"}`;
 
-      const userKey = typeof body?.byokApiKey === "string" ? body.byokApiKey.trim() : ""; const userProvider = userKey ? (body?.byokProvider === "openai" ? "openai" : "gemini") : ""; const logVoorAi = isAlleenAfbeelding
+      const userKey = typeof body?.byokApiKey === "string" ? body.byokApiKey.trim() : ""; const userProvider = userKey ? (["openai", "claude"].includes(body?.byokProvider) ? body.byokProvider : "gemini") : ""; const logVoorAi = isAlleenAfbeelding
         ? { info: "Geen .oqdebug.json logbestand meegestuurd; analyseer op basis van de meegestuurde afbeelding(en) en gebruikersvraag." }
         : bereidLogVoorAi(logData);
       const systemInstruction = bouwSystemInstruction(logVoorAi);
@@ -440,7 +440,52 @@ STRIKTE GEBRUIKERSCONTEXT:
               }
             }
 
-            for (const model of (gelukt || (userKey && userProvider === "openai") ? [] : geselecteerdeModellen)) {
+            if (userKey && userProvider === "claude") {
+              gebruiktModel = "claude-sonnet-4-5 (eigen Anthropic key)";
+              await writer.write(encoder.encode(`---MODEL_TRY---${JSON.stringify({ model: "CLAUDE SONNET 4.5", attempt: 1 })}---\n`));
+              const claudeMessages = [];
+              for (const msg of contents) {
+                const role = msg.role === "model" ? "assistant" : "user";
+                const parts = Array.isArray(msg.parts) ? msg.parts : [];
+                const contentArr = [];
+                for (const p of parts) {
+                  if (p.text) contentArr.push({ type: "text", text: p.text });
+                  if (p.inlineData?.data && p.inlineData?.mimeType) {
+                    contentArr.push({
+                      type: "image",
+                      source: { type: "base64", media_type: p.inlineData.mimeType, data: p.inlineData.data }
+                    });
+                  }
+                }
+                if (contentArr.length > 0) claudeMessages.push({ role, content: contentArr });
+              }
+              const claudeRes = await fetch(['https://api.', 'anthropic', '.com/v1/messages'].join(''), {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  "x-api-key": userKey,
+                  "anthropic-version": "2023-06-01"
+                },
+                body: JSON.stringify({
+                  model: "claude-sonnet-4-5",
+                  max_tokens: 4096,
+                  temperature: 0.3,
+                  system: systemInstruction,
+                  messages: claudeMessages
+                })
+              });
+              const claudeData = await claudeRes.json().catch(() => null);
+              const claudeText = Array.isArray(claudeData?.content) ? claudeData.content.find(c => c.type === "text")?.text : null;
+              if (claudeRes.ok && claudeText) {
+                geminiJson = { candidates: [{ content: { parts: [{ text: claudeText }] } }] };
+                gelukt = true;
+              } else {
+                const errMsg = claudeData?.error?.message || `HTTP ${claudeRes.status}`;
+                geminiJson = { error: { message: `Anthropic Claude API fout: ${errMsg}` } };
+              }
+            }
+
+            for (const model of (gelukt || (userKey && (userProvider === "openai" || userProvider === "claude")) ? [] : geselecteerdeModellen)) {
               if (Date.now() - startTijd >= 42000) break;
               pogingNr++;
               gebruiktModel = model;

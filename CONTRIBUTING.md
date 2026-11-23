@@ -1,4 +1,4 @@
-﻿# Contributing & AI Development Guidelines — OpenHeatPumps Logs Analyzer (v0.24.0)
+﻿# Contributing & AI Development Guidelines — OpenHeatPumps Logs Analyzer (v0.25.0)
 
 Dit document bevat de architectuurregels, het gedeelde dataprotocol en de ontwikkelafspraken voor **`openheatpumps-logs-analyzer`** (`openheatpumps.nl`). Zowel menselijke bijdragers als AI-code-assistenten (Cursor, Windsurf, Claude Code, etc.) moeten deze regels strikt volgen.
 

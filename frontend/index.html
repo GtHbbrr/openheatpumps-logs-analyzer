@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="nl">
 <head>
     <script>if (location.hostname === 'test-oqai.openheatpumps.nl' && (location.pathname === '/' || location.pathname === '')) { location.replace('/bookmarklet.html' + location.search); }
@@ -19,7 +19,7 @@
             <div class="max-w-6xl mx-auto flex justify-between items-center">
                 <h1 class="text-xl font-bold text-orange-500 tracking-wide">OpenHeatPumps <span class="text-xs text-gray-400 font-normal">AI Analytics</span></h1>
                 <div class="flex items-center space-x-3">
-                    <span class="bg-orange-950 text-orange-400 border border-orange-800 text-xs px-2 py-1 rounded">OpenQuatt debug logs analyzer v0.24.0</span>
+                    <span class="bg-orange-950 text-orange-400 border border-orange-800 text-xs px-2 py-1 rounded">OpenQuatt debug logs analyzer v0.25.0</span>
                 </div>
             </div>
 
@@ -2447,12 +2447,12 @@ if (false) {
                   <label class="block text-gray-400 mb-1">Aanbieder</label>
                   <select id="byok-provider" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white">
                     <option value="openai" ${cur.provider === 'openai' ? 'selected' : ''}>OpenAI (ChatGPT / GPT-4o)</option>
-                    <option value="gemini" ${cur.provider === 'gemini' ? 'selected' : ''}>Google AI Studio (Gemini)</option>
+                    <option value="gemini" ${cur.provider === 'gemini' ? 'selected' : ''}>Google AI Studio (Gemini)</option><option value="claude" ${cur.provider === 'claude' ? 'selected' : ''}>Anthropic (Claude Sonnet 4.5)</option>
                   </select>
                 </div>
                 <div>
                   <label class="block text-gray-400 mb-1">API-sleutel</label>
-                  <input id="byok-key" type="password" value="${cur.apiKey || ''}" placeholder="sk-... of AIza..." class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white font-mono">
+                  <input id="byok-key" type="password" value="${cur.apiKey || ''}" placeholder="sk-..., AIza... of sk-ant-..." class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white font-mono">
                 </div>
               </div>
               <div class="flex items-center justify-between pt-2">
@@ -2480,7 +2480,7 @@ if (false) {
           const cfg = getByok();
           document.querySelectorAll('.oq-byok-trigger').forEach(btn => {
             if (cfg?.apiKey) {
-              const name = cfg.provider === 'openai' ? 'OpenAI' : 'Gemini';
+              const name = cfg.provider === 'openai' ? 'OpenAI' : (cfg.provider === 'claude' ? 'Claude' : 'Gemini');
               btn.textContent = `🔑 ${name} actief`;
               btn.className = 'oq-byok-trigger text-[11px] bg-green-950 text-green-300 border border-green-700 px-2 py-0.5 rounded-full cursor-pointer hover:bg-green-900 transition whitespace-nowrap';
             } else {

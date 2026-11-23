@@ -1,4 +1,4 @@
-﻿# OpenHeatPumps Logs Analyzer (`openheatpumps.nl`) — v0.24.0
+﻿# OpenHeatPumps Logs Analyzer (`openheatpumps.nl`) — v0.25.0
 
 Publieke eerstelijns AI-diagnosetool en zelfhulpschil voor **[OpenQuatt](https://github.com)**-gebruikers. Warmtepompbezitters kunnen hiermee hun `.oqdebug.json` logbestanden en screenshots van instellingen of grafieken direct laten analyseren in begrijpelijk Nederlands, gekoppeld aan de actuele OpenQuatt-documentatie.
 
