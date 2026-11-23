@@ -1,2 +1,3 @@
 ﻿# OpenHeatPumps Logs Analyzer (`openheatpumps.nl`) — v0.24.0
-Zie de volledige bijgewerkte documentatie en configuratie-instructies in de gerefereerde bronnen.
+
+Publieke eerstelijns AI-diagnosetool en zelfhulpschil voor OpenQuatt-gebruikers. De volledige documentatie, architectuur, BYOK-instellingen (OpenAI/Gemini), het zijpaneel en instructies zijn te vinden in de gerefereerde bronnen.
