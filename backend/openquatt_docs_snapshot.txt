@@ -1,4 +1,4 @@
-[OpenQuatt docs snapshot | fw: v0.61.0 | fetched: 2026-11-23T11:52:09.982Z]
+[OpenQuatt docs snapshot | fw: v0.61.0 | fetched: 2026-11-25T08:47:53.129Z]
 
 ---OPEN ISSUES---
 
